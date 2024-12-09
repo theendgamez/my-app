@@ -1,6 +1,5 @@
 // app/login/page.tsx
 "use client";
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navber';
@@ -18,11 +17,11 @@ export default function LoginPage() {
     });
 
     if (response.ok) {
-      const { token } = await response.json();
-      localStorage.setItem('token', token);  // 儲存 JWT token
-      router.push('/');  // 導向首頁
+      // Handle successful login (e.g., store token, redirect)
+      router.push('/'); // Redirect to the homepage
     } else {
-      alert('登入失敗，請檢查帳號和密碼');
+      const errorData = await response.json();
+      alert(`登入失敗，請檢查帳號和密碼。錯誤信息：${errorData.message}`);
     }
   };
 
