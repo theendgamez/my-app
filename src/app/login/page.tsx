@@ -1,5 +1,6 @@
-// app/login/page.tsx
+// src/app/login/page.tsx
 "use client";
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navber';
@@ -17,8 +18,9 @@ export default function LoginPage() {
     });
 
     if (response.ok) {
-      // Handle successful login (e.g., store token, redirect)
-      router.push('/'); // Redirect to the homepage
+      const data = await response.json();
+      localStorage.setItem('user', JSON.stringify(data.user));
+      router.push('/'); // 登入成功後導向首頁
     } else {
       const errorData = await response.json();
       alert(`登入失敗，請檢查帳號和密碼。錯誤信息：${errorData.message}`);
@@ -28,12 +30,12 @@ export default function LoginPage() {
   return (
     <>
       <Navbar />
-      <div className="p-8 flex items-center justify-center min-h-screen border border-black rounded-lg">
-        <div className="max-w-lg w-full border border-black rounded-lg p-6">
+      <div className="p-8 flex items-center justify-center min-h-screen">
+        <div className="max-w-md w-full border border-black rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-4 text-center text-blue-500">登入</h1>
           <input
             type="email"
-            placeholder="Email"
+            placeholder="電子郵件"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="border border-black p-2 w-full mb-4 rounded"

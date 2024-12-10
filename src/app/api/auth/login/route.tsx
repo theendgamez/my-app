@@ -1,35 +1,46 @@
-// app/api/auth/login/route.ts
 import { NextResponse } from 'next/server';
-import AWS from 'aws-sdk';
+import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
 import bcrypt from 'bcrypt';
 
-const dynamoDB = new AWS.DynamoDB.DocumentClient( {region: 'ap-southeast-1' });
+const client = new DynamoDBClient({ region: 'ap-southeast-1' });
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();
 
   try {
-    // Fetch user from DynamoDB
+    // 查詢 GSI
     const params = {
-      TableName: 'user',
-      Key: { email },
+      TableName: 'Users',
+      IndexName: 'email-index', // 使用 GSI
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: {
+        ':email': { S: email },
+      },
     };
 
-    const data = await dynamoDB.get(params).promise();
+    const command = new QueryCommand(params);
+    const data = await client.send(command);
 
-    if (!data.Item) {
+    // 檢查是否找到用戶
+    if (!data.Items || data.Items.length === 0) {
       return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }
 
-    // Compare passwords
-    const match = await bcrypt.compare(password, data.Item.passwordHash);
+    // 提取用戶數據
+    const userItem = unmarshall(data.Items[0]);
+    const passwordHash = userItem.passwordHash;
+
+    // 驗證密碼
+    const match = await bcrypt.compare(password, passwordHash);
+
     if (!match) {
       return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }
 
-    // TODO: Generate a token or session as needed
-
-    return NextResponse.json({ message: 'Login successful' });
+    // 返回成功響應，包含使用者資訊
+    delete userItem.passwordHash;
+    return NextResponse.json({ message: 'Login successful', user: userItem }, { status: 200 });
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
