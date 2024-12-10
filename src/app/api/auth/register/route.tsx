@@ -11,34 +11,34 @@ const client = new DynamoDBClient({
 });
 
 export async function POST(request: Request) {
-  const { userName,email, password, phoneNumber } = await request.json();
+  const { userName, email, password, phoneNumber } = await request.json();
 
   try {
     const wallet = ethers.Wallet.createRandom();
     const blockchainAddress = wallet.address;
 
     const params = {
-        TableName: 'Users',
-        Item: marshall(
-            {
-                userId: blockchainAddress,
-                userName: userName,
-                email: email,
-                passwordHash: await bcrypt.hash(password, 10),
-                phoneNumber: phoneNumber,
-                isPhoneVerified: false,
-                createdAt: new Date().toISOString(),
-                role: 'user',
-            },
-            { removeUndefinedValues: true }
-        ),
+      TableName: 'Users',
+      Item: marshall(
+        {
+          userId: blockchainAddress,
+          userName: userName,
+          email: email,
+          passwordHash: await bcrypt.hash(password, 10),
+          phoneNumber: phoneNumber,
+          isPhoneVerified: false,
+          createdAt: new Date().toISOString(),
+          role: 'user',
+        },
+        { removeUndefinedValues: true }
+      ),
     };
 
     const command = new PutItemCommand(params);
     await client.send(command);
 
     return NextResponse.json(
-      { message: 'User registered', userId: blockchainAddress },
+      { message: 'User registered successfully', userId: blockchainAddress },
       { status: 201 }
     );
   } catch (error) {

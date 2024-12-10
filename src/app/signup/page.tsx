@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navber';
 
 export default function SignUpPage() {
-const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const[phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const router = useRouter();
 
 
@@ -17,7 +17,7 @@ const [userName, setUserName] = useState('');
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ userName, email, password, phoneNumber}),
     });
 
     if (response.ok) {
@@ -37,7 +37,7 @@ const [userName, setUserName] = useState('');
         <div className="max-w-md w-full border border-black rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-4 text-center text-blue-500">註冊</h1>
           <input
-            type="userName"
+            type="text"
             placeholder="用戶名稱"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
@@ -50,13 +50,13 @@ const [userName, setUserName] = useState('');
             onChange={(e) => setEmail(e.target.value)}
             className="border border-black p-2 w-full mb-4 rounded"
           />
-            <input
-                type="text"
-                placeholder="電話號碼"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="border border-black p-2 w-full mb-4 rounded"
-            />
+          <input
+            type="text"
+            placeholder="電話號碼"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="border border-black p-2 w-full mb-4 rounded"
+          />
           <input
             type="password"
             placeholder="密碼"
