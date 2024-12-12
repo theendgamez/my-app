@@ -1,10 +1,9 @@
 // components/Navbar.tsx
-"use client";
-
+'use client'
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User } from '../types/User';
+import { User } from '../types/index';
 
 
 export default function Navbar() {

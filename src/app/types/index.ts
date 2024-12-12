@@ -7,5 +7,4 @@ export interface User {
   isPhoneVerified: boolean;
   createdAt: string;
   role: string;
-  // Add other properties if needed
 }
