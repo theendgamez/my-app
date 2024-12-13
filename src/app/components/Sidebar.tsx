@@ -1,0 +1,33 @@
+"use client";
+
+import Link from 'next/link';
+import { FiHome, FiTrendingUp, FiCompass, FiSettings } from 'react-icons/fi';
+
+type SidebarProps = object;
+
+const Sidebar: React.FC<SidebarProps> = () => {
+  const menuItems = [
+    { name: '首頁', icon: FiHome, href: '/' },
+    { name: '趨勢', icon: FiTrendingUp, href: '/trending' },
+    { name: '探索', icon: FiCompass, href: '/explore' },
+    { name: '設定', icon: FiSettings, href: '/settings' },
+  ];
+
+  return (
+    <div className="w-64 bg-gray-800 text-white h-full fixed">
+      <div className="flex items-center justify-center h-16 border-b border-gray-700">
+        <h2 className="text-xl font-bold">管理員面板</h2>
+      </div>
+      <nav className="mt-4">
+        {menuItems.map((item) => (
+          <Link href={item.href} key={item.name} className="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white">
+            <item.icon className="h-6 w-6 mr-3" />
+            {item.name}
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
+};
+
+export default Sidebar;

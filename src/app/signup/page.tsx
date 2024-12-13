@@ -3,7 +3,7 @@
 
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import Navbar from "../components/Navber";
+import Navbar from "../components/Navbar";
 
 interface FormData {
   userName: string;
@@ -46,62 +46,94 @@ export default function SignUpPage() {
   return (
     <>
       <Navbar />
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="max-w-md w-full border border-black rounded-lg p-6">
-          <h1 className="text-2xl font-bold mb-4 text-center text-blue-500">註冊</h1>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <input
-              type="text"
-              placeholder="用戶名稱"
-              {...register("userName", { required: "用戶名稱是必填的。", maxLength: 20,minLength:1 })}
-              className="border border-black p-2 w-full mb-1 rounded"
-            />
-            {errors.userName && <p className="text-red-500 text-sm mb-3">{errors.userName.message}</p>}
+      <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-sm">
+          <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900">註冊</h2>
+        </div>
 
-            <input
-              type="email"
-              placeholder="電子郵件"
-              {...register("email", {
-                required: "電子郵件是必填的。",
-                maxLength: 25,
-                pattern: {
-                  value: /^\S+@\S+$/i,
-                  message: "電子郵件格式不正確。",
-                }
-              })}
-              className="border border-black p-2 w-full mb-1 rounded"
-            />
-            {errors.email && <p className="text-red-500 text-sm mb-3">{errors.email.message}</p>}
+        <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <label className="block text-sm/6 font-medium text-gray-900">
+                用戶名稱
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  placeholder="用戶名稱"
+                  {...register("userName", { required: "用戶名稱是必填的。", maxLength: 20, minLength: 1 })}
+                  className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                {errors.userName && <p className="text-red-500 text-sm mb-3">{errors.userName.message}</p>}
+              </div>
+            </div>
 
-            <input
-              type="text"
-              placeholder="電話號碼"
-              {...register("phoneNumber", { required: "電話號碼是必填的。" })}
-              className="border border-black p-2 w-full mb-1 rounded"
-            />
-            {errors.phoneNumber && <p className="text-red-500 text-sm mb-3">{errors.phoneNumber.message}</p>}
+            <div>
+              <label className="block text-sm/6 font-medium text-gray-900">
+                電子郵件
+              </label>
+              <div className="mt-2">
+                <input
+                  type="email"
+                  placeholder="電子郵件"
+                  {...register("email", {
+                    required: "電子郵件是必填的。",
+                    maxLength: 25,
+                    pattern: {
+                      value: /^\S+@\S+$/i,
+                      message: "電子郵件格式不正確。",
+                    }
+                  })}
+                  className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                {errors.email && <p className="text-red-500 text-sm mb-3">{errors.email.message}</p>}
+              </div>
+            </div>
 
-            <input
-              type="password"
-              placeholder="密碼"
-              {...register("password", {
-                required: "密碼是必填的。",
-                minLength: { value: 6, message: "密碼至少需要6個字符。" },
-                validate: {
-                  hasUpperCase: value => /[A-Z]/.test(value) || "密碼必須包含至少一個大寫字母。",
-                  hasLowerCase: value => /[a-z]/.test(value) || "密碼必須包含至少一個小寫字母。",
-                },
-              })}
-              className="border border-black p-2 w-full mb-1 rounded"
-            />
-            {errors.password && <p className="text-red-500 text-sm mb-3">{errors.password.message}</p>}
+            <div>
+              <label className="block text-sm/6 font-medium text-gray-900">
+                電話號碼
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  placeholder="電話號碼"
+                  {...register("phoneNumber", { required: "電話號碼是必填的。" })}
+                  className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                {errors.phoneNumber && <p className="text-red-500 text-sm mb-3">{errors.phoneNumber.message}</p>}
+              </div>
+            </div>
 
+            <div>
+              <label className="block text-sm/6 font-medium text-gray-900">
+                密碼
+              </label>
+              <div className="mt-2">
+                <input
+                  type="password"
+                  placeholder="密碼"
+                  {...register("password", {
+                    required: "密碼是必填的。",
+                    minLength: { value: 6, message: "密碼至少需要6個字符。" },
+                    validate: {
+                      hasUpperCase: value => /[A-Z]/.test(value) || "密碼必須包含至少一個大寫字母。",
+                      hasLowerCase: value => /[a-z]/.test(value) || "密碼必須包含至少一個小寫字母。",
+                    },
+                  })}
+                  className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                {errors.password && <p className="text-red-500 text-sm mb-3">{errors.password.message}</p>}
+              </div>
+            </div>
+            <div>
             <button
               type="submit"
-              className="bg-blue-500 text-white p-2 rounded w-full border border-black"
+              className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               註冊
             </button>
+          </div>
           </form>
         </div>
       </div>
