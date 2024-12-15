@@ -3,11 +3,7 @@
 import { useEffect, useState } from 'react';
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
-
-interface User {
-  role: string;
-  // 可以根据需要添加其他用户属性
-}
+import { User } from './types/index';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -23,15 +19,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex">
-      {/* 当用户是管理员时显示 Sidebar */}
+      {/* 當用戶是管理員時顯示 Sidebar */}
       {isAdmin && <Sidebar />}
 
-      {/* 主内容区域 */}
+      {/* 主內容區域 */}
       <div className={`flex-1 flex flex-col ${isAdmin ? 'ml-64' : 'ml-0'}`}>
-        <Navbar />
+        <Navbar userName={user?.userName} />
         <main className="p-8">
           <h1 className="text-2xl font-bold mb-4 text-blue-500">即將舉行的演唱會</h1>
-          {/* 其他内容，例如演唱會列表 */}
+          {/* 其他內容，例如演唱會列表 */}
         </main>
       </div>
     </div>

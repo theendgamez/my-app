@@ -3,7 +3,9 @@ import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
 import { unmarshall } from '@aws-sdk/util-dynamodb';
 import bcrypt from 'bcrypt';
 
-const client = new DynamoDBClient({ region: 'ap-southeast-1' });
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION,
+});
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();

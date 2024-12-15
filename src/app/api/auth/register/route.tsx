@@ -1,71 +1,107 @@
-// src/app/api/auth/register/route.ts
+// app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
 import { DynamoDBClient, PutItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb';
 import { ethers } from 'ethers';
 import bcrypt from 'bcrypt';
-import { marshall } from '@aws-sdk/util-dynamodb';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
 });
 
-// Function to check if email is unique
-async function isEmailUnique(email: string): Promise<boolean> {
-  const params = {
-    TableName: 'Users',
-    IndexName: 'email-index', // Ensure this GSI exists on your DynamoDB table
-    KeyConditionExpression: 'email = :email',
-    ExpressionAttributeValues: marshall({
-      ':email': email,
-    }),
-    Limit: 1,
+const ticketingEmail = process.env.TICKETING_EMAIL;
+const ticketingPass = process.env.TICKETING_PASSWORD;
+
+// Function to send verification code via email
+async function sendVerificationCode(email: string, verificationCode: string) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: ticketingEmail,
+      pass: ticketingPass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  const mailOptions = {
+    from: ticketingEmail,
+    to: email,
+    subject: '您的驗證碼',
+    html: `<p>感謝您的註冊！以下是您的驗證碼：</p>
+           <h3>${verificationCode}</h3>
+           <p>請在 10 分鐘內完成驗證。</p>`,
   };
 
-  const command = new QueryCommand(params);
-  const result = await client.send(command);
-  return (result.Count || 0) === 0;
+  await transporter.sendMail(mailOptions);
 }
 
 export async function POST(request: Request) {
-  const { userName, email, password, phoneNumber } = await request.json();
-
   try {
-    // Check if the email is unique
-    const emailIsUnique = await isEmailUnique(email);
-    if (!emailIsUnique) {
+    const { userName, email, password, phoneNumber } = await request.json();
+
+    // 確保 email 是唯一的
+    const params = {
+      TableName: 'Users',
+      IndexName: 'email-index',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: {
+        ':email': { S: email },
+      },
+      Limit: 1,
+    };
+
+    const queryCommand = new QueryCommand(params);
+    const queryResult = await client.send(queryCommand);
+    if (queryResult.Count && queryResult.Count > 0) {
       return NextResponse.json({ error: '該電子郵件已被註冊。' }, { status: 400 });
     }
 
-    // Proceed with user registration
+    // 創建區塊鏈地址
     const wallet = ethers.Wallet.createRandom();
     const blockchainAddress = wallet.address;
 
-    const params = {
+    // 密碼加密
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 生成用戶 ID
+    const userId = crypto.randomBytes(16).toString('hex');
+
+    // 儲存用戶數據到 DynamoDB
+    const putParams = {
       TableName: 'Users',
-      Item: marshall(
-        {
-          userId: blockchainAddress,
-          userName,
-          email,
-          passwordHash: await bcrypt.hash(password, 10),
-          phoneNumber,
-          isPhoneVerified: false,
-          createdAt: new Date().toISOString(),
-          role: 'user',
-        },
-        { removeUndefinedValues: true }
-      ),
+      Item: {
+        userId: { S: userId },
+        userName: { S: userName },
+        email: { S: email },
+        password: { S: hashedPassword },
+        phoneNumber: { S: phoneNumber },
+        blockchainAddress: { S: blockchainAddress },
+        isEmailVerified: { BOOL: false },
+        verificationCode: { S: verificationCode },
+        createdAt: { S: new Date().toISOString() },
+        role: { S: 'user' },
+      },
     };
 
-    const command = new PutItemCommand(params);
-    await client.send(command);
+    const putCommand = new PutItemCommand(putParams);
+    await client.send(putCommand);
 
-    return NextResponse.json(
-      { message: 'User registered successfully', userId: blockchainAddress },
-      { status: 201 }
-    );
+    // 發送驗證碼
+    await sendVerificationCode(email, verificationCode);
+
+    return NextResponse.json({ message: '註冊成功，驗證碼已發送至您的電子郵件。' }, { status: 201 });
   } catch (error) {
-    console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (error instanceof Error) {
+      console.error('Registration error:', error.message);
+    } else {
+      console.error('Registration error:', error);
+    }
+    return NextResponse.json({ error: '內部伺服器錯誤' }, { status: 500 });
   }
 }

@@ -1,16 +1,16 @@
 "use client";
 
 import Link from 'next/link';
-import { FiHome, FiTrendingUp, FiCompass, FiSettings } from 'react-icons/fi';
+import { FaHome, FaPlusCircle, FaRandom, FaCog } from 'react-icons/fa';
 
 type SidebarProps = object;
 
 const Sidebar: React.FC<SidebarProps> = () => {
   const menuItems = [
-    { name: '首頁', icon: FiHome, href: '/' },
-    { name: '趨勢', icon: FiTrendingUp, href: '/trending' },
-    { name: '探索', icon: FiCompass, href: '/explore' },
-    { name: '設定', icon: FiSettings, href: '/settings' },
+    { name: '首頁', icon: FaHome, href: '/' },
+    { name: '建立活動', icon: FaPlusCircle, href: '/create-event' },
+    { name: '抽籤', icon: FaRandom, href: '/lottery' },
+    { name: '管理', icon: FaCog, href: '/settings' },
   ];
 
   return (
@@ -20,7 +20,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
       </div>
       <nav className="mt-4">
         {menuItems.map((item) => (
-          <Link href={item.href} key={item.name} className="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white">
+          <Link
+            href={item.href}
+            key={item.name}
+            className="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white"
+          >
             <item.icon className="h-6 w-6 mr-3" />
             {item.name}
           </Link>
