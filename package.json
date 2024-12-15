@@ -20,6 +20,7 @@
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
     "ethers": "^6.13.4",
+<<<<<<< HEAD
     "ethers-utils": "^2.1.11",
     "jsonwebtoken": "^9.0.2",
     "mailersend": "^2.3.0",
@@ -27,6 +28,11 @@
     "nodemailer": "^6.9.16",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+=======
+    "next": "15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "19.0.0-rc-66855b96-20241106",
+>>>>>>> 0aa80bc826f04029f0eaab65586088b21c68d978
     "react-hook-form": "^7.54.0",
     "react-icons": "^5.4.0",
     "utils": "^0.3.1"
