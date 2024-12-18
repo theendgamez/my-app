@@ -4,7 +4,7 @@ import { DynamoDBClient, PutItemCommand, QueryCommand } from '@aws-sdk/client-dy
 import { ethers } from 'ethers';
 import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -69,14 +69,12 @@ export async function POST(request: Request) {
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 生成用戶 ID
-    const userId = crypto.randomBytes(16).toString('hex');
 
     // 儲存用戶數據到 DynamoDB
     const putParams = {
       TableName: 'Users',
       Item: {
-        userId: { S: userId },
+        userId: { S: uuidv4() },
         userName: { S: userName },
         email: { S: email },
         password: { S: hashedPassword },

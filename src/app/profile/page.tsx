@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '../components/Navbar';
 import { useRouter } from 'next/navigation';
-import { User } from '../types/index';
+import { Users } from '../api/types/index';
 
 interface FormData {
   userName: string;
@@ -15,7 +15,7 @@ interface FormData {
 
 export default function ProfilePage() {
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Users | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const router = useRouter();
@@ -23,7 +23,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      const parsedUser: User = JSON.parse(storedUser);
+      const parsedUser: Users = JSON.parse(storedUser);
       setUser(parsedUser);
       setValue('userName', parsedUser.userName || '');
       setValue('email', parsedUser.email || '');

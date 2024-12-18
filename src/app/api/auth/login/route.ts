@@ -11,10 +11,9 @@ export async function POST(request: Request) {
   const { email, password } = await request.json();
 
   try {
-    // 查詢 GSI
     const params = {
       TableName: 'Users',
-      IndexName: 'email-index', // 使用 GSI
+      IndexName: 'email-index',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: {
         ':email': { S: email },
@@ -24,25 +23,23 @@ export async function POST(request: Request) {
     const command = new QueryCommand(params);
     const data = await client.send(command);
 
-    // 檢查是否找到用戶
     if (!data.Items || data.Items.length === 0) {
-      return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
+      return NextResponse.json({ message: '帳號或密碼不正確' }, { status: 401 });
     }
 
-    // 提取用戶數據
     const userItem = unmarshall(data.Items[0]);
-    const passwordHash = userItem.passwordHash;
-
-    // 驗證密碼
-    const match = await bcrypt.compare(password, passwordHash);
+    const match = await bcrypt.compare(password, userItem.password);
 
     if (!match) {
-      return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
+      return NextResponse.json({ message: '帳號或密碼不正確' }, { status: 401 });
     }
 
-    // 返回成功響應，包含使用者資訊
-    delete userItem.passwordHash;
-    return NextResponse.json({ message: 'Login successful', user: userItem }, { status: 200 });
+    delete userItem.password;
+    const userCookie = JSON.stringify(userItem);
+
+    const response = NextResponse.json({ message: '登入成功', user: userItem }, { status: 200 });
+    response.cookies.set('user', userCookie, { path: '/', httpOnly: true, secure: true });
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

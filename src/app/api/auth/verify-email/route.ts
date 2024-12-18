@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const jwtSecret = process.env.JWT_SECRET!;
-const jwtExpiry = '1h'; // 可配置過期時間
+const jwtExpiry = '1h'; // Configurable expiry time
 
 export async function POST(request: Request) {
   try {
@@ -15,14 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '驗證令牌缺失。' }, { status: 400 });
     }
 
-    // 查詢用戶信息
     const params = {
       TableName: 'Users',
-      IndexName: 'verificationCode-index', // 確保 GSI 存在
+      IndexName: 'verificationCode-index',
       KeyConditionExpression: 'verificationCode = :token',
-      ExpressionAttributeValues: marshall({
-        ':token': token,
-      }),
+      ExpressionAttributeValues: marshall({ ':token': token }),
       Limit: 1,
     };
 
@@ -32,7 +29,6 @@ export async function POST(request: Request) {
     if (result.Items && result.Items.length > 0) {
       const user = unmarshall(result.Items[0]);
 
-      // 更新使用者資料，設置 isEmailVerified 為 true 並移除 verificationCode
       const updateParams = {
         TableName: 'Users',
         Key: marshall({ userId: user.userId }),
@@ -43,23 +39,22 @@ export async function POST(request: Request) {
       const updateCommand = new UpdateItemCommand(updateParams);
       await client.send(updateCommand);
 
-      // 生成 JWT
       const authToken = jwt.sign(
         { userId: user.userId, email: user.email, role: user.role },
         jwtSecret,
         { expiresIn: jwtExpiry }
       );
 
-      return NextResponse.json({ 
-        message: '驗證成功！', 
-        token: authToken, 
-        user: { 
-          userId: user.userId, 
-          userName: user.userName || user.name, // Try both userName and name
-          email: user.email, 
+      return NextResponse.json({
+        message: '驗證成功！',
+        token: authToken,
+        user: {
+          userId: user.userId,
+          userName: user.userName || user.name,
+          email: user.email,
           role: user.role,
           phoneNumber: user.phoneNumber,
-        } 
+        },
       }, { status: 200 });
     } else {
       return NextResponse.json({ error: '無效的驗證令牌。' }, { status: 400 });

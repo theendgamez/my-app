@@ -17,6 +17,7 @@ export default async function Home() {
       {/* 主內容區域 */}
       <div className={`flex-1 flex flex-col ${isAdmin ? 'ml-64' : 'ml-0'}`}>
         <Navbar userName={user?.userName} />
+        
         <main className="p-8">
           <h1 className="text-2xl font-bold mb-4 text-blue-500">即將舉行的演唱會</h1>
           {/* 其他內容，例如演唱會列表 */}
