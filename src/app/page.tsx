@@ -1,21 +1,13 @@
-"use client";
+import { cookies } from 'next/headers';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 
-import { useEffect, useState } from 'react';
-import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
-import { User } from './types/index';
-
-export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
+export default async function Home() {
+  const cookieStore = await cookies();
+  const userCookie = cookieStore.get('user');
+  const user = userCookie ? JSON.parse(userCookie.value) : null;
   const isAdmin = user?.role === 'admin';
+
 
   return (
     <div className="min-h-screen flex">

@@ -10,8 +10,8 @@ const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
 });
 
-const ticketingEmail = process.env.TICKETING_EMAIL;
-const ticketingPass = process.env.TICKETING_PASSWORD;
+const ticketingEmail = process.env.SMTP_EMAIL;
+const ticketingPass = process.env.SMTP_PASSWORD;
 
 // Function to send verification code via email
 async function sendVerificationCode(email: string, verificationCode: string) {
