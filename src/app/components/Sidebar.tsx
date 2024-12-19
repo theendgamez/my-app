@@ -8,13 +8,13 @@ type SidebarProps = object;
 const Sidebar: React.FC<SidebarProps> = () => {
   const menuItems = [
     { name: '首頁', icon: FaHome, href: '/' },
-    { name: '建立活動', icon: FaPlusCircle, href: '/create-event' },
+    { name: '建立活動', icon: FaPlusCircle, href: '/admin/create-event' },
     { name: '抽籤', icon: FaRandom, href: '/lottery' },
     { name: '管理', icon: FaCog, href: '/settings' },
   ];
 
   return (
-    <div className="w-64 bg-gray-800 text-white h-full fixed">
+    <div className="w-64 bg-gray-800 text-white h-[calc(100vh-4rem)] fixed left-0 top-16">
       <div className="flex items-center justify-center h-16 border-b border-gray-700">
         <h2 className="text-xl font-bold">管理員面板</h2>
       </div>
