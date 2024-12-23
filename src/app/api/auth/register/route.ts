@@ -1,6 +1,6 @@
 // app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
-import { DynamoDBClient, PutItemCommand} from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb';
 import { ethers } from 'ethers';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,6 +12,7 @@ const client = new DynamoDBClient({
 });
 
 export async function POST(request: Request) {
+  let userId: string | undefined;
   try {
     const { userName, email, password, phoneNumber } = await request.json();
 
@@ -28,10 +29,11 @@ export async function POST(request: Request) {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // 儲存用戶數據到 DynamoDB
+    userId = uuidv4();
     const putParams = {
       TableName: 'Users',
       Item: {
-        userId: { S: uuidv4() },
+        userId: { S: userId },
         userName: { S: userName },
         email: { S: email },
         password: { S: hashedPassword },
@@ -55,6 +57,18 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { message: '註冊成功，驗證碼已發送至您的電子郵件。' }, { status: 201 });
   } catch (error) {
+    if (userId) {
+      const deleteParams = {
+        TableName: 'Users',
+        Key: {
+          userId: { S: userId },
+        },
+      };
+      const deleteCommand = new DeleteItemCommand(deleteParams);
+      await client.send(deleteCommand).catch((deleteError) => {
+        console.error('Failed to delete user after registration error:', deleteError);
+      });
+    }
     if (error instanceof Error) {
       console.error('Registration error:', error.message);
     } else {

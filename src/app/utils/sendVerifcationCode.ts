@@ -4,21 +4,23 @@ const ticketingEmail = process.env.SMTP_EMAIL;
 const ticketingPass = process.env.SMTP_PASSWORD;
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  port: 587,
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // true for 465, false for other ports
   auth: {
     user: ticketingEmail,
     pass: ticketingPass,
   },
   tls: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: false, // Avoid issues with self-signed certificates
+    minVersion: 'TLSv1.2',
   },
 });
 
 export default async function sendVerificationCode(email: string, verificationCode: string) {
   try {
     const mailOptions = {
-      from: `"票務平台" <${process.env.GMAIL_USER}>`,
+      from: `"票務平台" <${ticketingEmail}>`,
       to: email,
       subject: '電子郵件驗證碼',
       html: `
@@ -32,12 +34,13 @@ export default async function sendVerificationCode(email: string, verificationCo
       `,
     };
 
+    // Verify the transport
     await transporter.verify();
+
+    // Send the email
     const info = await transporter.sendMail(mailOptions);
-    console.log('Verification email sent:', info.messageId);
-    return true;
+    console.log('Email sent: ' + info.response);
   } catch (error) {
-    console.error('Email sending failed:', error);
-    throw error;
+    console.error('Error sending verification email:', error);
   }
 }

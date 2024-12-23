@@ -3,8 +3,8 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import Navbar from '../../components/Navbar';
-import Sidebar from "../../components/Sidebar";
+import Navbar from '@/components/Navbar';
+import Sidebar from "@/components/Sidebar";
 
 interface Zone {
   name: string;

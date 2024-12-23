@@ -4,7 +4,8 @@
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import Navbar from '../components/Navbar';
+import Navbar from '@/components/Navbar';
+
 
 interface FormData {
   email: string;
@@ -19,7 +20,7 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoginError(''); // 每次提交時清除之前的錯誤訊息
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', { // Updated URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

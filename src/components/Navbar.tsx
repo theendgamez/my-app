@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users } from '../api/types/index';
+import { Users } from '@/app/api/types';
 import { Menu, Transition } from '@headlessui/react';
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
 

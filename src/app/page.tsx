@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
+import Navbar from '@/components/Navbar';
 import { Users } from './api/types';
-import Sidebar from './components/Sidebar';
-import PromoCarousel from '@/app/components/PromoCarousel';
+import Sidebar from '@/components/Sidebar';
+import PromoCarousel from '@/components/PromoCarousel';
 
 export default function Home() {
   const [user, setUser] = useState<Users | null>(null);

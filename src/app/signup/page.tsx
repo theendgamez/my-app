@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import Navbar from "../components/Navbar";
+import Navbar from "@/components/Navbar";
 import { useState } from "react";
 
 interface FormData {
