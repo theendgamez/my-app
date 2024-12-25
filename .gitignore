@@ -42,3 +42,6 @@ next-env.d.ts
 
 # accounting
 .env .local
+
+cert.pem
+key.pem

@@ -58,7 +58,7 @@ export default function CreateEventPage() {
         formData.append("photo", data.photo[0]);
       }
 
-      const response = await fetch("/api/events", {
+      const response = await fetch("/api/cre-events", {
         method: "POST",
         body: formData,
       });

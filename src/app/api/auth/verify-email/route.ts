@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { DynamoDBClient, QueryCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { unmarshall, marshall } from '@aws-sdk/util-dynamodb';
+import db from '@/lib/db'; // Import the db module
 import jwt from 'jsonwebtoken';
 
-const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const jwtSecret = process.env.JWT_SECRET!;
 const jwtExpiry = '1h'; // Configurable expiry time
 
@@ -15,29 +13,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '驗證令牌缺失。' }, { status: 400 });
     }
 
-    const params = {
-      TableName: 'Users',
-      IndexName: 'verificationCode-index',
-      KeyConditionExpression: 'verificationCode = :token',
-      ExpressionAttributeValues: marshall({ ':token': token }),
-      Limit: 1,
-    };
+    // Use db.users.findByVerificationCode
+    const user = await db.users.findByVerificationCode(token);
 
-    const command = new QueryCommand(params);
-    const result = await client.send(command);
-
-    if (result.Items && result.Items.length > 0) {
-      const user = unmarshall(result.Items[0]);
-
-      const updateParams = {
-        TableName: 'Users',
-        Key: marshall({ userId: user.userId }),
-        UpdateExpression: 'SET isEmailVerified = :true REMOVE verificationCode',
-        ExpressionAttributeValues: marshall({ ':true': true }),
-      };
-
-      const updateCommand = new UpdateItemCommand(updateParams);
-      await client.send(updateCommand);
+    if (user) {
+      // Update user using db.users.update
+      await db.users.update(user.userId, {
+        isEmailVerified: true,
+        verificationCode: undefined,
+      });
 
       const authToken = jwt.sign(
         { userId: user.userId, email: user.email, role: user.role },
@@ -50,7 +34,7 @@ export async function POST(request: Request) {
         token: authToken,
         user: {
           userId: user.userId,
-          userName: user.userName || user.name,
+          userName: user.userName,
           email: user.email,
           role: user.role,
           phoneNumber: user.phoneNumber,

@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DynamoDBClient, UpdateItemCommand, ReturnValue } from '@aws-sdk/client-dynamodb';
-import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-
-const client = new DynamoDBClient({
-  region: process.env.AWS_REGION,
-});
+import db from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,30 +9,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const params = {
-      TableName: 'Users',
-      Key: marshall({ userId }),
-      UpdateExpression: 'SET userName = :userName, email = :email, phoneNumber = :phoneNumber',
-      ExpressionAttributeValues: marshall({
-        ':userName': userName,
-        ':email': email,
-        ':phoneNumber': phoneNumber,
-      }),
-      ReturnValues: ReturnValue.ALL_NEW,
+    const updates = {
+      userName,
+      email,
+      phoneNumber,
     };
 
-    const command = new UpdateItemCommand(params);
-    const result = await client.send(command);
-
-    if (result.Attributes) {
-      const updatedUser = unmarshall(result.Attributes);
+    try {
+      await db.users.update(userId, updates);
       return NextResponse.json(
-        { message: 'Profile updated successfully', user: updatedUser },
+        { message: 'Profile updated successfully', user: { userId, ...updates } },
         { status: 200 }
       );
-    } else {
+    } catch (error) {
+      console.error('Update failed:', error);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
   } catch (error) {
     console.error('Update profile error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

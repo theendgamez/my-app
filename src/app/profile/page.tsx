@@ -39,7 +39,7 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/updateProfile', {
+      const response = await fetch('/users/updateProfile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
