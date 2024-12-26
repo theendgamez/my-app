@@ -33,14 +33,10 @@ export default function ListItem({ event }: ListItemProps) {
       return 'Date not available';
     }
   };
-
-  // Log the full event object for debugging
-  console.log('Event data:', event);
-
   return (
     <Link 
-      href={`/img/${event.eventId}`}
-      className="block w-full sm:w-[450px] h-[250px] rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 relative group cursor-pointer"
+      href={`/events/${event.eventId}`}
+      className="block w-full sm:w-[200px] h-[100px] rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 relative group cursor-pointer"
     >
       <div className="w-full h-full relative">
         <Image

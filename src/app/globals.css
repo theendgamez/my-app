@@ -9,8 +9,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #ffffff;
-    --foreground: #000000;
+    --background: #fcfdff; /* Dark background */
+    --foreground: #000000; /* Light foreground */
   }
 }
 
@@ -36,10 +36,40 @@ body {
 }
 
 /* A4 Paper styling */
-.a4-page {
+.a4-size {
   width: 210mm;
   min-height: 297mm;
   padding: 20mm;
   margin: 0 auto;
   background: white;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.form-control:focus {
+  border-color: #007bff;
+}
+
+/* Navbar styles */
+.navbar {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.navbar a {
+  color: var(--foreground);
+  margin-right: 16px;
+  text-decoration: none;
+}
+
+.navbar a:hover {
+  color: #007bff;
 }

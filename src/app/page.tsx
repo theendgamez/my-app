@@ -43,20 +43,29 @@ export default function Home() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar userName={user?.userName} />
-      <div className="flex flex-1">
-        {isAdmin && <Sidebar />}
-        <main className={`flex-1 p-8 ${isAdmin ? 'ml-64' : ''}`}>
-          <PromoCarousel images={promoImages} />
-          {loading ? (
-            <div className="flex justify-center items-center h-48">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
-            </div>
-          ) : (
-            <Events events={events} />
-          )}
-        </main>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col" style={{ width: '210mm', height: '297mm' }}>
+        <Navbar userName={user?.userName} />
+        {isAdmin && (
+          <div className="absolute left-0 top-0 h-full">
+            <Sidebar />
+          </div>
+        )}
+        <div className="flex flex-1 w-full">
+          <main className="flex-1 p-8">
+            <PromoCarousel images={promoImages} />
+            <h2 className="text-2xl font-bold my-4">最新活動</h2>
+            {loading ? (
+              <div className="grid grid-rows-4 grid-cols-4 h-48">
+                <div className="row-start-2 col-start-2 row-span-2 col-span-2 flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
+                </div>
+              </div>
+            ) : (
+              <Events events={events} />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

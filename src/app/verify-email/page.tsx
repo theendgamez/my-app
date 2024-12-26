@@ -21,7 +21,7 @@ export default function VerifyEmailPage() {
     }
 
     if (!initialToken) {
-      setError('驗證碼缺失，請檢查您的電子郵件。');
+      setError('請輸入你的驗證碼。');
     }
   }, [successMessage, initialToken]);
 

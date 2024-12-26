@@ -12,6 +12,7 @@
     "@aws-sdk/client-dynamodb": "^3.705.0",
     "@aws-sdk/util-dynamodb": "^3.712.0",
     "@headlessui/react": "^2.2.0",
+    "@prisma/client": "^6.1.0",
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",

@@ -1,7 +1,6 @@
-import { DynamoDBClient, ScanCommand, PutItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, ScanCommand, PutItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand , GetItemCommand} from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 import { Events, Users } from '../app/api/types'; // Import the interfaces
-
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
   region: process.env.NEXT_PUBLIC_AWS_REGION,
@@ -30,6 +29,18 @@ const db = {
       const command = new PutItemCommand(params);
       await client.send(command);
       return data;
+    },
+    findById: async (eventId: string) => {
+      const params = {
+        TableName: 'Events',
+        Key: marshall({ eventId }), // Ensure 'eventId' is the primary key
+      };
+      const command = new GetItemCommand(params);
+      const result = await client.send(command);
+      if (result.Item) {
+        return unmarshall(result.Item) as Events;
+      }
+      return null;
     },
     // ...other methods...
   },

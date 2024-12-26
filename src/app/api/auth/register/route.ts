@@ -6,7 +6,11 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '@/lib/db';
 import { Users } from '@/app/api/types';
 import sendVerificationCode from '@/app/utils/sendVerifcationCode';
-import { checkEmailUnique } from '@/app/utils/checkEmailUnique';
+
+export async function checkEmailUnique(email: string): Promise<boolean> {
+  const existingUser = await db.users.findByEmail(email);
+  return existingUser === null;
+}
 
 export async function POST(request: Request) {
   let userId: string | undefined;
