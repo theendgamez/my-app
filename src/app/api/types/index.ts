@@ -1,12 +1,12 @@
 // src/types/User.ts
 export interface Users {
   userId: string;
-  userName: string; // Ensure this property is included
+  userName: string;
   email: string;
-  password: string; // Added password field
+  password: string; 
   phoneNumber: string;
   isPhoneVerified: boolean;
-  isEmailVerified: boolean; // Added email verification field
+  isEmailVerified: boolean; 
   createdAt: string;
   role: string;
   blockchainAddress: string;
@@ -16,12 +16,14 @@ export interface Users {
 export interface Zone {
   name: string;
   price: string;
+  total: string;
+
 }
 
 export interface Events {
   eventId: string;
-  eventName: string;  // maps to 'name' in DynamoDB
-  eventDate: string;  // maps to 'date' in DynamoDB
+  eventName: string;  
+  eventDate: string; 
   photoUrl: string;
   description: string;
   location: string;

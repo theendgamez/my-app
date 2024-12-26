@@ -5,11 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Sidebar from "@/components/Sidebar";
-
-interface Zone {
-  name: string;
-  price: string;
-}
+import type { Zone } from '@/app/api/types';
 
 interface FormData {
   name: string;
@@ -183,12 +179,16 @@ export default function CreateEventPage() {
                     {...register(`zones.${index}.price`, { required: "Zone price is required" })}
                     placeholder="Zone Price"
                   />
+                  <input
+                    {...register(`zones.${index}.total`, { required: "Total Tickets is required" })}
+                    placeholder="Total Tickets"
+                  />
                   <button type="button" onClick={() => remove(index)}>
                     Remove
                   </button>
                 </div>
               ))}
-              <button type="button" onClick={() => append({ name: "", price: "" })}>
+              <button type="button" onClick={() => append({ name: "", price: "", total: "" })}>
                 Add Zone
               </button>
             </div>
