@@ -14,18 +14,18 @@ const EventDetail = () => {
   const { id } = useParams();
 
   const fetchEvent = async () => {
-      try {
-          const data = await db.event.findById(id as string)
-          setEvent(data);
-        } catch (err: unknown) {
-          setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setLoading(false);
-        }
-      };
-    
+    try {
+      const data = await db.event.findById(id as string)
+      setEvent(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-      fetchEvent();
+    fetchEvent();
   }, [id]);
 
   const handleRetry = () => {
@@ -45,6 +45,15 @@ const EventDetail = () => {
   );
   if (!event) return <div>Event not found</div>;
 
+  const formatZonePrices = (zones: Array<{ name: string, price: string }> | null): string => {
+    if (!zones?.length) return 'Free';
+    return zones
+      .map(zone => `HKD ${Number(zone.price).toLocaleString('en-HK')} ${zone.name}區`)
+      .join(' / ');
+  };
+
+
+
   const eventDate = event.eventDate ? new Date(event.eventDate) : null;
   return (
     <>
@@ -52,11 +61,11 @@ const EventDetail = () => {
       <div className="container mx-auto p-4 flex flex-col items-center pt-20">
         <h1 className="text-4xl font-bold mb-6 text-left w-full max-w-3xl px-6">{event.eventName || 'Untitled Event'}</h1>
         {event.photoUrl ? (
-          <Image 
-            src={event.photoUrl} 
-            alt={event.eventName || 'Event image'} 
-            width={720} 
-            height={400} 
+          <Image
+            src={event.photoUrl}
+            alt={event.eventName || 'Event image'}
+            width={720}
+            height={400}
             className="mb-6 rounded-lg shadow-lg"
           />
         ) : (
@@ -66,16 +75,26 @@ const EventDetail = () => {
         )}
         <div className="text-lg text-left w-full max-w-3xl px-6">
           <p className="mb-2">
-            <strong>Date:</strong> {eventDate ? eventDate.toLocaleString() : 'Date not specified'}
+            <strong>活動名稱:</strong> {event.eventName || 'Untitled Event'}
           </p>
           <p className="mb-2">
-            <strong>Location:</strong> {event.location || 'Location not specified'}
+            <strong>演出時間:</strong> {eventDate ? eventDate.toLocaleString() : 'Date not specified'}
           </p>
           <p className="mb-2">
-            <strong>Description:</strong> {event.description || 'No description available'}
+            <strong>演出地點:</strong> {event.location || 'Location not specified'}
+          </p>
+          <p className="mb-2">
+            <strong>簡介:</strong> {event.description || 'No description available'}
+          </p>
+          <p className="mb-2 text-sm ">
+            <strong>門票價格:</strong> {formatZonePrices(event.zones) + ' (全場企位 All Standing)'}
           </p>
         </div>
       </div>
+        <div className="flex justify-center mt-4">
+          
+          </div>
+
     </>
   );
 }

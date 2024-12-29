@@ -22,15 +22,18 @@ export interface Zone {
 
 export interface Events {
   eventId: string;
-  eventName: string;  
-  eventDate: string; 
-  photoUrl: string;
+  eventName: string;
+  eventDate: string;
   description: string;
   location: string;
-  status: string;
+  isDrawMode: boolean;
+  onSaleDate: string | null;
+  registerDate: string | null;
+  endregisterDate: string | null;
+  drawDate: string | null;
+  zones:[];
+  photoUrl: string;
   createdAt: string;
-  registerDate: string;
-  endregisterDate: string;
-  drawDate: string;
-  zones: Zone[];
+  status: string;
 }
+

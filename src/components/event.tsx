@@ -10,8 +10,8 @@ interface Props {
 export default function Events({ events }: Props) {
   return (
     <EventList>
-      {events.map((evt, index) => (
-        <ListItem key={index} event={evt} />
+      {events.map((evt) => (
+        <ListItem key={evt.eventId} event={evt} /> 
       ))}
     </EventList>
   );

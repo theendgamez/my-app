@@ -10,9 +10,6 @@ interface ListItemProps {
 export default function ListItem({ event }: ListItemProps) {
   const formatDate = (dateString: string) => {
     try {
-      console.log('Raw date value:', dateString); // Debug log
-
-      // Handle the date format from DynamoDB (2024-12-27T20:00)
       const date = new Date(dateString);
       
       if (isNaN(date.getTime())) {
@@ -20,7 +17,6 @@ export default function ListItem({ event }: ListItemProps) {
         return 'Date not available';
       }
 
-      // Format the date
       return new Intl.DateTimeFormat('zh-HK', {
         year: 'numeric',
         month: 'long',
@@ -33,18 +29,19 @@ export default function ListItem({ event }: ListItemProps) {
       return 'Date not available';
     }
   };
+
   return (
     <Link 
       href={`/events/${event.eventId}`}
-      className="block w-full sm:w-[200px] h-[100px] rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 relative group cursor-pointer"
+      className="block w-full rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 relative group cursor-pointer"
     >
-      <div className="w-full h-full relative">
+      <div className="relative aspect-[16/9]">
         <Image
           src={event.photoUrl}
           alt={`${event.eventName} - Event Cover Image`}
           fill
-          style={{ objectFit: 'cover' }}
-          className="group-hover:scale-105 transition-transform duration-300"
+          sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-300"
         />
         
         {/* Dark gradient overlay */}
@@ -52,10 +49,10 @@ export default function ListItem({ event }: ListItemProps) {
         
         {/* Event info */}
         <div className="absolute bottom-0 left-0 p-4 w-full">
-          <h3 className="text-xl font-bold text-white mb-1 line-clamp-2">
+          <h3 className="text-base font-semibold text-white mb-2 line-clamp-2">
             {event.eventName}
           </h3>
-          <p className="text-sm text-gray-200">
+          <p className="text-sm text-gray-100">
             {formatDate(event.eventDate)}
           </p>
         </div>

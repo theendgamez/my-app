@@ -10,18 +10,41 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const eventId = uuidv4();
     
-    // Extract form data with validation
+    // Extract common form data
     const eventName = formData.get('name') as string;
     const eventDate = formData.get('date') as string;
     const zones = JSON.parse(formData.get('zones') as string);
     const photo = formData.get('photo') as File;
+    const isDrawMode = formData.get('isDrawMode') === 'true';
 
-    // Validate required fields
+    // Validate common required fields
     if (!eventName?.trim() || !eventDate?.trim() || !zones || !photo) {
       return NextResponse.json(
-        { error: '所有欄位都是必填的' },
+        { error: '所有基本欄位都是必填的' },
         { status: 400 }
       );
+    }
+
+    // Validate mode-specific required fields
+    if (isDrawMode) {
+      const registerDate = formData.get('registerDate');
+      const endregisterDate = formData.get('endregisterDate');
+      const drawDate = formData.get('drawDate');
+      
+      if (!registerDate || !endregisterDate || !drawDate) {
+        return NextResponse.json(
+          { error: '抽籤模式需要填寫所有日期欄位' },
+          { status: 400 }
+        );
+      }
+    } else {
+      const onSaleDate = formData.get('onSaleDate');
+      if (!onSaleDate) {
+        return NextResponse.json(
+          { error: '請填寫開售日期' },
+          { status: 400 }
+        );
+      }
     }
 
     const uniqueFileName = `${eventId}-${photo.name}`;
@@ -33,9 +56,11 @@ export async function POST(request: Request) {
       eventDate,
       description: formData.get('description') as string,
       location: formData.get('location') as string,
-      registerDate: formData.get('registerDate') as string,
-      endregisterDate: formData.get('endregisterDate') as string,
-      drawDate: formData.get('drawDate') as string,
+      isDrawMode,
+      onSaleDate: !isDrawMode ? formData.get('onSaleDate') as string : null,
+      registerDate: isDrawMode ? formData.get('registerDate') as string : null,
+      endregisterDate: isDrawMode ? formData.get('endregisterDate') as string : null,
+      drawDate: isDrawMode ? formData.get('drawDate') as string : null,
       zones,
       photoUrl: `/img/${uniqueFileName}`,
       createdAt: new Date().toISOString(),

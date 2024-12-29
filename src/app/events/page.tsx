@@ -38,30 +38,29 @@ export default function EventsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <div className="flex-1 flex items-center justify-center mt-16">
-        <div className="container mx-auto" style={{ width: '210mm', height: '297mm' }}>
-          <h1 className="text-4xl font-bold text-left mb-4">活動</h1>
-          <input
-            type="text"
-            name="search"
-            id="search"
-            placeholder="搜尋活動"
-            className="form-control"
-            style={{ width: '200mm' }}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <main className="flex-1 pt-20">
+        <div className="container mx-auto px-6 lg:px-8">
+          <h1 className="text-3xl text font-boldmb-12">活動</h1>
+          <div className="max-w-xl mx-auto mb-12">
+            <input
+              type="text"
+              name="search"
+              id="search"
+              placeholder="搜尋活動"
+              className="w-full p-4 border rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           {loading ? (
-            <div className="grid grid-rows-4 grid-cols-4 h-48">
-              <div className="row-start-2 col-start-2 row-span-2 col-span-2 flex justify-center items-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
-              </div>
+            <div className="flex justify-center items-center h-48">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             </div>
           ) : (
             <Events events={filteredEvents} />
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
