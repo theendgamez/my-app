@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/navbar/Navbar';
 import { useRouter } from 'next/navigation';
 import { Users } from '@/app/api/types/index';
 

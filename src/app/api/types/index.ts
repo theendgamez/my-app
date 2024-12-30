@@ -31,9 +31,10 @@ export interface Events {
   registerDate: string | null;
   endregisterDate: string | null;
   drawDate: string | null;
-  zones:[];
+  zones: Zone[]; // Changed from zones: []
   photoUrl: string;
   createdAt: string;
   status: string;
+  category: string; // Changed from categories: string;
 }
 

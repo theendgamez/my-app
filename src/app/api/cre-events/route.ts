@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const photo = formData.get('photo') as File;
     const isDrawMode = formData.get('isDrawMode') === 'true';
 
+
     // Validate common required fields
     if (!eventName?.trim() || !eventDate?.trim() || !zones || !photo) {
       return NextResponse.json(
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
       zones,
       photoUrl: `/img/${uniqueFileName}`,
       createdAt: new Date().toISOString(),
-      status: 'Prepare'
+      status: 'Prepare',
+      category: formData.get('category') as string, // Changed from categories: ...
     };
 
     await db.event.create(eventData);

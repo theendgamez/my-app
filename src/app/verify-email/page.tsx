@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/navbar/Navbar';
 
 export default function VerifyEmailPage() {
   const router = useRouter();

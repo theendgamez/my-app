@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Events } from '@/app/api/types';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/navbar/Navbar';
 import db from '@/lib/db';
 
 const EventDetail = () => {

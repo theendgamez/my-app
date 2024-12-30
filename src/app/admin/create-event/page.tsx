@@ -2,8 +2,8 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import Navbar from '@/components/Navbar';
+import { useState, useEffect } from 'react';
+import Navbar from '@/components/navbar/Navbar';
 import Sidebar from "@/components/Sidebar";
 import type { Zone } from '@/app/api/types';
 
@@ -23,25 +23,49 @@ interface FormData {
   zones: Zone[];
   photo: FileList;
   status?: 'Prepare' | 'OnSale' | 'SoldOut';
+  category?: string; // Ensure this matches the Events interface
 }
 
-export default function CreateEventPage() {
+const CreateEventPage = () => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDrawMode, setIsDrawMode] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/check-admin');
+        const data = await response.json();
+        
+        if (!data.isAdmin) {
+          router.push('/');
+          return;
+        }
+        setIsLoading(false);
+      } catch {
+        router.push('/');
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
   const { register, handleSubmit, control, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       zones: [],
-      isDrawMode: false,
       status: 'Prepare'
     }
   });
-  
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "zones"
   });
-
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -72,6 +96,9 @@ export default function CreateEventPage() {
         formData.append("photo", data.photo[0]);
       }
 
+      // Added category field
+      formData.append("category", data.category || "default");
+
       const response = await fetch("/api/cre-events", {
         method: "POST",
         body: formData,
@@ -90,8 +117,6 @@ export default function CreateEventPage() {
       setIsSubmitting(false);
     }
   };
-
-  const [isDrawMode, setIsDrawMode] = useState(false);
 
   return (
     <div>
@@ -153,6 +178,16 @@ export default function CreateEventPage() {
               )}
             </div>
 
+            {/* Category */}
+            <div className="form-group">
+              <label className="block text-sm font-medium text-gray-700 mb-2">活動類別:</label>
+              <input
+                {...register("category")}
+                type="text"
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+
             {/* Draw Mode */}
             <div className="form-group">
               <label className="block text-sm font-medium text-gray-700 mb-2">是否抽籤 ?</label>
@@ -205,22 +240,18 @@ export default function CreateEventPage() {
                 </div>
               </>
             ) : (
-              <>
-                <div className="form-group">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">開售日期:</label>
-                  <input
-                    {...register("onSaleDate", { required: "開售日期是必填的" })}
-                    type="datetime-local"
-                    className="w-full p-2 border rounded-md"
-                  />
-                  {errors.endregisterDate && <p className="text-red-500 text-sm mt-1">{errors.endregisterDate.message}</p>}
-                </div>
-              </>
-            )
-            }
-            {/* Dynamic Zones */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Zones:</label>
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">開售日期:</label>
+                <input
+                  {...register("onSaleDate", { required: "開售日期是必填的" })}
+                  type="datetime-local"
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
+            )}
+
+            {/* Zone Fields */}
+            <div className="form-group">
               {fields.map((field, index) => (
                 <div key={field.id} style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
                   <input className="block text-sm font-medium text-gray-700 mb-2"
@@ -272,3 +303,5 @@ export default function CreateEventPage() {
     </div>
   );
 }
+
+export default CreateEventPage;

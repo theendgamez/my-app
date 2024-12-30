@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Events } from '../app/api/types';
+import { Events } from '../../app/api/types';
 
 interface ListItemProps {
   event: Events;

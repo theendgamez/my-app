@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Navbar from '@/components/Navbar';
-import Events from '@/components/event';
+import Navbar from '@/components/navbar/Navbar';
+import Events from '@/components/event/event';
 import db from '@/lib/db';
 import { Events as EventType } from '@/app/api/types';
 

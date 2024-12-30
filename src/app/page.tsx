@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/navbar/Navbar';
 import { Users, Events as EventType } from './api/types';
 import Sidebar from '@/components/Sidebar';
 import PromoCarousel from '@/components/PromoCarousel';
-import Events from '@/components/event';
+import Events from '@/components/event/event';
 import db from '@/lib/db';
 
 export default function Home() {
@@ -19,13 +19,11 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    // Fetch user data
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
 
-    // Fetch events using db utility
     const fetchEvents = async () => {
       try {
         const data = await db.event.findMany();
@@ -43,16 +41,16 @@ export default function Home() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="flex flex-col" style={{ width: '210mm', height: '297mm' }}>
-        <Navbar userName={user?.userName} />
+    <div className="min-h-screen flex flex-col">
+      <Navbar userName={user?.userName} />
+      <div className="flex flex-1">
         {isAdmin && (
-          <div className="absolute left-0 top-0 h-full">
+          <div className="w-64 min-h-[calc(100vh-64px)] fixed left-0 top-16">
             <Sidebar />
           </div>
         )}
-        <div className="flex flex-1 w-full">
-          <main className="flex-1 p-8">
+        <main className={`flex-1 ${isAdmin ? 'ml-64' : ''}`}>
+          <div className="p-8">
             <PromoCarousel images={promoImages} />
             <h2 className="text-2xl font-bold my-4">最新活動</h2>
             {loading ? (
@@ -64,8 +62,8 @@ export default function Home() {
             ) : (
               <Events events={events} />
             )}
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   );
