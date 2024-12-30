@@ -1,6 +1,6 @@
 import { DynamoDBClient, ScanCommand, PutItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand , GetItemCommand} from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users } from '../app/api/types'; // Import the interfaces
+import { Events, Users } from '../components/types'; // Import the interfaces
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
   region: process.env.NEXT_PUBLIC_AWS_REGION,

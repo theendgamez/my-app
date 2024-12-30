@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Events } from '@/app/api/types';
+import { Events } from '@/components/types';
 import Navbar from '@/components/navbar/Navbar';
 import db from '@/lib/db';
 
 const EventDetail = () => {
+  const router = useRouter();
   const [event, setEvent] = useState<Events | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +53,6 @@ const EventDetail = () => {
       .join(' / ');
   };
 
-
-
   const eventDate = event.eventDate ? new Date(event.eventDate) : null;
   return (
     <>
@@ -73,7 +72,10 @@ const EventDetail = () => {
             <span className="text-gray-600">No image available</span>
           </div>
         )}
-        <div className="text-lg text-left w-full max-w-3xl px-6">
+        <div className="w-full max-w-3xl px-6">
+          <h2 className="text-2xl font-bold mb-4">活動資訊</h2>
+        </div>
+        <div className="text-sm text-left w-full max-w-3xl px-6">
           <p className="mb-2">
             <strong>活動名稱:</strong> {event.eventName || 'Untitled Event'}
           </p>
@@ -86,15 +88,106 @@ const EventDetail = () => {
           <p className="mb-2">
             <strong>簡介:</strong> {event.description || 'No description available'}
           </p>
-          <p className="mb-2 text-sm ">
-            <strong>門票價格:</strong> {formatZonePrices(event.zones) + ' (全場企位 All Standing)'}
+          <p className="mb-2">
+            <strong>門票價格:</strong> {formatZonePrices(event.zones)}
+          </p>
+
+          {event.isDrawMode ? (
+            <>
+              <p className="mb-2">
+                <strong>報名開始日期:</strong> {event.registerDate ? new Date(event.registerDate).toLocaleString() : 'N/A'}
+              </p>
+              <p className="mb-2">
+                <strong>報名結束日期:</strong> {event.endregisterDate ? new Date(event.endregisterDate).toLocaleString() : 'N/A'}
+              </p>
+              <p className="mb-2">
+                <strong>抽籤日期:</strong> {event.drawDate ? new Date(event.drawDate).toLocaleString() : 'N/A'}
+              </p>
+            </>
+          ) : (
+            <p className="mb-2">
+              <strong>開售日期:</strong> {event.onSaleDate ? new Date(event.onSaleDate).toLocaleString() : 'N/A'}
+            </p>
+          )}
+        </div>
+        <div className="w-full max-w-3xl px-6">
+          <h2 className="text-2xl font-bold mb-4">注意事項</h2>
+          <p>
+            按主辦機構要求，所有演唱會觀眾所攜帶之隨身手提包/背包在進入演出場地前必須通過保安檢查。保安檢查會在表演時間前兩個小時開始。由於預計排隊進場時間會延長，我們建議觀眾盡早到達演出場地，請耐心等候並與保安人員合作。
+          </p>
+          <p>
+            你可把個人物品存放在場地特設之服務台，多謝合作！
+          </p>
+          <h3 className="mt-4 text-lg font-semibold">以下物品不得攜帶進入演出場地：</h3>
+          <ul className="list-decimal list-inside ml-4">
+            <li>相機及任何錄影、錄音器材</li>
+            <li>玻璃樽、鋁罐及膠樽（含或不含液體）</li>
+            <li>手提袋/背包 (超過 12”x 15”) 或盛器</li>
+            <li>外來食物及飲料</li>
+            <li>長雨傘</li>
+            <li>任何可能對他人造成傷害的危險物品</li>
+            <li>任何可疑物品</li>
+          </ul>
+          <p className="mt-4">
+            整個演出過程中禁止使用手機、平板電腦、相機和其他錄音設備。違者將被要求離開場地，恕不另行通知且不予退款或賠償。
           </p>
         </div>
-      </div>
-        <div className="flex justify-center mt-4">
-          
-          </div>
+        
+        <div className="w-full max-w-3xl px-6">
+          <h2 className="text-2xl font-bold mb-4">門票價格</h2>
+          <table className="w-full max-w-3xl px-6">
+            <thead>
+              <tr>
+                <th className="text-left">區域</th>
+                {event.isDrawMode ? (
+                  <>
+                    <th className="text-right">報名開始日期</th>
+                    <th className="text-right">報名結束日期</th>
+                    <th className="text-right">抽籤日期</th>
+                  </>
+                ) : (
+                  <th className="text-right">開售日期</th>
+                )}
+                <th className="text-right">價錢</th>
+              </tr>
+            </thead>
+            <tbody>
+              {event.zones?.map(zone => (
+                <tr key={zone.name}>
+                  <td>{zone.name}</td>
+                  {event.isDrawMode ? (
+                    <>
+                      <td className="text-right">
+                        {event.registerDate ? new Date(event.registerDate).toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="text-right">
+                        {event.endregisterDate ? new Date(event.endregisterDate).toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="text-right">
+                        {event.drawDate ? new Date(event.drawDate).toLocaleString() : 'N/A'}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="text-right">
+                      {event.onSaleDate ? new Date(event.onSaleDate).toLocaleString() : 'N/A'}
+                    </td>
+                  )}
+                  <td className="text-right">HKD {Number(zone.price).toLocaleString('en-HK')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
+        <div className="w-full max-w-3xl px-6 mt-8">
+          <button 
+            onClick={() => router.push(`/events/${id}/booking`)}
+            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+          >
+            立即訂票
+          </button>
+        </div>
+      </div>
     </>
   );
 }

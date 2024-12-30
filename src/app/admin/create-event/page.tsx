@@ -2,10 +2,10 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import Navbar from '@/components/navbar/Navbar';
+import { useState } from 'react';
+import Navbar from '@/components/navbar/Navbar'; // Ensure correct path casing
 import Sidebar from "@/components/Sidebar";
-import type { Zone } from '@/app/api/types';
+import type { Zone } from '@/components/types';
 
 interface FormData {
   eventName: string;
@@ -30,27 +30,7 @@ const CreateEventPage = () => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isDrawMode, setIsDrawMode] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/check-admin');
-        const data = await response.json();
-        
-        if (!data.isAdmin) {
-          router.push('/');
-          return;
-        }
-        setIsLoading(false);
-      } catch {
-        router.push('/');
-      }
-    };
-
-    checkAuth();
-  }, [router]);
 
   const { register, handleSubmit, control, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -63,9 +43,6 @@ const CreateEventPage = () => {
     control,
     name: "zones"
   });
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -294,7 +271,7 @@ const CreateEventPage = () => {
                 ? "bg-gray-400"
                 : "bg-blue-500 hover:bg-blue-600"
                 } text-white py-2 px-4 rounded-md transition-colors`}
-            >
+              >
               {isSubmitting ? "創建中..." : "創建活動"}
             </button>
           </form>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter } from 'next/navigation';
-import { Users } from '@/app/api/types/index';
+import { Users } from '@/components/types/index';
 
 interface FormData {
   userName: string;
@@ -39,7 +39,7 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const response = await fetch('api/users/updateProfile', {
+      const response = await fetch('api/users/edit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

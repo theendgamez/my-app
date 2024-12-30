@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import db from '@/lib/db';
-import { Users } from '@/app/api/types';
+import { Users } from '@/components/types';
 import sendVerificationCode from '@/app/utils/sendVerifcationCode';
 
 export async function checkEmailUnique(email: string): Promise<boolean> {

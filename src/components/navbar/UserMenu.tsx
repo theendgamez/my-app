@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Fragment } from 'react';
-import { Users } from '@/app/api/types';
+import { Users } from '@/components/types';
 import { Menu,MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { FiChevronDown} from 'react-icons/fi';
 

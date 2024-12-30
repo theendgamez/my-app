@@ -25,6 +25,17 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: true
     });
+
+    // Set role cookie for admin users
+    if (user.role === 'admin') {
+      response.cookies.set('role', 'admin', {
+        path: '/',
+        httpOnly: false, // Allow client-side access if needed
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24, // 1 day
+      });
+    }
     
     return response;
   } catch (error) {

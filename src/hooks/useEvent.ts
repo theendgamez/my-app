@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import db from '@/lib/db';
-import { Events } from '../app/api/types';
+import { Events } from '../components/types';
 
 export function useEvents(initialData?: Events[]) {
   const [events, setEvents] = useState<Events[]>(initialData || []);
@@ -23,7 +23,7 @@ export function useEvents(initialData?: Events[]) {
     }
 
     fetchEvents();
-  }, [initialData]);
+  }, [initialData]); 
 
   return { events, loading, error };
 }

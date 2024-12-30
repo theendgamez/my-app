@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect} from 'react';
 import { useRouter } from 'next/navigation';
-import { Users } from '@/app/api/types';
+import { Users } from '@/components/types';
 import SearchBar from './SearchBar';
 import UserMenu from './UserMenu';
 

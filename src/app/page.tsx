@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
-import { Users, Events as EventType } from './api/types';
+import { Users, Events as EventType } from '../components/types';
 import Sidebar from '@/components/Sidebar';
 import PromoCarousel from '@/components/PromoCarousel';
 import Events from '@/components/event/event';
