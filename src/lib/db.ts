@@ -75,7 +75,72 @@ const db = {
       const command = new DeleteItemCommand(params);
       await client.send(command);
     },
-    // ...other methods...
+    updateZoneMax: async (eventId: string, zoneName: string, newMax: number) => {
+      // Fetch the current item to find the index of the zone
+      const getItemParams = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+      };
+      
+      const getItemCommand = new GetItemCommand(getItemParams);
+      const currentItem = await client.send(getItemCommand);
+      const zones = currentItem.Item ? unmarshall(currentItem.Item).zones : []; // Unmarshall the item
+
+      // Find the index of the zone
+      const zoneIndex = zones.findIndex(zone => zone.name === zoneName);
+      
+      if (zoneIndex === -1) {
+        throw new Error(`Zone ${zoneName} not found`);
+      }
+
+      const params = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+        UpdateExpression: `SET zones[${zoneIndex}].#max = :newMax`,
+        ExpressionAttributeValues: marshall({ ':newMax': newMax.toString() }), // Convert to string if needed
+        ExpressionAttributeNames: {
+          '#max': 'max', // Use a placeholder for the reserved keyword
+        },
+      };
+      
+      const command = new UpdateItemCommand(params);
+      await client.send(command);
+      return { zoneName, newMax };
+    },
+    
+    // Update the zone total
+    updateZoneTotal: async (eventId: string, zoneName: string, newTotal: number) => {
+      // Fetch the current item to find the index of the zone
+      const getItemParams = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+      };
+      
+      const getItemCommand = new GetItemCommand(getItemParams);
+      const currentItem = await client.send(getItemCommand);
+      const zones = currentItem.Item ? unmarshall(currentItem.Item).zones : []; // Unmarshall the item
+      
+      // Find the index of the zone
+      const zoneIndex = zones.findIndex(zone => zone.name === zoneName);
+      
+      if (zoneIndex === -1) {
+        throw new Error(`Zone ${zoneName} not found`);
+      }
+
+      const params = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+        UpdateExpression: `SET zones[${zoneIndex}].#total = :newTotal`,
+        ExpressionAttributeValues: marshall({ ':newTotal': newTotal.toString() }), // Convert to string if needed
+        ExpressionAttributeNames: {
+          '#total': 'total', // Use a placeholder for the reserved keyword
+        },
+      };
+      
+      const command = new UpdateItemCommand(params);
+      await client.send(command);
+      return { zoneName, newTotal };
+    }
   },
   users: {
     findByVerificationCode: async (verificationCode: string): Promise<Users | null> => {

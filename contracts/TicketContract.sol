@@ -11,12 +11,13 @@ contract TicketContract is ERC721, Ownable {
         uint256 seatNumber;
         uint256 price;
         bool isUsed;
+        uint256 eventDate;
     }
 
     mapping(uint256 => Ticket) public tickets;
     uint256 private _tokenIdCounter;
-    
-    event TicketMinted(uint256 tokenId, uint256 eventId, string zone, uint256 seatNumber);
+
+    event TicketMinted(uint256 tokenId, uint256 eventId, string zone, uint256 seatNumber , uint256 eventDate);
 
     constructor() ERC721("EventTicket", "TCKT") Ownable(msg.sender) {}
 
@@ -25,7 +26,9 @@ contract TicketContract is ERC721, Ownable {
         uint256 eventId,
         string memory zone,
         uint256 seatNumber,
-        uint256 price
+        uint256 price,
+        uint256 eventDate
+
     ) public onlyOwner returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
         _tokenIdCounter++;
@@ -35,12 +38,13 @@ contract TicketContract is ERC721, Ownable {
             zone: zone,
             seatNumber: seatNumber,
             price: price,
-            isUsed: false
+            isUsed: false,
+            eventDate: eventDate
         });
 
         _safeMint(to, tokenId);
-        emit TicketMinted(tokenId, eventId, zone, seatNumber);
-        
+        emit TicketMinted(tokenId, eventId, zone, seatNumber, eventDate); // Emit event with event date
+
         return tokenId;
     }
 
@@ -51,5 +55,15 @@ contract TicketContract is ERC721, Ownable {
 
     function getTicketDetails(uint256 tokenId) public view returns (Ticket memory) {
         return tickets[tokenId];
+    }
+
+    function ticketsMintedCount(uint256 eventId, string memory zone) public view returns (uint256) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _tokenIdCounter; i++) {
+            if (tickets[i].eventId == eventId && keccak256(bytes(tickets[i].zone)) == keccak256(bytes(zone))) {
+                count++;
+            }
+        }
+        return count;
     }
 }

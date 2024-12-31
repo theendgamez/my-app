@@ -17,7 +17,7 @@ export interface Zone {
   name: string;
   price: string;
   total: string;
-
+  max: string;
 }
 
 export interface Events {
@@ -44,11 +44,20 @@ export interface Ticket {
   seatNumber: number;
   price: number;
   tokenId?: string;
+  owner?: string;
+  eventDate: string;
+  eventName: string;
+  photoUrl: string;
+  location: string;
 }
-
 export interface TicketMintRequest {
+
   eventId: string;
+
   zone: string;
+
   quantity: number;
+
   pricePerTicket: number;
+
 }

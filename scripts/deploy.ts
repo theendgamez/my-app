@@ -2,28 +2,20 @@ import { ethers } from "hardhat";
 
 async function main() {
   try {
-    // Debug logs
-    console.log("Loading deployer account...");
-    console.log("Network URL:", process.env.NEXT_PUBLIC_GANACHE_URL);
-    console.log("Private Key exists:", !!process.env.GANACHE_PRIVATE_KEY);
-
     const [deployer] = await ethers.getSigners();
-    console.log("Got signer:", !!deployer);
+    console.log("Deploying with account:", await deployer.getAddress());
 
-    if (!deployer) throw new Error("No deployer account found");
-    
-    const address = await deployer.getAddress();
-    console.log("Deploying with account:", address);
-
-    const balance = await deployer.getBalance();
-    console.log("Account balance:", ethers.utils.formatEther(balance));
-
-    const TicketContractFactory = await ethers.getContractFactory("TicketContract", deployer);
+    const TicketContractFactory = await ethers.getContractFactory("TicketContract");
     const contract = await TicketContractFactory.deploy();
-    await contract.deployed();
-
-    console.log("Contract deployed to:", contract.address);
-    return contract.address;
+    
+    // Wait for contract deployment
+    await contract.waitForDeployment();
+    
+    // Get the deployed contract address
+    const deployedAddress = await contract.getAddress();
+    console.log("Contract deployed to:", deployedAddress);
+    
+    return deployedAddress;
   } catch (error) {
     console.error("Deployment failed:", error);
     throw error;

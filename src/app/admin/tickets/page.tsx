@@ -1,15 +1,9 @@
 'use client';
 
-declare global {
-  interface Window {
-    ethereum?: ethers.providers.ExternalProvider;
-  }
-}
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import db from '@/lib/db';
-import { TicketMintRequest } from '@/types';
+import { TicketMintRequest } from '@/types'; // Ensure this includes the price property
 import { Events as EventType } from '@/types';
 import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/Sidebar';
@@ -18,23 +12,24 @@ import TicketContract from '@/artifacts/contracts/TicketContract.sol/TicketContr
 
 const CreateTickets = () => {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [events, setEvents] = useState<EventType[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
-  const [maxTickets, setMaxTickets] = useState<number>(0);
+  const [remainingTickets, setRemainingTickets] = useState<number>(0);
   const [request, setRequest] = useState<TicketMintRequest>({
     eventId: '',
     zone: '',
     quantity: 1,
-    pricePerTicket: 0
+    pricePerTicket: 0 // Ensure this is included
   });
-  const ADMIN_PRIVATE_KEY = '0xf15051ba37d8c8b4ed0bc3a6147c0de9da4f535162cd700255ee6866d2d59583';
+  const key = '0x941f99977ca2acc84b3c9354c286f593df7502cd9128766fbf5a1ef5144dec30'; // Replace with your actual private key
+  const [counter, setCounter] = useState<number>(0);
 
   // Ganache Configuration
   const GANACHE_CONFIG = {
-    rpcUrl: 'http://127.0.0.1:5545',
+    rpcUrl: 'http://127.0.0.1:7545',
     chainId: 1337,
-    gasPrice: ethers.utils.parseUnits('20', 'gwei'), // 20 GWEI
+    gasPrice: ethers.parseUnits('20', 'gwei'), // 20 GWEI
     gasLimit: 6721975,
   };
 
@@ -58,47 +53,50 @@ const CreateTickets = () => {
       ...prev,
       eventId,
       zone: '',
-      pricePerTicket: 0
+      pricePerTicket: 0,
+      quantity: 1 // Reset quantity when event changes
     }));
-    setMaxTickets(0);
+    setRemainingTickets(0); // Reset remaining tickets
   };
 
   const handleZoneChange = (zoneName: string) => {
     const zone = selectedEvent?.zones?.find(z => z.name === zoneName);
+    if (!zone) return;
+
     setRequest(prev => ({
       ...prev,
       zone: zoneName,
-      pricePerTicket: Number(zone?.price) || 0,
-      quantity: 1
+      pricePerTicket: Number(zone.price) || 0,
+      quantity: 1 // Reset quantity when zone changes
     }));
-    setMaxTickets(Number(zone?.total) || 0);
+
+    // Calculate remaining tickets
+    const remaining = Number(zone.max) - counter;
+    setRemainingTickets(remaining);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (request.quantity > maxTickets) {
-      alert(`Maximum tickets available: ${maxTickets}`);
+    if (request.quantity > remainingTickets) {
+      alert(`Maximum tickets available: ${remainingTickets}`);
       return;
     }
     setLoading(true);
 
     try {
-      // Connect to Ganache
-      const provider = new ethers.providers.JsonRpcProvider(GANACHE_CONFIG.rpcUrl);
-      const wallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
-      
-      // Verify network
+      const provider = new ethers.JsonRpcProvider(GANACHE_CONFIG.rpcUrl);
+      const wallet = new ethers.Wallet(key, provider);
+
       const network = await provider.getNetwork();
-      if (network.chainId !== GANACHE_CONFIG.chainId) {
+      if (Number(network.chainId) !== GANACHE_CONFIG.chainId) {
         throw new Error('Wrong network, please connect to Ganache');
       }
 
       const address = await wallet.getAddress();
       console.log('Using address:', address);
-      
-      // Check wallet balance
+
       const balance = await provider.getBalance(address);
-      console.log('Wallet balance:', ethers.utils.formatEther(balance), 'ETH');
+      console.log('Wallet balance:', ethers.formatEther(balance), 'ETH');
 
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
       const contract = new ethers.Contract(contractAddress, TicketContract.abi, wallet);
@@ -108,28 +106,40 @@ const CreateTickets = () => {
         throw new Error('Event not found');
       }
 
-      const numericId = event.eventId;
-      const zone = ethers.utils.formatBytes32String(request.zone);
+      const numericId = BigInt(event.eventId);
+      const nonce = await provider.getTransactionCount(address);
 
-      // Use Ganache's fixed gas price
-      console.log('Using Ganache gas price:', ethers.utils.formatUnits(GANACHE_CONFIG.gasPrice, 'gwei'), 'gwei');
+      // Convert event date to timestamp
+      const eventDate = Math.floor(new Date(event.eventDate).getTime() / 1000); // Convert to seconds
 
-      const tx = await contract.mintTicket(
-        address,
-        ethers.BigNumber.from(numericId),
-        zone,
-        request.quantity,
-        ethers.utils.parseEther(request.pricePerTicket.toString()),
-        {
-          gasPrice: GANACHE_CONFIG.gasPrice,
-          gasLimit: GANACHE_CONFIG.gasLimit,
-          nonce: await provider.getTransactionCount(address)
+      // Loop to create multiple tickets
+      for (let i = 0; i < request.quantity; i++) {
+        const tx = await contract.mintTicket(
+          address,          // The address to mint the ticket to
+          numericId,       // The event ID (should be a uint256)
+          request.zone,    // The zone (should be a string)
+          i + 1,           // The seat number (should be a uint256)
+          request.pricePerTicket, // The price (should be a uint256)
+          eventDate,       // The event date (should be a uint256 timestamp)
+          {
+            gasPrice: GANACHE_CONFIG.gasPrice,
+            gasLimit: GANACHE_CONFIG.gasLimit,
+            nonce: nonce + i // Use nonce for each transaction
+          },
+        );
+        console.log('Transaction hash:', tx.hash);
+        const receipt = await tx.wait();
+        console.log('Transaction successful:', receipt);
+
+        // Update the counter and remaining tickets in the database
+        setCounter(prev => prev + 1);
+        const zone = event.zones?.find(z => z.name === request.zone);
+        if (zone) {
+          const updatedMax = Number(zone.max) - (i + 1); // Decrease max by the number of tickets minted
+          await db.event.updateZoneMax(event.eventId, request.zone, updatedMax);
         }
-      );
+      }
 
-      console.log('Transaction hash:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('Transaction successful:', receipt);
       alert('Tickets created successfully!');
       router.push('/admin/tickets');
     } catch (error) {
@@ -147,9 +157,7 @@ const CreateTickets = () => {
       <div className="container mx-auto p-8">
         <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
           <h1 className="text-2xl font-bold mb-6">創建門票</h1>
-          
-          {/* Remove wallet connection UI since we're using admin account directly */}
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="form-group">
               <label className="block text-sm font-medium text-gray-700 mb-2">活動</label>
@@ -180,7 +188,7 @@ const CreateTickets = () => {
                   <option value="">選擇區域</option>
                   {selectedEvent.zones?.map((zone) => (
                     <option key={zone.name} value={zone.name}>
-                      {zone.name} - HKD {zone.price} (剩餘: {zone.total})
+                      {zone.name} - HKD {zone.price} (剩餘: {Number(zone.max) - counter})
                     </option>
                   ))}
                 </select>
@@ -190,21 +198,25 @@ const CreateTickets = () => {
             {request.zone && (
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  數量 (最多: {maxTickets})
+                  數量 (最多: {remainingTickets})
                 </label>
                 <input
                   type="number"
                   min="1"
-                  max={maxTickets}
+                  max={remainingTickets}
                   value={request.quantity}
                   onChange={(e) => setRequest(prev => ({
                     ...prev,
-                    quantity: Math.min(parseInt(e.target.value), maxTickets)
+                    quantity: Math.min(parseInt(e.target.value), remainingTickets)
                   }))}
                   className="w-full p-2 border rounded"
                   required
                 />
               </div>
+            )}
+
+            {remainingTickets > 0 && selectedEvent?.zones?.find(z => z.name === request.zone) && (
+              <p>剩餘可創建票券數量: {Number(selectedEvent.zones.find(z => z.name === request.zone)?.max) - counter}</p>
             )}
 
             <button
