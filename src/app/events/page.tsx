@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import Events from '@/components/event/event';
 import db from '@/lib/db';
-import { Events as EventType } from '@/components/types';
+import { Events as EventType } from '@/types';
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventType[]>([]);

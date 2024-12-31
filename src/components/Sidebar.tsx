@@ -9,6 +9,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const menuItems = [
     { name: '首頁', icon: FaHome, href: '/' },
     { name: '建立活動', icon: FaPlusCircle, href: '/admin/create-event' },
+    { name: '活動列表', icon: FaHome, href: '/admin/events' },
+    { name: '票券管理', icon: FaHome, href: '/admin/tickets' },
     { name: '抽籤', icon: FaRandom, href: '/lottery' },
     { name: '管理', icon: FaCog, href: '/settings' },
   ];

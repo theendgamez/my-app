@@ -1,6 +1,6 @@
 import { DynamoDBClient, ScanCommand, PutItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand , GetItemCommand} from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users } from '../components/types'; // Import the interfaces
+import { Events, Users } from '@/types'; // Import the interfaces
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
   region: process.env.NEXT_PUBLIC_AWS_REGION,
@@ -41,6 +41,39 @@ const db = {
         return unmarshall(result.Item) as Events;
       }
       return null;
+    },
+    update: async (eventId: string, updates: Partial<Events>) => {
+      const updateExpressions: string[] = [];
+      const expressionAttributeValues: { [key: string]: unknown } = {};
+      const expressionAttributeNames: { [key: string]: string } = {};
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeValues[`:${key}`] = value;
+          expressionAttributeNames[`#${key}`] = key;
+        }
+      });
+
+      const params = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+        ExpressionAttributeValues: marshall(expressionAttributeValues),
+        ExpressionAttributeNames: expressionAttributeNames
+      };
+
+      const command = new UpdateItemCommand(params);
+      await client.send(command);
+      return updates;
+    },
+    delete: async (eventId: string) => {
+      const params = {
+        TableName: 'Events',
+        Key: marshall({ eventId }),
+      };
+      const command = new DeleteItemCommand(params);
+      await client.send(command);
     },
     // ...other methods...
   },
@@ -117,6 +150,20 @@ const db = {
       const command = new DeleteItemCommand(params);
       await client.send(command);
     },
+    getAdmin: async () => {
+      const params = {
+        TableName: 'Users',
+        FilterExpression: '#isAdmin = :isAdmin',
+        ExpressionAttributeValues: marshall({ ':isAdmin': true }),
+        ExpressionAttributeNames: { '#isAdmin': 'isAdmin' },
+      };
+      const command = new ScanCommand(params);
+      const result = await client.send(command);
+      if (result.Items && result.Items.length > 0) {
+        return unmarshall(result.Items[0]) as Users;
+      }
+      return null;
+    }
   },
   // ...other tables...
 };

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Navbar from '@/components/navbar/Navbar'; // Ensure correct path casing
 import Sidebar from "@/components/Sidebar";
-import type { Zone } from '@/components/types';
+import type { Zone } from '@/types';
 
 interface FormData {
   eventName: string;

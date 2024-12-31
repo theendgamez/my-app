@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Events } from '@/components/types';
+import { Events } from '@/types';
 import Navbar from '@/components/navbar/Navbar';
 import db from '@/lib/db';
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 import db from '@/lib/db';
-import { Events } from '@/components/types';
+import { Events } from '@/types';
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 

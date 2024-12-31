@@ -38,3 +38,17 @@ export interface Events {
   category: string; // Changed from categories: string;
 }
 
+export interface Ticket {
+  eventId: string;
+  zone: string;
+  seatNumber: number;
+  price: number;
+  tokenId?: string;
+}
+
+export interface TicketMintRequest {
+  eventId: string;
+  zone: string;
+  quantity: number;
+  pricePerTicket: number;
+}

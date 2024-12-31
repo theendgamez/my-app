@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db'; // Import the db module
 import { writeFile, mkdir } from 'fs/promises';
-import { Events } from '@/components/types'; // Import the Events interface
+import { Events } from '@/types'; // Import the Events interface
 import path from 'path';
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const eventId = Math.random().toString(36).substring(8);
+    const eventId = Math.floor(Math.random() * 1000000).toString();
     
     // Extract common form data
     const eventName = formData.get('name') as string;
