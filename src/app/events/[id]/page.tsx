@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Events } from '@/types';
@@ -14,7 +14,7 @@ const EventDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const { id } = useParams();
 
-  const fetchEvent = async () => {
+  const fetchEvent = useCallback(async () => {
     try {
       const data = await db.event.findById(id as string)
       setEvent(data);
@@ -23,11 +23,11 @@ const EventDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchEvent();
-  }, [id]);
+  }, [fetchEvent]);
 
   const handleRetry = () => {
     setLoading(true);

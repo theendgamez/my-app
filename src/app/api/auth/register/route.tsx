@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import db from '@/lib/db';
 import { Users } from '@/types';
-import sendVerificationCode from '@/app/utils/sendVerifcationCode';
+import sendVerificationCode from '@/utils/sendVerifcationCode';
 
 export async function checkEmailUnique(email: string): Promise<boolean> {
   const existingUser = await db.users.findByEmail(email);

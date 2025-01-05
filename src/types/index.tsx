@@ -51,13 +51,37 @@ export interface Ticket {
   location: string;
 }
 export interface TicketMintRequest {
-
   eventId: string;
-
   zone: string;
-
   quantity: number;
-
   pricePerTicket: number;
+}
 
+export interface Payment {
+  paymentId: string;
+  eventId: string;
+  userId: string;
+  zone: string;
+  quantity: number;
+  totalAmount: number;
+  createdAt: string;
+  status: 'completed' | 'pending' | 'failed';
+  cardDetails: {
+    lastFourDigits: string;
+  };
+  user: {
+    blockchainAddress: string;
+  };
+  tokenId?: string;
+
+  
+}
+
+export interface Ticket {
+  ticketId: string; //
+  eventId: string;
+  zone: string;
+  userId: string; 
+  blockchainAddress: string; 
+  status: 'minted' | 'transferred';
 }

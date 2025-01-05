@@ -37,7 +37,8 @@ const BookingPage = () => {
       alert('請選擇區域');
       return;
     }
-    router.push(`/events/${id}/payment?zone=${selectedZone}&quantity=${quantity}`);
+    const ticketPrice = selectedZoneDetails ? Number(selectedZoneDetails.price) : 0;
+    router.push(`/events/${id}/payment?zone=${selectedZone}&quantity=${quantity}&price=${ticketPrice}`);
   };
 
   if (loading) return <div>Loading...</div>;

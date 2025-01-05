@@ -1,6 +1,7 @@
 import { DynamoDBClient, ScanCommand, PutItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand , GetItemCommand} from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users } from '@/types'; // Import the interfaces
+import { Events, Users, Payment , Ticket} from '@/types'; // Import the interfaces
+
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
   region: process.env.NEXT_PUBLIC_AWS_REGION,
@@ -230,7 +231,44 @@ const db = {
       return null;
     }
   },
-  // ...other tables...
+  payments: {
+    create: async (paymentData: Payment) => {
+      await client.send(new PutItemCommand({
+        TableName: 'Payments',
+        Item: marshall(paymentData),
+      }));
+      return paymentData;
+    },
+    findById: async (paymentId: string) => {
+      const params = {
+        TableName: 'Payments',
+        Key: marshall({ paymentId })
+      };
+      const result = await client.send(new GetItemCommand(params));
+      return result.Item ? unmarshall(result.Item) as Payment : null;
+    },
+    findByUser: async (userId: string) => {
+      const params = {
+        TableName: 'Payments',
+        IndexName: 'userId-index',
+        KeyConditionExpression: 'userId = :userId',
+        ExpressionAttributeValues: marshall({
+          ':userId': userId
+        })
+      };
+      const result = await client.send(new QueryCommand(params));
+      return result.Items?.map(item => unmarshall(item) as Payment) || [];
+    }
+  },
+  tickets: {
+    create: async (ticketData: Ticket) => {
+      await client.send(new PutItemCommand({
+        TableName: 'Tickets',
+        Item: marshall(ticketData),
+      }));
+      return ticketData;
+    }
+  }
 };
 
 export default db;
