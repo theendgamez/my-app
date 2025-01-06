@@ -239,12 +239,16 @@ const CreateEventPage = () => {
                     {...register(`zones.${index}.max`, { required: "Total Tickets is required" })}
                     placeholder="Total Tickets"
                   />
+                  <input className="block text-sm font-medium text-gray-700 mb-2"
+                    {...register(`zones.${index}.remaining`, { required: "Total Tickets is required" })}
+                    placeholder="Total Tickets"
+                  />
                   <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => remove(index)}>
                     Remove
                   </button>
                 </div>
               ))}
-              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", total: "0" , max: "" })}>
+              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", remaining: "" , max: "" })}>
                 Add Zone
               </button>
             </div>

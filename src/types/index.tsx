@@ -16,7 +16,7 @@ export interface Users {
 export interface Zone {
   name: string;
   price: string;
-  total: string;
+  remaining: string;
   max: string;
 }
 
@@ -38,18 +38,6 @@ export interface Events {
   category: string; // Changed from categories: string;
 }
 
-export interface Ticket {
-  eventId: string;
-  zone: string;
-  seatNumber: number;
-  price: number;
-  tokenId?: string;
-  owner?: string;
-  eventDate: string;
-  eventName: string;
-  photoUrl: string;
-  location: string;
-}
 export interface TicketMintRequest {
   eventId: string;
   zone: string;
@@ -72,16 +60,15 @@ export interface Payment {
   user: {
     blockchainAddress: string;
   };
-  tokenId?: string;
-
-  
 }
 
 export interface Ticket {
-  ticketId: string; //
+  ticketId: string;
   eventId: string;
   zone: string;
-  userId: string; 
-  blockchainAddress: string; 
-  status: 'minted' | 'transferred';
+  userId: string;
+  blockchainAddress: string;
+  status: 'minted';
+  tokenId: string;
+  // Add other required properties if any
 }

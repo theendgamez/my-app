@@ -1,43 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import db from '@/lib/db';
-import { TicketMintRequest } from '@/types'; // Ensure this includes the price property
-import { Events as EventType } from '@/types';
+import { Ticket, Events} from '@/types';
+
 import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/Sidebar';
-import { ethers } from 'ethers';
-import TicketContract from '@/artifacts/contracts/TicketContract.sol/TicketContract.json';
+import db from '@/lib/db';
+import { mintTicket } from '@/utils/blockchainService';
 
-const CreateTickets = () => {
+
+
+interface TicketMintRequest {
+  eventId: string;
+  zone: string;
+  quantity: number;
+  pricePerTicket: number;
+}
+
+export default function AdminTicketsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(false);
-  const [events, setEvents] = useState<EventType[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
-  const [remainingTickets, setRemainingTickets] = useState<number>(0);
+  const [events, setEvents] = useState<Events[]>([]); // Assuming Event type is defined
+  const [selectedEvent, setSelectedEvent] = useState<Events | null>(null);
   const [request, setRequest] = useState<TicketMintRequest>({
     eventId: '',
     zone: '',
     quantity: 1,
-    pricePerTicket: 0 // Ensure this is included
+    pricePerTicket: 0,
   });
-  const key = '0x941f99977ca2acc84b3c9354c286f593df7502cd9128766fbf5a1ef5144dec30'; // Replace with your actual private key
-  const [counter, setCounter] = useState<number>(0);
+  const [remainingTickets, setRemainingTickets] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Ganache Configuration
-  const GANACHE_CONFIG = {
-    rpcUrl: 'http://127.0.0.1:7545',
-    chainId: 1337,
-    gasPrice: ethers.parseUnits('20', 'gwei'), // 20 GWEI
-    gasLimit: 6721975,
-  };
-
+  // Fetch events on component mount
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const data = await db.event.findMany();
-        setEvents(data as EventType[]);
+        // Implement fetch logic
+        const fetchedEvents: Events[] = await fetchEventsFromDB(); // Define this function
+        setEvents(fetchedEvents);
       } catch (error) {
         console.error('Failed to fetch events:', error);
       }
@@ -47,104 +47,90 @@ const CreateTickets = () => {
   }, []);
 
   const handleEventChange = (eventId: string) => {
-    const event = events.find(e => e.eventId === eventId);
+    const event = events.find((e) => e.eventId === eventId);
     setSelectedEvent(event || null);
-    setRequest(prev => ({
-      ...prev,
+    setRequest({
+      ...request,
       eventId,
       zone: '',
       pricePerTicket: 0,
-      quantity: 1 // Reset quantity when event changes
-    }));
-    setRemainingTickets(0); // Reset remaining tickets
+      quantity: 1,
+    });
+    setRemainingTickets(0);
   };
 
   const handleZoneChange = (zoneName: string) => {
-    const zone = selectedEvent?.zones?.find(z => z.name === zoneName);
+    const zone = selectedEvent?.zones.find((z) => z.name === zoneName);
     if (!zone) return;
 
-    setRequest(prev => ({
-      ...prev,
+    setRequest({
+      ...request,
       zone: zoneName,
-      pricePerTicket: Number(zone.price) || 0,
-      quantity: 1 // Reset quantity when zone changes
-    }));
-
-    // Calculate remaining tickets
-    const remaining = Number(zone.max) - counter;
+      pricePerTicket: Number(zone.price),
+      quantity: 1,
+    });
+    const remaining = Math.min(Number(zone.max), Number(zone.remaining));
     setRemainingTickets(remaining);
+  };
+
+
+  const fetchEventsFromDB = async (): Promise<Events[]> => {
+    // Implement fetch logic
+    return db.event.findMany()
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (request.quantity > remainingTickets) {
-      alert(`Maximum tickets available: ${remainingTickets}`);
+      alert(`最多可用票數：${remainingTickets}`);
       return;
     }
     setLoading(true);
 
     try {
-      const provider = new ethers.JsonRpcProvider(GANACHE_CONFIG.rpcUrl);
-      const wallet = new ethers.Wallet(key, provider);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-      const network = await provider.getNetwork();
-      if (Number(network.chainId) !== GANACHE_CONFIG.chainId) {
-        throw new Error('Wrong network, please connect to Ganache');
+      if (!user.userId || !user.blockchainAddress) {
+        throw new Error('User ID and Blockchain Address are required');
       }
 
-      const address = await wallet.getAddress();
-      console.log('Using address:', address);
+      const eventDate = Math.floor(new Date(selectedEvent?.eventDate || '').getTime() / 1000);
 
-      const balance = await provider.getBalance(address);
-      console.log('Wallet balance:', ethers.formatEther(balance), 'ETH');
 
-      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-      const contract = new ethers.Contract(contractAddress, TicketContract.abi, wallet);
-
-      const event = events.find(e => e.eventId === request.eventId);
-      if (!event) {
-        throw new Error('Event not found');
-      }
-
-      const numericId = BigInt(event.eventId);
-      const nonce = await provider.getTransactionCount(address);
-
-      // Convert event date to timestamp
-      const eventDate = Math.floor(new Date(event.eventDate).getTime() / 1000); // Convert to seconds
-
-      // Loop to create multiple tickets
       for (let i = 0; i < request.quantity; i++) {
-        const tx = await contract.mintTicket(
-          address,          // The address to mint the ticket to
-          numericId,       // The event ID (should be a uint256)
-          request.zone,    // The zone (should be a string)
-          i + 1,           // The seat number (should be a uint256)
-          request.pricePerTicket, // The price (should be a uint256)
-          eventDate,       // The event date (should be a uint256 timestamp)
-          {
-            gasPrice: GANACHE_CONFIG.gasPrice,
-            gasLimit: GANACHE_CONFIG.gasLimit,
-            nonce: nonce + i // Use nonce for each transaction
-          },
+        // Mint Ticket and get transaction hash
+        const tokenId = await mintTicket(
+          user.blockchainAddress,
+          Number(request.eventId),
+          request.zone,
+          i + 1,
+          request.pricePerTicket,
+          eventDate
         );
-        console.log('Transaction hash:', tx.hash);
-        const receipt = await tx.wait();
-        console.log('Transaction successful:', receipt);
 
-        // Update the counter and remaining tickets in the database
-        setCounter(prev => prev + 1);
-        const zone = event.zones?.find(z => z.name === request.zone);
-        if (zone) {
-          const updatedMax = Number(zone.max) - (i + 1); // Decrease max by the number of tickets minted
-          await db.event.updateZoneMax(event.eventId, request.zone, updatedMax);
-        }
+        // Store ticket information in the database
+        const ticketData: Ticket = {
+          ticketId: `${request.eventId}-${request.zone}-${i + 1}`,
+          eventId: request.eventId,
+          zone: request.zone,
+          userId: user.userId,
+          blockchainAddress: user.blockchainAddress,
+          status: 'minted',
+          tokenId: tokenId.toString(),
+        };
+
+        await db.tickets.create(ticketData);
       }
 
-      alert('Tickets created successfully!');
+      // Update remaining tickets in the database
+      const newRemaining = remainingTickets - request.quantity;
+      await db.event.updateZoneRemaining(request.eventId, request.zone, newRemaining);
+
+      alert('票券創建成功！');
       router.push('/admin/tickets');
     } catch (error) {
-      console.error('Failed to create tickets:', error);
-      alert(`Failed to create tickets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('創建票券失敗:', error);
+      alert('票券創建失敗，請重試');
     } finally {
       setLoading(false);
     }
@@ -155,11 +141,12 @@ const CreateTickets = () => {
       <Navbar />
       <Sidebar />
       <div className="container mx-auto p-8">
-        <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
+        <div className="max-w-xl mx-auto bg-white shadow-lg p-6">
           <h1 className="text-2xl font-bold mb-6">創建門票</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="form-group">
+            {/* Event Selection */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">活動</label>
               <select
                 value={request.eventId}
@@ -176,56 +163,50 @@ const CreateTickets = () => {
               </select>
             </div>
 
+            {/* Zone Selection */}
             {selectedEvent && (
               <div>
-                <label className="block text-sm font-medium mb-2">區域</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">區域</label>
                 <select
                   value={request.zone}
                   onChange={(e) => handleZoneChange(e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">選擇區域</option>
-                  {selectedEvent.zones?.map((zone) => (
+                  {selectedEvent.zones.map((zone) => (
                     <option key={zone.name} value={zone.name}>
-                      {zone.name} - HKD {zone.price} (剩餘: {Number(zone.max) - counter})
+                      {zone.name} - ${zone.price} - Remaining: {zone.remaining}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {request.zone && (
+            {/* Quantity */}
+            {selectedEvent && request.zone && (
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  數量 (最多: {remainingTickets})
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">數量</label>
                 <input
                   type="number"
                   min="1"
                   max={remainingTickets}
                   value={request.quantity}
-                  onChange={(e) => setRequest(prev => ({
-                    ...prev,
-                    quantity: Math.min(parseInt(e.target.value), remainingTickets)
-                  }))}
-                  className="w-full p-2 border rounded"
+                  onChange={(e) => setRequest({ ...request, quantity: Number(e.target.value) })}
+                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+                <p className="text-sm text-gray-500 mt-1">最多可購買：{remainingTickets}</p>
               </div>
             )}
 
-            {remainingTickets > 0 && selectedEvent?.zones?.find(z => z.name === request.zone) && (
-              <p>剩餘可創建票券數量: {Number(selectedEvent.zones.find(z => z.name === request.zone)?.max) - counter}</p>
-            )}
-
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full ${loading
-                ? 'bg-gray-400'
-                : 'bg-blue-500 hover:bg-blue-600'
-                } text-white py-2 px-4 rounded-md transition-colors`}
+              className={`w-full ${
+                loading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+              } text-white py-2 px-4 rounded transition-colors`}
             >
               {loading ? '創建中...' : '創建門票'}
             </button>
@@ -234,6 +215,4 @@ const CreateTickets = () => {
       </div>
     </div>
   );
-};
-
-export default CreateTickets;
+}

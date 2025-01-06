@@ -109,8 +109,8 @@ const db = {
       return { zoneName, newMax };
     },
     
-    // Update the zone total
-    updateZoneTotal: async (eventId: string, zoneName: string, newTotal: number) => {
+    // Update the zone Remaining
+    updateZoneRemaining: async (eventId: string, zoneName: string, newRemaining: number) => {
       // Fetch the current item to find the index of the zone
       const getItemParams = {
         TableName: 'Events',
@@ -131,16 +131,16 @@ const db = {
       const params = {
         TableName: 'Events',
         Key: marshall({ eventId }),
-        UpdateExpression: `SET zones[${zoneIndex}].#total = :newTotal`,
-        ExpressionAttributeValues: marshall({ ':newTotal': newTotal.toString() }), // Convert to string if needed
+        UpdateExpression: `SET zones[${zoneIndex}].#remaining = :newRemaining`,
+        ExpressionAttributeValues: marshall({ ':newRemaining': newRemaining.toString() }), // Convert to string if needed
         ExpressionAttributeNames: {
-          '#total': 'total', // Use a placeholder for the reserved keyword
+          '#remaining': 'remaining', // Use a placeholder for the reserved keyword
         },
       };
       
       const command = new UpdateItemCommand(params);
       await client.send(command);
-      return { zoneName, newTotal };
+      return { zoneName, newRemaining };
     }
   },
   users: {
@@ -267,7 +267,58 @@ const db = {
         Item: marshall(ticketData),
       }));
       return ticketData;
-    }
+    },
+    findMany: async () => {
+      const params = {
+        TableName: 'Tickets',
+      };
+      const command = new ScanCommand(params);
+      const data = await client.send(command);
+      return data.Items?.map((item) => unmarshall(item)) as Ticket[];
+    },
+    findByUser: async (userId: string) => {
+      const params = {
+        TableName: 'Tickets',
+        IndexName: 'userId-index',
+        KeyConditionExpression: 'userId = :userId',
+        ExpressionAttributeValues: marshall({
+          ':userId': userId
+        })
+      };
+      const result = await client.send(new QueryCommand(params));
+      return result.Items?.map(item => unmarshall(item) as Ticket) || [];
+    },
+    findByEvent: async (eventId: string) => {
+      const params = {
+        TableName: 'Tickets',
+        IndexName: 'eventId-index',
+        KeyConditionExpression: 'eventId = :eventId',
+        ExpressionAttributeValues: marshall({
+          ':eventId': eventId
+        })
+      };
+      const result = await client.send(new QueryCommand(params));
+      return result.Items?.map(item => unmarshall(item) as Ticket) || [];
+    },
+    findById: async (ticketId: string) => {
+      const params = {
+        TableName: 'Tickets',
+        Key: marshall({ ticketId })
+      };
+      const result = await client.send(new GetItemCommand(params));
+      return result.Item ? unmarshall(result.Item) as Ticket : null;
+    },
+    update: async (ticketId: string, updates: Partial<Ticket>) => {
+      const params = {
+        TableName: 'Tickets',
+        Key: marshall({ ticketId }),
+        UpdateExpression: 'SET #status = :status',
+        ExpressionAttributeValues: marshall({ ':status': updates.status }),
+        ExpressionAttributeNames: { '#status': 'status' }
+      };
+      await client.send(new UpdateItemCommand(params));
+      return { ticketId, ...updates };
+      },
   }
 };
 

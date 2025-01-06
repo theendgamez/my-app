@@ -17,7 +17,7 @@ contract TicketContract is ERC721, Ownable {
     mapping(uint256 => Ticket) public tickets;
     uint256 private _tokenIdCounter;
 
-    event TicketMinted(uint256 tokenId, uint256 eventId, string zone, uint256 seatNumber , uint256 eventDate);
+    event TicketMinted(address indexed to, uint256 indexed tokenId, uint256 eventId, string zone, uint256 seatNumber, uint256 eventDate);
 
     constructor() ERC721("EventTicket", "TCKT") Ownable(msg.sender) {}
 
@@ -28,23 +28,12 @@ contract TicketContract is ERC721, Ownable {
         uint256 seatNumber,
         uint256 price,
         uint256 eventDate
-
     ) public onlyOwner returns (uint256) {
-        uint256 tokenId = _tokenIdCounter;
-        _tokenIdCounter++;
-
-        tickets[tokenId] = Ticket({
-            eventId: eventId,
-            zone: zone,
-            seatNumber: seatNumber,
-            price: price,
-            isUsed: false,
-            eventDate: eventDate
-        });
-
+        uint256 tokenId = _tokenIdCounter++;
+        tickets[tokenId] = Ticket(eventId, zone, seatNumber, price, false, eventDate);
         _safeMint(to, tokenId);
-        emit TicketMinted(tokenId, eventId, zone, seatNumber, eventDate); // Emit event with event date
 
+        emit TicketMinted(to, tokenId, eventId, zone, seatNumber, eventDate);
         return tokenId;
     }
 
