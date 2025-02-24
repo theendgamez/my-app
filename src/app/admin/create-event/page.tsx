@@ -236,12 +236,12 @@ const CreateEventPage = () => {
                     placeholder="Zone Name"
                   />
                    <input className="block text-sm font-medium text-gray-700 mb-2"
-                    {...register(`zones.${index}.max`, { required: "Total Tickets is required" })}
-                    placeholder="Total Tickets"
+                    {...register(`zones.${index}.max`, { required: "Max Tickets is required" })}
+                    placeholder="Max Tickets"
                   />
                   <input className="block text-sm font-medium text-gray-700 mb-2"
-                    {...register(`zones.${index}.remaining`, { required: "Total Tickets is required" })}
-                    placeholder="Total Tickets"
+                    {...register(`zones.${index}.remaining`, { required: "Remaining Tickets is required" })}
+                    placeholder="Remaining Tickets"
                   />
                   <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => remove(index)}>
                     Remove

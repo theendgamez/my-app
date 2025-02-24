@@ -56,56 +56,16 @@ export const mintTicket = async (
 };
 
 
-interface TransferTicketParams {
-  privateKey: string;
-  contractAddress: string;
-  fromAddress: string;
-  toAddress: string;
-  tokenId: number;
-}
 
-export async function transferTicket(params: TransferTicketParams): Promise<string> {
-  const { privateKey, contractAddress, fromAddress, toAddress, tokenId } = params;
-
-  const provider = new ethers.JsonRpcProvider(GANACHE_CONFIG.rpcUrl);
-  const wallet = new ethers.Wallet(privateKey, provider);
-
-  console.log(`Connecting to contract at ${contractAddress}`);
-  const contract = new ethers.Contract(contractAddress, TicketContract.abi, wallet);
-
-  console.log(`Transferring ticket #${tokenId} from ${fromAddress} to ${toAddress}`);
-  const tx = await contract.safeTransferFrom(
-    fromAddress,
-    toAddress,
-    tokenId,
-    {
-      gasPrice: GANACHE_CONFIG.gasPrice,
-      gasLimit: GANACHE_CONFIG.gasLimit,
-    }
-  );
-
-  console.log('Transaction hash:', tx.hash);
+export async function transferTicket(
+  from: string,
+  to: string,
+  tokenId: string
+): Promise<void> {
+  const tx = await contract.transferFrom(from, to, tokenId);
   await tx.wait();
-  console.log('Transaction confirmed:', tx.hash);
-  return tx.hash;
+  console.log('Transferred TokenId:', tokenId);
 }
 
-export async function parseTokenIdFromReceipt(receipt: ethers.TransactionReceipt): Promise<string | null> {
-  const mintEvent = receipt.logs.find((log) => {
-    try {
-      const iface = new ethers.Interface(TicketContract.abi);
-      const event = iface.parseLog(log);
-      return event && event.name === 'Transfer'; // 解析 ERC721 的 Transfer 事件
-    } catch {
-      return false;
-    }
-  });
 
-  if (mintEvent) {
-    const iface = new ethers.Interface(TicketContract.abi);
-    const parsedLog = iface.parseLog(mintEvent);
-    return parsedLog && parsedLog.args?.tokenId?.toString() || null;
-  }
-  return null;
-}
 

@@ -6,13 +6,13 @@ const ticketingPass = process.env.SMTP_PASSWORD;
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // true for 465, false for other ports
+  secure: true, 
   auth: {
     user: ticketingEmail,
     pass: ticketingPass,
   },
   tls: {
-    rejectUnauthorized: false, // Avoid issues with self-signed certificates
+    rejectUnauthorized: false,
     minVersion: 'TLSv1.2',
   },
 });

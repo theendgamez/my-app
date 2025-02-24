@@ -31,11 +31,11 @@ export interface Events {
   registerDate: string | null;
   endregisterDate: string | null;
   drawDate: string | null;
-  zones: Zone[]; // Changed from zones: []
+  zones: Zone[]; 
   photoUrl: string;
   createdAt: string;
   status: string;
-  category: string; // Changed from categories: string;
+  category: string;
 }
 
 export interface TicketMintRequest {

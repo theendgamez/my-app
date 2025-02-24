@@ -18,17 +18,37 @@ export async function POST(request: Request): Promise<NextResponse<Payment | { e
     // 2. Store payment record in the database
     await db.payments.create(payment);
 
-
+    
+    const adminWallet = process.env.ADMIN_WALLET_ADDRESS;
+    if (!adminWallet) {
+      return NextResponse.json(
+        { error: 'Admin wallet address is not defined' },
+        { status: 500 }
+      );
+    }
     // 3. Transfer ticket on the blockchain
     try {
-      const txHash = await transferTicket({
-        userAddress: payment.userWallerAddress, // Blockchain address
-        eventId: payment.eventId,
-        zone: payment.zone,
-        quantity: payment.quantity,
-      });
+      const ticketData = await db.tickets.findByEvent(payment.eventId, payment.zone);
+      if (!ticketData) {
+        return NextResponse.json(
+          { error: 'Ticket not found' },
+          { status: 404 }
+        );
+      }
+      const transferResults = await Promise.all(ticketData.map(ticket => 
+        transferTicket(
+          adminWallet,
+          payment.user.blockchainAddress, // Placeholder recipient address
+          ticket.tokenId,
+        )
+      ));
 
-      console.log('Ticket transferred successfully:', txHash);
+
+      transferResults.forEach((txHash, index) => {
+        const ticket = ticketData[index];
+        db.tickets.update(ticket.ticketId, { status: 'transferred', txHash });
+        console.log('Ticket transferred successfully:', txHash);
+      });
     } catch (err) {
       console.error('Failed to transfer ticket:', err);
       return NextResponse.json(

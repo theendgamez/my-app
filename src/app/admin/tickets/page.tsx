@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Ticket, Events} from '@/types';
-
 import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/Sidebar';
 import db from '@/lib/db';
 import { mintTicket } from '@/utils/blockchainService';
-
+import { v4 as uuidv4 } from 'uuid'; 
 
 
 interface TicketMintRequest {
@@ -98,6 +97,7 @@ export default function AdminTicketsPage() {
 
 
       for (let i = 0; i < request.quantity; i++) {
+        const uniqueTicketId = uuidv4();
         // Mint Ticket and get transaction hash
         const tokenId = await mintTicket(
           user.blockchainAddress,
@@ -110,7 +110,7 @@ export default function AdminTicketsPage() {
 
         // Store ticket information in the database
         const ticketData: Ticket = {
-          ticketId: `${request.eventId}-${request.zone}-${i + 1}`,
+          ticketId: uniqueTicketId,
           eventId: request.eventId,
           zone: request.zone,
           userId: user.userId,
@@ -196,7 +196,7 @@ export default function AdminTicketsPage() {
                   className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <p className="text-sm text-gray-500 mt-1">最多可購買：{remainingTickets}</p>
+                <p className="text-sm text-gray-500 mt-1">最多可創造：{remainingTickets}</p>
               </div>
             )}
 

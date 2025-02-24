@@ -32,6 +32,7 @@ export default function PaymentPage() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (!user.userId) {
       alert('Please log in to make a payment');
+      router.push(`/app/login`);
       return;
     }
 
@@ -40,6 +41,7 @@ export default function PaymentPage() {
       eventId: id as string,
       userId: user.userId,
       userWallerAddress: user.blockchainAddress,
+      user,
       zone,
       quantity,
       totalAmount: totalPrice,
@@ -68,7 +70,8 @@ export default function PaymentPage() {
   return (
     <>
       <Navbar />
-      <div className="container mx-auto p-4 pt-20">
+      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="w-full max-w-md p-8 bg-white rounded shadow">
         <h1 className="text-2xl font-bold mb-4">信用卡付款</h1>
         <p className="mb-2">區域: {zone}</p>
         <p className="mb-6">數量: {quantity}</p>
@@ -131,6 +134,7 @@ export default function PaymentPage() {
               eventId: id as string,
               userId: user.userId,
               userWallerAddress: user.blockchainAddress,
+              user,
               zone,
               quantity,
               totalAmount: totalPrice,
@@ -151,6 +155,7 @@ export default function PaymentPage() {
           Test
         </button>
       </div>
+    </div>
     </>
   );
 }

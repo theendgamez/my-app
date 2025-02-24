@@ -262,10 +262,12 @@ const db = {
   },
   tickets: {
     create: async (ticketData: Ticket) => {
-      await client.send(new PutItemCommand({
+      const params = {
         TableName: 'Tickets',
         Item: marshall(ticketData),
-      }));
+      };
+      const command = new PutItemCommand(params);
+      await client.send(command);
       return ticketData;
     },
     findMany: async () => {
@@ -288,13 +290,14 @@ const db = {
       const result = await client.send(new QueryCommand(params));
       return result.Items?.map(item => unmarshall(item) as Ticket) || [];
     },
-    findByEvent: async (eventId: string) => {
+    findByEvent: async (eventId: string, zone: string) => {
       const params = {
         TableName: 'Tickets',
         IndexName: 'eventId-index',
         KeyConditionExpression: 'eventId = :eventId',
         ExpressionAttributeValues: marshall({
-          ':eventId': eventId
+          ':eventId': eventId,
+          ':zone': zone
         })
       };
       const result = await client.send(new QueryCommand(params));
