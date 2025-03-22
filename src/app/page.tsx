@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
-import { Users, Events as EventType } from '../types';
+import { Users, Events as EventType } from '@/types';
 import Sidebar from '@/components/Sidebar';
-import PromoCarousel from '@/components/PromoCarousel';
-import Events from '@/components/event/event';
+import PromoCarousel from '@/components/ui/PromoCarousel';
+import Events from '@/components/event/Event';
 import db from '@/lib/db';
 
 export default function Home() {
@@ -26,7 +26,7 @@ export default function Home() {
 
     const fetchEvents = async () => {
       try {
-        const data = await db.event.findMany();
+        const data = await db.events.findMany();
         setEvents((data as EventType[]) || []);
       } catch (error) {
         console.error('Failed to fetch events:', error);

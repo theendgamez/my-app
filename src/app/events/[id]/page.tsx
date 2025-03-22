@@ -16,7 +16,7 @@ const EventDetail = () => {
 
   const fetchEvent = useCallback(async () => {
     try {
-      const data = await db.event.findById(id as string)
+      const data = await db.events.findById(id as string)
       setEvent(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');

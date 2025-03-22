@@ -65,10 +65,10 @@ export async function POST(request: Request) {
       photoUrl: `/img/${uniqueFileName}`,
       createdAt: new Date().toISOString(),
       status: 'Prepare',
-      category: formData.get('category') as string, // Changed from categories: ...
+      category: formData.get('category') as string,
     };
 
-    await db.event.create(eventData);
+    await db.events.create(eventData);
     return NextResponse.json({ message: '活動建立成功', event: eventData }, { status: 201 });
 
   } catch (error) {

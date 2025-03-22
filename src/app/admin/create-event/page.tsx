@@ -13,13 +13,10 @@ interface FormData {
   description: string;
   location: string;
   isDrawMode: boolean;
-  // Draw mode fields
   registerDate?: string;
   endregisterDate?: string;
   drawDate?: string;
-  // Direct sale field
   onSaleDate?: string;
-  // Common fields
   zones: Zone[];
   photo: FileList;
   status?: 'Prepare' | 'OnSale' | 'SoldOut';
@@ -240,15 +237,15 @@ const CreateEventPage = () => {
                     placeholder="Max Tickets"
                   />
                   <input className="block text-sm font-medium text-gray-700 mb-2"
-                    {...register(`zones.${index}.remaining`, { required: "Remaining Tickets is required" })}
-                    placeholder="Remaining Tickets"
+                    {...register(`zones.${index}.quantity`, { required: "Tickets Quantity is required" })}
+                    placeholder="Tickets Quantity"
                   />
                   <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => remove(index)}>
                     Remove
                   </button>
                 </div>
               ))}
-              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", remaining: "" , max: "" })}>
+              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", quantity: "" , max: "" })}>
                 Add Zone
               </button>
             </div>
