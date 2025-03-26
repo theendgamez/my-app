@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect} from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users } from '@/types';
 import SearchBar from './SearchBar';
@@ -13,11 +13,7 @@ const NavbarLink = ({ href, children }: { href: string; children: React.ReactNod
   </Link>
 );
 
-interface NavbarProps {
-  userName?: string;
-}
-
-const Navbar: React.FC<NavbarProps> = ({}) => {
+const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<Users | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -130,6 +126,6 @@ const Navbar: React.FC<NavbarProps> = ({}) => {
       </div>
     </nav>
   );
-}
+};
 
 export default Navbar;

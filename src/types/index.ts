@@ -1,4 +1,4 @@
-// src/types/User.ts
+// User related types
 export interface Users {
   userId: string;
   userName: string;
@@ -14,10 +14,25 @@ export interface Users {
   tokenVersion?: number;
 }
 
+export interface AuthResponse {
+  success: boolean;
+  message?: string;
+  user?: Partial<Users>;
+  error?: string;
+}
+
+export interface JWTPayload {
+  userId: string;
+  email: string;
+  role: string;
+  tokenVersion?: number;
+}
+
+// Event related types
 export interface Zone {
   name: string;
   price: string;
-  quantity: number;
+  zoneQuantity: number;
   max: string;
 }
 
@@ -39,19 +54,7 @@ export interface Events {
   category: string;
 }
 
-/*export interface TicketMintRequest {
-  eventId: string;
-  zone: string;
-  quantity: number;
-  pricePerTicket: number;
-  totalAmount: number;
-  createdAt: string;
-  status: 'completed' | 'pending' | 'failed';
-  cardDetails: {
-    lastFourDigits: string;
-  };
-}*/
-
+// Payment and ticket related types
 export interface Payment {
   paymentId: string;
   eventId: string;
@@ -69,13 +72,38 @@ export interface Payment {
 
 export interface Ticket {
   ticketId: string;
+  eventId: string;
   eventName: string;
   eventDate: string;
   zone: string;
   userId: string;
   paymentId: string;
   status: 'available' | 'reserved' | 'sold';
-  createdAt: string;
-  updatedAt: string;
   seatNumber: string;
+  price: number;
+  purchaseDate: string;
+}
+
+// Booking related types
+export interface Booking {
+  bookingToken: string;
+  sessionId: string;
+  eventId: string;
+  zone: string;
+  quantity: number;
+  userId: string
+  expiresAt: string;
+  status: 'pending' | 'completed';
+}
+
+export interface BookingDetails {
+  eventName: string;
+  zone: string;
+  quantity: number;
+  price: number;
+  expiresAt: number;
+}
+
+export interface ProcessedPayment {
+  paymentId: string;
 }

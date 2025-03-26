@@ -8,46 +8,87 @@ import Navbar from '@/components/navbar/Navbar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 
+// Helper function to sanitize redirect URLs to prevent loops
+const sanitizeRedirectUrl = (url: string): string => {
+  // If the URL already contains 'redirect=', extract just the final target
+  if (url.includes('redirect=')) {
+    try {
+      // Extract the deepest redirect parameter
+      const redirectParts = url.split('redirect=');
+      if (redirectParts.length > 1) {
+        // Get the last part and decode it
+        let finalRedirect = redirectParts[redirectParts.length - 1];
+        // Remove any trailing parameters
+        finalRedirect = finalRedirect.split('&')[0];
+        return decodeURIComponent(finalRedirect);
+      }
+    } catch (e) {
+      console.error('Error parsing redirect URL:', e);
+    }
+  }
+  return url;
+};
+
 export default function SuccessPage() {
   const searchParams = useSearchParams();
   const { id: eventId } = useParams();
   const router = useRouter();
   
-  // Use optional chaining with useAuth to prevent errors during initial render
-  const auth = typeof window !== 'undefined' ? useAuth() : null;
-  const isAuthenticated = auth?.isAuthenticated || false;
-  const authLoading = auth?.loading || true;
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   
   const [payment, setPayment] = useState<Payment | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchAttempted, setFetchAttempted] = useState(false);
   
   const paymentId = searchParams.get('paymentId');
 
   useEffect(() => {
-    // Only run the authentication check if auth context is available
-    if (auth && !authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/events/${eventId}`)}`);
+    // If authentication is still loading, wait
+    if (authLoading) return;
+
+    // Handle not authenticated case
+    if (!isAuthenticated) {
+      const currentPath = window.location.pathname + window.location.search;
+      const cleanRedirectUrl = `/login?redirect=${encodeURIComponent(sanitizeRedirectUrl(currentPath))}`;
+      router.push(cleanRedirectUrl);
+      return;
+    }
+
+    // If we've already tried fetching or there's no paymentId, don't try again
+    if (fetchAttempted || !paymentId) {
+      if (!paymentId) {
+        setError('未提供付款ID');
+      }
+      setLoading(false);
       return;
     }
 
     const fetchPaymentDetails = async () => {
-      if (!paymentId) {
-        setError('未提供付款ID');
-        setLoading(false);
-        return;
-      }
-      
-      if (!isAuthenticated) {
-        // Wait for authentication to complete
-        return;
-      }
-      
       try {
-        // Fetch payment details using the new endpoint
-        const paymentRes = await fetch(`/api/payments/${paymentId}`);
+        setFetchAttempted(true);
+        
+        // Get user ID
+        const userId = user?.userId;
+        
+        // Common request options with authentication
+        const requestOptions = {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': userId || '' // Add the user ID in header for fallback auth
+          }
+        };
+        
+        // Fetch payment details
+        const paymentRes = await fetch(`/api/payments/${paymentId}`, requestOptions);
+        
         if (!paymentRes.ok) {
+          if (paymentRes.status === 401) {
+            router.push(`/login?redirect=${encodeURIComponent(sanitizeRedirectUrl(window.location.pathname + window.location.search))}`);
+            return;
+          }
+          
           const errorData = await paymentRes.json().catch(() => ({}));
           throw new Error(errorData.error || `API responded with status: ${paymentRes.status}`);
         }
@@ -55,13 +96,13 @@ export default function SuccessPage() {
         const paymentData = await paymentRes.json();
         setPayment(paymentData);
         
-        // Fetch associated tickets using the new endpoint
-        const ticketsRes = await fetch(`/api/tickets/payment/${paymentId}`);
-        if (!ticketsRes.ok) {
-          console.warn(`Failed to fetch tickets: ${ticketsRes.status}`);
-        } else {
+        // Fetch associated tickets
+        const ticketsRes = await fetch(`/api/tickets/payment/${paymentId}`, requestOptions);
+        if (ticketsRes.ok) {
           const ticketsData = await ticketsRes.json();
           setTickets(ticketsData);
+        } else {
+          console.warn(`Failed to fetch tickets: ${ticketsRes.status}`);
         }
       } catch (error) {
         console.error('Failed to fetch payment details:', error);
@@ -71,13 +112,8 @@ export default function SuccessPage() {
       }
     };
 
-    if (auth && isAuthenticated && paymentId) {
-      fetchPaymentDetails();
-    } else if (auth && !authLoading && !paymentId) {
-      setLoading(false);
-      setError('無效的付款資訊');
-    }
-  }, [paymentId, isAuthenticated, authLoading, router, eventId, auth]);
+    fetchPaymentDetails();
+  }, [paymentId, isAuthenticated, authLoading, router, eventId, user, fetchAttempted]);
 
   const formatDate = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = { 

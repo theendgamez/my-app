@@ -67,12 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Ensure cookies are stored
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setUser(data.user);
+        // Also store access token if available in the response
+        if (data.accessToken) {
+          localStorage.setItem('accessToken', data.accessToken);
+        }
         localStorage.setItem('user', JSON.stringify(data.user));
       } else {
         setError(data.error || '登入失敗');

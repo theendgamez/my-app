@@ -5,7 +5,6 @@ import { Users, Events as EventType } from '@/types';
 import Sidebar from '@/components/Sidebar';
 import PromoCarousel from '@/components/ui/PromoCarousel';
 import Events from '@/components/event/Event';
-import db from '@/lib/db';
 
 export default function Home() {
   const [user, setUser] = useState<Users | null>(null);
@@ -19,15 +18,20 @@ export default function Home() {
   ];
 
   useEffect(() => {
+    // Load user from local storage
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
 
+    // Fetch events
     const fetchEvents = async () => {
       try {
-        const data = await db.events.findMany();
-        setEvents((data as EventType[]) || []);
+        const response = await fetch('/api/events');
+        if (response.ok) {
+          const data = await response.json();
+          setEvents(data || []);
+        }
       } catch (error) {
         console.error('Failed to fetch events:', error);
       } finally {
@@ -42,7 +46,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar userName={user?.userName} />
+      <Navbar />
       <div className="flex flex-1">
         {isAdmin && (
           <div className="w-64 min-h-[calc(100vh-64px)] fixed left-0 top-16">

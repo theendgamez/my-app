@@ -118,19 +118,24 @@ const BookingPage = () => {
     
     // Check that zone has available tickets
     const zoneDetails = event?.zones?.find(z => z.name === selectedZone);
-    if (!zoneDetails || (zoneDetails.quantity && zoneDetails.quantity < quantity)) {
-      setError(`所選區域的票券不足，目前僅剩 ${zoneDetails?.quantity || 0} 張`);
+    if (!zoneDetails || (zoneDetails.zoneQuantity && zoneDetails.zoneQuantity < quantity)) {
+      setError(`所選區域的票券不足，目前僅剩 ${zoneDetails?.zoneQuantity || 0} 張`);
       return;
     }
 
     // Generate a session ID and create a booking intent
     const sessionId = crypto.randomUUID();
     
+    console.log('Creating booking intent with user:', user); // Debugging
+    
     // Create a secure booking token
     fetch('/api/bookings/create-intent', {
       method: 'POST',
+      credentials: 'include', // Ensure cookies are sent
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        // Add Authorization header as backup authentication method
+        ...(user ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}` } : {})
       },
       body: JSON.stringify({
         eventId: id,
@@ -140,7 +145,21 @@ const BookingPage = () => {
         sessionId
       })
     })
-    .then(res => res.json())
+    .then(async res => {
+      if (!res.ok) {
+        // For 401 errors, attempt to refresh authentication
+        if (res.status === 401) {
+          console.error('Authentication failed - redirecting to login');
+          // Redirect to login page with return URL
+          router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+          return { error: 'Please login to continue' };
+        }
+        // Get the error message from the response
+        const errorData = await res.json();
+        throw new Error(errorData.error || `API error: ${res.status}`);
+      }
+      return res.json();
+    })
     .then(data => {
       if (data.error) {
         throw new Error(data.error);
@@ -150,6 +169,7 @@ const BookingPage = () => {
       router.push(`/events/${id}/payment?bookingToken=${data.bookingToken}`);
     })
     .catch(err => {
+      console.error('Booking intent error:', err);
       setError(err.message || 'Unable to create booking. Please try again.');
     });
   };
@@ -249,12 +269,12 @@ const BookingPage = () => {
                       key={zone.name}
                       type="button"
                       onClick={() => setSelectedZone(zone.name)}
-                      disabled={zone.quantity === 0}
+                      disabled={zone.zoneQuantity === 0}
                       className={`
                         p-4 rounded-lg border-2 text-left transition-all
                         ${selectedZone === zone.name 
                           ? 'border-blue-500 bg-blue-50' 
-                          : zone.quantity === 0
+                          : zone.zoneQuantity === 0
                             ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
                             : 'border-gray-200 hover:border-blue-200'}
                       `}
@@ -264,9 +284,9 @@ const BookingPage = () => {
                         HKD {Number(zone.price).toLocaleString('en-HK')}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {zone.quantity === 0 
+                        {zone.zoneQuantity === 0 
                           ? '已售罄' 
-                          : `尚餘 ${zone.quantity} 張`}
+                          : `尚餘 ${zone.zoneQuantity} 張`}
                       </div>
                     </button>
                   ))}
@@ -282,7 +302,7 @@ const BookingPage = () => {
                   required
                 >
                   {[1, 2, 3, 4].map(num => {
-                    const isDisabled = selectedZoneDetails ? selectedZoneDetails.quantity < num : false;
+                    const isDisabled = selectedZoneDetails ? selectedZoneDetails.zoneQuantity < num : false;
                     return (
                       <option key={num} value={num} disabled={isDisabled}>
                         {num} 張 {isDisabled ? '(票券不足)' : ''}

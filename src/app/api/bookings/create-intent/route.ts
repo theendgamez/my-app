@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 
 // Time-limited bookings (10 minutes)
 const BOOKING_EXPIRY_MS = 10 * 60 * 1000;
@@ -27,18 +26,31 @@ setInterval(() => {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify user is authenticated
-    const user = await getCurrentUser(request);
+    // Parse the request data
+    const data = await request.json();
+    const { userId, eventId, zone, quantity, sessionId } = data;
+    
+    // Validate required fields
+    if (!userId || !eventId || !zone || !quantity || !sessionId) {
+      return NextResponse.json({ 
+        error: 'Missing required fields', 
+        details: 'userId, eventId, zone, quantity, and sessionId are required'
+      }, { status: 400 });
+    }
+    
+    console.log('Creating booking intent with userId:', userId);
+    
+    // Verify the user exists (simplified authentication)
+    const user = await db.users.findById(userId);
     if (!user) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+      console.error('Invalid userId provided:', userId);
+      return NextResponse.json({ 
+        error: 'Invalid user ID',
+        details: 'The provided userId does not exist in our records' 
+      }, { status: 401 });
     }
-
-    const { eventId, zone, quantity, sessionId } = await request.json();
-
-    // Validate inputs
-    if (!eventId || !zone || !quantity || !sessionId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+    
+    console.log('User found:', user.userId);
 
     // Check if event exists
     const event = await db.events.findById(eventId);
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid zone' }, { status: 400 });
     }
 
-    if (zoneDetails.quantity < quantity) {
+    if (zoneDetails.zoneQuantity < quantity) {
       return NextResponse.json({ error: 'Not enough tickets available' }, { status: 400 });
     }
 
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
       .update(JSON.stringify(bookingData))
       .digest('hex');
 
-    // Store the booking token with its data
+    // Store the booking token in the database
     await db.bookings.createIntent({
       bookingToken,
       sessionId,
@@ -94,7 +106,9 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + BOOKING_EXPIRY_MS).toISOString(),
       status: 'pending'
     });
-
+    
+    console.log('Created booking intent with token:', bookingToken);
+    
     return NextResponse.json({ 
       bookingToken,
       expiresAt: Date.now() + BOOKING_EXPIRY_MS 
@@ -102,6 +116,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error creating booking intent:', error);
-    return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to create booking', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

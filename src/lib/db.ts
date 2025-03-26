@@ -5,10 +5,13 @@ import {
   QueryCommand,
   UpdateItemCommand,
   DeleteItemCommand,
-  GetItemCommand
+  GetItemCommand,
+  TransactWriteItemsCommand,
+  TransactWriteItem,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users, Payment, Ticket } from '@/types';
+import { Events, Users, Payment, Ticket, Booking } from '@/types';
+
 
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
@@ -47,6 +50,98 @@ async function executeDbCommand<T>(operation: () => Promise<T>): Promise<T> {
   } catch (error) {
     console.error(`Database operation failed:`, error);
     throw new Error(`Database operation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+// Transaction implementation
+class Transaction {
+  private writeItems: TransactWriteItem[] = [];
+  private client: DynamoDBClient;
+
+  constructor(client: DynamoDBClient) {
+    this.client = client;
+  }
+
+  payments = {
+    create: async (payment: Payment): Promise<void> => {
+      this.writeItems.push({
+        Put: {
+          TableName: 'Payments',
+          Item: marshall(payment)
+        }
+      });
+    }
+  };
+
+  bookings = {
+    update: async (bookingToken: string, updates: Partial<Booking>): Promise<void> => {
+      const { updateExpressions, expressionAttributeValues, expressionAttributeNames } = 
+        createUpdateExpression(updates);
+
+      this.writeItems.push({
+        Update: {
+          TableName: 'Bookings',
+          Key: marshall({ bookingToken }),
+          UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeNames: expressionAttributeNames
+        }
+      });
+    }
+  };
+
+  events = {
+    updateZoneRemaining: async (eventId: string, zoneName: string, newRemaining: number): Promise<void> => {
+      // First we need to get the current event to find the zone index
+      const currentEvent = await db.events.findById(eventId);
+      if (!currentEvent) throw new Error(`Event with ID ${eventId} not found`);
+      
+      const zones = currentEvent.zones || [];
+      const zoneIndex = zones.findIndex(zone => zone.name === zoneName);
+      
+      if (zoneIndex === -1) throw new Error(`Zone ${zoneName} not found in event ${eventId}`);
+
+      this.writeItems.push({
+        Update: {
+          TableName: 'Events',
+          Key: marshall({ eventId }),
+          UpdateExpression: `SET zones[${zoneIndex}].zoneQuantity = :newValue`,
+          ExpressionAttributeValues: marshall({ ':newValue': newRemaining.toString() })
+        }
+      });
+    }
+  };
+
+  tickets = {
+    create: async (ticket: Ticket): Promise<void> => {
+      this.writeItems.push({
+        Put: {
+          TableName: 'Tickets',
+          Item: marshall(ticket)
+        }
+      });
+    }
+  };
+
+  async commit(): Promise<void> {
+    if (this.writeItems.length === 0) {
+      return;
+    }
+    
+    try {
+      const command = new TransactWriteItemsCommand({
+        TransactItems: this.writeItems
+      });
+      
+      await this.client.send(command);
+      // Clear items after successful commit
+      this.writeItems = [];
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      // Clear items on failure so the transaction can be retried
+      this.writeItems = [];
+      throw error;
+    }
   }
 }
 
@@ -432,9 +527,82 @@ const db = {
         return result.Attributes ? (unmarshall(result.Attributes) as Ticket) : { ...currentTicket, ...updates };
       });
     }
-  }
+  },
 
-  boo
+  bookings: {
+    create: async (bookingData: Booking): Promise<Booking> => {
+      return executeDbCommand(async () => {
+        const command = new PutItemCommand({
+          TableName: 'Bookings',
+          Item: marshall(bookingData)
+        });
+        await client.send(command);
+        return bookingData;
+      });
+    },
+    createIntent: async (bookingData: Booking): Promise<Booking> => {
+      return executeDbCommand(async () => {
+        const command = new PutItemCommand({
+          TableName: 'Bookings',
+          Item: marshall(bookingData)
+        });
+        await client.send(command);
+        return bookingData;
+      });
+    },
+    findIntentByToken: async (bookingToken: string): Promise<Booking | null> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Bookings',
+          IndexName: 'bookingToken-index',
+          KeyConditionExpression: 'bookingToken = :token',
+          ExpressionAttributeValues: marshall({ ':token': bookingToken }),
+          Limit: 1
+        });
+        
+        const result = await client.send(command);
+        return result.Items && result.Items.length > 0 
+          ? (unmarshall(result.Items[0]) as Booking) 
+          : null;
+      });
+    },
+    scanAllBookings: async (): Promise<Booking[]> => {
+      return executeDbCommand(async () => {
+        console.log('Scanning all bookings...');
+        const command = new ScanCommand({
+          TableName: 'Bookings'
+        });
+        
+        const result = await client.send(command);
+        console.log(`Found ${result.Items?.length || 0} bookings in scan`);
+        return result.Items?.map(item => unmarshall(item) as Booking) || [];
+      });
+    }
+  },
+  
+  scanTable: async (tableName: string): Promise<any[]> => {
+    return executeDbCommand(async () => {
+      console.log(`Scanning table: ${tableName}`);
+      const command = new ScanCommand({
+        TableName: tableName
+      });
+      
+      const result = await client.send(command);
+      console.log(`Found ${result.Items?.length || 0} items in ${tableName}`);
+      return result.Items?.map(item => unmarshall(item)) || [];
+    });
+  },
+
+  transaction: async (callback: (transaction: Transaction) => Promise<void>): Promise<void> => {
+    const transaction = new Transaction(client);
+    try {
+      await callback(transaction);
+      await transaction.commit();
+    } catch (error) {
+      console.error('Transaction execution failed:', error);
+      throw error;
+    }
+  }
 };
 
 export default db;

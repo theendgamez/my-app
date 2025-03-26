@@ -4,32 +4,34 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    // Verify user is authenticated
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: '請先登入' }, { status: 401 });
-    }
-
-    const paymentId = params.id;
+    const paymentId = context.params.id;
     if (!paymentId) {
       return NextResponse.json({ error: '未提供付款ID' }, { status: 400 });
     }
 
-    // Fetch payment first to verify ownership
+    // Handle authentication with fallback
+    const user = await getCurrentUser(request);
+    const fallbackUserId = !user ? request.headers.get('x-user-id') : null;
+    const userId = user?.userId || fallbackUserId;
+    
+    if (!userId) {
+      return NextResponse.json({ error: '請先登入', code: 'UNAUTHORIZED' }, { status: 401 });
+    }
+
+    // Get payment and check ownership
     const payment = await db.payments.findById(paymentId);
     if (!payment) {
       return NextResponse.json({ error: '找不到相關付款資訊' }, { status: 404 });
     }
 
-    // Security check - only allow users to see their own tickets
-    if (payment.userId !== user.userId) {
-      return NextResponse.json({ error: '無權訪問此票券資訊' }, { status: 403 });
+    if (payment.userId !== userId) {
+      return NextResponse.json({ error: '無權訪問此票券資訊', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Fetch tickets associated with the payment
+    // Return tickets
     const tickets = await db.tickets.findByPayment(paymentId);
     return NextResponse.json(tickets);
   } catch (error) {

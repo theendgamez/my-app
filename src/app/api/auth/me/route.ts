@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return createResponse({ user: null }, 200);
     }
     
-    // Return sanitized user data
+    // Return only necessary user data
     return createResponse({
       user: {
         userId: user.userId,

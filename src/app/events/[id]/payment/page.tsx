@@ -9,20 +9,29 @@ import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
 import { BookingDetails, ProcessedPayment } from '@/types';
 
-// 15-minute countdown timer component
+// 10-minute countdown timer component
 const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const router = useRouter();
 
   useEffect(() => {
     const calculateTimeLeft = () => {
       const difference = expiresAt - Date.now();
-      setTimeLeft(Math.max(0, Math.floor(difference / 1000)));
+      const newTimeLeft = Math.max(0, Math.floor(difference / 1000));
+      setTimeLeft(newTimeLeft);
+      
+      // If time has expired, redirect to home page
+      if (newTimeLeft === 0) {
+        // Show alert and then redirect
+        alert('預留時間已結束，請重新選擇座位。');
+        router.push('/');
+      }
     };
 
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);
-  }, [expiresAt]);
+  }, [expiresAt, router]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -100,12 +109,24 @@ export default function PaymentPage() {
         throw new Error('您的預訂已過期，請重新選擇座位');
       }
 
+      // Get user ID from localStorage or context
+      const userDataStr = localStorage.getItem('user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      const userId = userData?.userId;
+
+      if (!userId) {
+        alert('找不到用戶資訊，請重新登入');
+        router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+        return;
+      }
+
       const response = await fetch('/api/payments/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          userId, // Include the userId for authentication
           bookingToken,
           cardDetails: {
             // Only send last 4 digits for security
@@ -116,6 +137,15 @@ export default function PaymentPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Payment processing error:', errorData);
+        
+        // Handle authentication errors specifically
+        if (errorData.code === 'UNAUTHORIZED') {
+          alert('認證失敗，請重新登入');
+          router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+          return;
+        }
+        
         throw new Error(errorData.error || '付款處理失敗');
       }
 
@@ -202,7 +232,7 @@ export default function PaymentPage() {
             <div className="border-t border-b py-3 mb-4">
               <div className="flex justify-between mb-1">
                 <span>票價:</span>
-                <span>HKD {bookingDetails.price.toLocaleString('en-HK')} × {bookingDetails.quantity}</span>
+                <span>HKD {(bookingDetails?.price ?? 0).toLocaleString('en-HK')} × {bookingDetails.quantity}</span>
               </div>
               <div className="flex justify-between mb-1">
                 <span>平台服務費:</span>
