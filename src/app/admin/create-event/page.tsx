@@ -3,8 +3,8 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import Navbar from '@/components/navbar/Navbar'; // Ensure correct path casing
-import Sidebar from "@/components/Sidebar";
+import Navbar from '@/components/navbar/Navbar';
+import Sidebar from "@/components/ui/Sidebar";
 import type { Zone } from '@/types';
 
 interface FormData {

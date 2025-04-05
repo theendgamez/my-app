@@ -577,10 +577,32 @@ const db = {
         console.log(`Found ${result.Items?.length || 0} bookings in scan`);
         return result.Items?.map(item => unmarshall(item) as Booking) || [];
       });
-    }
+    },
+    findByUser: async (userId: string): Promise<Booking[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Bookings',
+          IndexName: 'userId-index',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: marshall({ ':userId': userId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as Booking) || [];
+      });
+    },
+    delete: async (bookingToken: string): Promise<void> => {
+      return executeDbCommand(async () => {
+        const command = new DeleteItemCommand({
+          TableName: 'Bookings',
+          Key: marshall({ bookingToken })
+        });
+        await client.send(command);
+      });
+    },
   },
   
-  scanTable: async (tableName: string): Promise<any[]> => {
+  scanTable: async (tableName: string): Promise<unknown[]> => {
     return executeDbCommand(async () => {
       console.log(`Scanning table: ${tableName}`);
       const command = new ScanCommand({
