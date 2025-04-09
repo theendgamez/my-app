@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Alert } from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Booking, Events } from '@/types';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface BookingWithEvent extends Booking {
   event?: Events;
@@ -46,11 +47,7 @@ export default function CartPage() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/bookings/user/${user.userId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
-          }
-        });
+        const response = await fetchWithAuth(`/api/bookings/user/${user.userId}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch bookings');
@@ -62,7 +59,7 @@ export default function CartPage() {
         const bookingsWithEvents = await Promise.all(
           data.map(async (booking: BookingWithEvent) => {
             try {
-              const eventResponse = await fetch(`/api/events/${booking.eventId}`);
+              const eventResponse = await fetchWithAuth(`/api/events/${booking.eventId}`);
               if (eventResponse.ok) {
                 const event = await eventResponse.json();
                 const zone = event.zones?.find((z: { name: string; price: string | number }) => z.name === booking.zone);
@@ -106,12 +103,8 @@ export default function CartPage() {
 
     try {
       setActionInProgress(bookingToken);
-      const response = await fetch(`/api/bookings/${bookingToken}/cancel`, {
+      const response = await fetchWithAuth(`/api/bookings/${bookingToken}/cancel`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
-        },
         body: JSON.stringify({ userId: user?.userId })
       });
 

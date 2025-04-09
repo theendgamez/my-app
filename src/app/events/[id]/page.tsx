@@ -180,12 +180,33 @@ const EventDetail = () => {
         </div>
 
         <div className="w-full max-w-3xl px-6 mt-8">
-          <button 
-            onClick={() => router.push(`/events/${id}/booking`)}
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
-          >
-            立即訂票
-          </button>
+          {event.isDrawMode ? (
+            <>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <h3 className="text-lg font-semibold text-yellow-800 mb-2">抽籤模式</h3>
+                <p className="text-yellow-700 mb-2">
+                  此活動採用抽籤模式分配門票。請在報名期間登記，抽籤結果將在抽籤日期後公佈。
+                </p>
+                <p className="text-sm text-yellow-600">
+                  報名期間：{event.registerDate ? new Date(event.registerDate).toLocaleString() : 'N/A'} - 
+                  {event.endregisterDate ? new Date(event.endregisterDate).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+              <button 
+                onClick={() => router.push(`/events/${id}/lottery`)}
+                className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+              >
+                抽籤登記
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => router.push(`/events/${id}/booking`)}
+              className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+            >
+              立即訂票
+            </button>
+          )}
         </div>
       </div>
     </>

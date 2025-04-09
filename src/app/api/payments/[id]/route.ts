@@ -4,11 +4,11 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Correctly await the params object using the context parameter
-    const params = context.params;
+    // Correctly await the params object
+    const params = await context.params;
     const paymentId = params.id;
     
     // Verify user is authenticated

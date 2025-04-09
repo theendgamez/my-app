@@ -7,63 +7,20 @@ import { useAuth } from '@/context/AuthContext';
 import { Events } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
+import crypto from 'crypto';
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
-// Create a server action to securely fetch event data
+// Fetch event details
 async function getEventDetails(eventId: string) {
-  try {
-    // Instead of using the API route, use the client-side db directly
-    // since we're in a client component
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    
-    // Try fetching directly from the db utility first
-    try {
-      // Using dynamic import to avoid SSR issues with db
-      const { default: db } = await import('@/lib/db');
-      const data = await db.events.findById(eventId);
-      
-      if (!data) {
-        throw new Error('Event not found');
-      }
-      
-      return data;
-    } catch (dbError) {
-      console.error('Error fetching from db directly:', dbError);
-      
-      // Fallback to API request if db direct access fails
-      const res = await fetch(`${origin}/api/events/${eventId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      });
-      
-      if (!res.ok) {
-        // Try a different API path if the first one fails
-        const altRes = await fetch(`${origin}/api/event/${eventId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        });
-        
-        if (!altRes.ok) {
-          throw new Error(`Failed to fetch event (Status ${res.status})`);
-        }
-        
-        return altRes.json();
-      }
-      
-      return res.json();
-    }
-  } catch (error) {
-    console.error('Error fetching event details:', error);
-    throw error instanceof Error ? error : new Error('Unknown error fetching event');
+  const response = await fetch(`/api/events/${eventId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch event: ${response.statusText}`);
   }
+  return response.json();
 }
 
-const BookingPage = () => {
+const LotteryPage = () => {
   const router = useRouter();
   const { id } = useParams();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -72,25 +29,33 @@ const BookingPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showMoreLegal, setShowMoreLegal] = useState(false);
 
   useEffect(() => {
     // Check authentication first
     if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/events/${id}/booking`)}`);
+      router.push(`/login?redirect=${encodeURIComponent(`/events/${id}/lottery`)}`);
       return;
     }
 
     const fetchEventDetails = async () => {
       try {
         setLoading(true);
-        setError(null); // Reset error state
+        setError(null);
         
-        // Check if id is valid
         if (!id) {
           throw new Error('Invalid event ID');
         }
         
         const data = await getEventDetails(id as string);
+        
+        // Verify this is a lottery event
+        if (!data.isDrawMode) {
+          router.push(`/events/${id}`);
+          return;
+        }
+        
         setEvent(data);
       } catch (error) {
         console.error('Error fetching event:', error);
@@ -110,31 +75,25 @@ const BookingPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Additional validations
     if (!selectedZone) {
       setError('請選擇區域');
       return;
     }
     
-    // Check that zone has available tickets
-    const zoneDetails = event?.zones?.find(z => z.name === selectedZone);
-    if (!zoneDetails || (zoneDetails.zoneQuantity && zoneDetails.zoneQuantity < quantity)) {
-      setError(`所選區域的票券不足，目前僅剩 ${zoneDetails?.zoneQuantity || 0} 張`);
+    if (!agreedToTerms) {
+      setError('請同意並確認理解抽籤條款');
       return;
     }
-
-    // Generate a session ID and create a booking intent
+    
+    // Generate a session ID for the lottery registration
     const sessionId = crypto.randomUUID();
     
-    console.log('Creating booking intent with user:', user); // Debugging
-    
-    // Create a secure booking token
-    fetch('/api/bookings/create-intent', {
+    // Create a lottery registration
+    fetch('/api/lottery/register', {
       method: 'POST',
-      credentials: 'include', // Ensure cookies are sent
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        // Add Authorization header as backup authentication method
         ...(user ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}` } : {})
       },
       body: JSON.stringify({
@@ -147,14 +106,10 @@ const BookingPage = () => {
     })
     .then(async res => {
       if (!res.ok) {
-        // For 401 errors, attempt to refresh authentication
         if (res.status === 401) {
-          console.error('Authentication failed - redirecting to login');
-          // Redirect to login page with return URL
           router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
           return { error: 'Please login to continue' };
         }
-        // Get the error message from the response
         const errorData = await res.json();
         throw new Error(errorData.error || `API error: ${res.status}`);
       }
@@ -165,12 +120,12 @@ const BookingPage = () => {
         throw new Error(data.error);
       }
       
-      // Navigate to payment page with the secure booking token
-      router.push(`/events/${id}/payment?bookingToken=${data.bookingToken}`);
+      // Navigate to lottery payment page with the registration token
+      router.push(`/events/${id}/lottery/payment?registrationToken=${data.registrationToken}`);
     })
     .catch(err => {
-      console.error('Booking intent error:', err);
-      setError(err.message || 'Unable to create booking. Please try again.');
+      console.error('Lottery registration error:', err);
+      setError(err.message || 'Unable to register for lottery. Please try again.');
     });
   };
 
@@ -217,27 +172,63 @@ const BookingPage = () => {
     );
   }
 
-  const selectedZoneDetails = event.zones?.find(z => z.name === selectedZone);
-  const ticketPrice = selectedZoneDetails ? Number(selectedZoneDetails.price) : 0;
   const platformFeeTotal = PLATFORM_FEE * quantity;
-  const subtotal = ticketPrice * quantity;
-  const totalPrice = subtotal + platformFeeTotal;
 
   return (
     <>
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">{event.eventName} - 選擇門票</h1>
+          <h1 className="text-2xl font-bold mb-6">{event.eventName} - 抽籤登記</h1>
           
           {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
           
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-yellow-800 mb-2">座位分配提示</h3>
-              <p className="text-yellow-700">
-                為確保訂票過程公平，所選區域內的座位將會由系統隨機分配。座位號碼將在付款完成後即時顯示。
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">抽籤說明</h3>
+              <p className="text-yellow-700 mb-2">
+                這是一個抽籤活動。您現在支付的僅是平台手續費，並不保證能購買到門票。
               </p>
+              <p className="text-yellow-700 mb-2">
+                抽籤將於 {event.drawDate ? new Date(event.drawDate).toLocaleString() : 'N/A'} 進行。
+                如果您被選中，我們將通知您完成票券付款流程。
+              </p>
+              <p className="text-yellow-700 mb-2">
+                <span className="font-semibold">法律合規說明：</span> 本抽籤活動符合香港《賭博條例》(Cap. 349)。平台手續費僅用於購買參與抽籤的資格，而非博彩用途。
+              </p>
+              <p className="text-yellow-700">
+                中籤者獲得的是購買門票的機會，而非直接的金錢獎勵。抽籤過程公平、透明，完全符合香港法律規定。票價設定亦符合《公眾娛樂場所條例》(Cap. 172) 的相關要求。
+              </p>
+              
+              <button 
+                type="button"
+                onClick={() => setShowMoreLegal(!showMoreLegal)}
+                className="mt-3 text-blue-600 hover:text-blue-800 flex items-center text-sm font-medium"
+              >
+                {showMoreLegal ? "收起詳細法律資訊" : "查閱詳細法律資訊"}
+                <svg 
+                  className={`ml-1 w-4 h-4 transition-transform ${showMoreLegal ? "rotate-180" : ""}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              
+              {showMoreLegal && (
+                <div className="mt-3 p-3 bg-white border border-yellow-200 rounded-lg text-sm">
+                  <h4 className="font-semibold mb-2">詳細法律聲明</h4>
+                  <p className="mb-2">依據香港《賭博條例》(Cap. 349)，本抽籤系統不構成非法博彩活動，原因如下：</p>
+                  <ul className="list-disc pl-5 mb-2 space-y-1">
+                    <li>平台手續費僅用於獲取抽籤資格，非賭注</li>
+                    <li>中籤者獲得的是購買門票的權利，而非金錢或獎品</li>
+                    <li>所有抽籤程序公開透明，確保公平</li>
+                  </ul>
+                  <p>本活動亦符合《公眾娛樂場所條例》(Cap. 172)的票價和安全規定。</p>
+                </div>
+              )}
             </div>
 
             <table className="w-full mb-6">
@@ -258,10 +249,7 @@ const BookingPage = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block mb-2 font-semibold">
-                  選擇區域: 
-                  <span className="text-sm font-normal text-gray-600 ml-2">
-                    (座位將隨機分配)
-                  </span>
+                  選擇區域
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                   {event.zones?.map(zone => (
@@ -269,24 +257,16 @@ const BookingPage = () => {
                       key={zone.name}
                       type="button"
                       onClick={() => setSelectedZone(zone.name)}
-                      disabled={zone.zoneQuantity === 0}
                       className={`
                         p-4 rounded-lg border-2 text-left transition-all
                         ${selectedZone === zone.name 
                           ? 'border-blue-500 bg-blue-50' 
-                          : zone.zoneQuantity === 0
-                            ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
-                            : 'border-gray-200 hover:border-blue-200'}
+                          : 'border-gray-200 hover:border-blue-200'}
                       `}
                     >
                       <div className="font-semibold mb-1">{zone.name}區</div>
                       <div className="text-sm text-gray-600">
                         HKD {Number(zone.price).toLocaleString('en-HK')}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {zone.zoneQuantity === 0 
-                          ? '已售罄' 
-                          : `尚餘 ${zone.zoneQuantity} 張`}
                       </div>
                     </button>
                   ))}
@@ -301,31 +281,19 @@ const BookingPage = () => {
                   className="w-full p-2 border rounded"
                   required
                 >
-                  {[1, 2, 3, 4].map(num => {
-                    const isDisabled = selectedZoneDetails ? selectedZoneDetails.zoneQuantity < num : false;
-                    return (
-                      <option key={num} value={num} disabled={isDisabled}>
-                        {num} 張 {isDisabled ? '(票券不足)' : ''}
-                      </option>
-                    );
-                  })}
+                  {[1, 2, 3, 4].map(num => (
+                    <option key={num} value={num}>
+                      {num} 張
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {selectedZone && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-semibold mb-3">訂單摘要</h3>
+                  <h3 className="font-semibold mb-3">平台手續費</h3>
                   <table className="w-full">
                     <tbody className="divide-y">
-                      <tr>
-                        <td className="py-2">門票價格</td>
-                        <td className="py-2 text-right">
-                          HKD {ticketPrice.toLocaleString('en-HK')} × {quantity}
-                        </td>
-                        <td className="py-2 text-right">
-                          HKD {subtotal.toLocaleString('en-HK')}
-                        </td>
-                      </tr>
                       <tr>
                         <td className="py-2">平台手續費</td>
                         <td className="py-2 text-right">
@@ -339,7 +307,7 @@ const BookingPage = () => {
                         <td className="py-2 font-bold">總計</td>
                         <td></td>
                         <td className="py-2 text-right font-bold">
-                          HKD {totalPrice.toLocaleString('en-HK')}
+                          HKD {platformFeeTotal.toLocaleString('en-HK')}
                         </td>
                       </tr>
                     </tbody>
@@ -347,23 +315,40 @@ const BookingPage = () => {
                 </div>
               )}
 
-                <div className="flex justify-between gap-4">
-                  <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                  >
-                    返回
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!selectedZone || loading}
-                    className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  >
-                    前往付款
-                  </button>
+              <div className="mt-6 flex items-start">
+                <div className="flex items-center h-5">
+                  <input
+                    id="terms-agreement"
+                    name="terms-agreement"
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    required
+                  />
                 </div>
-              </form>
+                <label htmlFor="terms-agreement" className="ml-3 text-sm">
+                  <span className="font-medium text-gray-700">我同意並確認理解：</span> 這是一個抽籤活動。我現在支付的僅是平台手續費，並不保證能購買到門票。如果我被選中，我將需要額外支付門票費用。
+                </label>
+              </div>
+
+              <div className="flex justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                >
+                  返回
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedZone || loading || !agreedToTerms}
+                  className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                >
+                  確認登記並付款
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -371,4 +356,4 @@ const BookingPage = () => {
   );
 };
 
-export default BookingPage;
+export default LotteryPage;

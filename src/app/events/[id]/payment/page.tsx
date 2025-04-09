@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
 import { BookingDetails, ProcessedPayment } from '@/types';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 // 10-minute countdown timer component
 const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
@@ -72,7 +73,7 @@ export default function PaymentPage() {
 
     const fetchBookingDetails = async () => {
       try {
-        const res = await fetch(`/api/bookings/verify?token=${bookingToken}`);
+        const res = await fetchWithAuth(`/api/bookings/verify?token=${bookingToken}`);
         if (!res.ok) {
           throw new Error(await res.text() || 'Failed to verify booking');
         }
@@ -109,24 +110,10 @@ export default function PaymentPage() {
         throw new Error('您的預訂已過期，請重新選擇座位');
       }
 
-      // Get user ID from localStorage or context
-      const userDataStr = localStorage.getItem('user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.userId;
-
-      if (!userId) {
-        alert('找不到用戶資訊，請重新登入');
-        router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
-        return;
-      }
-
-      const response = await fetch('/api/payments/process', {
+      const response = await fetchWithAuth('/api/payments/process', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          userId, // Include the userId for authentication
+          userId: user.userId, // Add userId to the request body
           bookingToken,
           cardDetails: {
             // Only send last 4 digits for security
@@ -136,25 +123,40 @@ export default function PaymentPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorMessage = `Payment failed with status: ${response.status}`;
+        let errorData: { message: string; error?: string; code?: string } = { message: errorMessage };
+        
+        try {
+          // Safely try to parse the error response as JSON
+          const jsonData = await response.json();
+          errorData = jsonData || errorData;
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          // Use the status text if JSON parsing fails
+          errorMessage = `Payment failed: ${response.statusText || 'Unknown error'}`;
+        }
+        
         console.error('Payment processing error:', errorData);
         
         // Handle authentication errors specifically
         if (errorData.code === 'UNAUTHORIZED') {
-          alert('認證失敗，請重新登入');
-          router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+          setError('Your session has expired. Please log in again.');
+          router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
           return;
         }
         
-        throw new Error(errorData.error || '付款處理失敗');
+        // Set a user-friendly error message
+        setError(errorMessage);
+        setProcessing(false);
+        return;
       }
 
       const payment: ProcessedPayment = await response.json();
       router.push(`/events/${eventId}/success?paymentId=${payment.paymentId}`);
     } catch (err) {
-      console.error('Payment failed:', err);
+      console.error('Payment submission error:', err);
       setError(err instanceof Error ? err.message : '付款處理過程中發生錯誤');
-    } finally {
       setProcessing(false);
     }
   };

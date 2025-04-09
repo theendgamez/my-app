@@ -5,6 +5,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter, useParams } from 'next/navigation';
 import { Users } from '@/types/index';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface FormData {
   userName: string;
@@ -41,7 +42,7 @@ export default function ProfilePage() {
       
       // If no match or no local storage, try to fetch the user data from API
       try {
-        const response = await fetch(`/api/users/${userId}`);
+        const response = await fetchWithAuth(`/api/users/${userId}`);
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
@@ -71,11 +72,8 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/users/edit', {
+      const response = await fetchWithAuth('/api/users/edit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           userId: userId,
           ...data,

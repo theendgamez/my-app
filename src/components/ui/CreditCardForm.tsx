@@ -189,7 +189,9 @@ export default function CreditCardForm({ onSubmit, isProcessing }: CreditCardFor
       >
         {isProcessing ? (
           <>
-            <LoadingSpinner size="small" className="mr-2" />
+            <div className="mr-2">
+              <LoadingSpinner size="small" />
+            </div>
             處理中...
           </>
         ) : (

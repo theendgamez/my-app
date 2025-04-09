@@ -37,11 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       try {
         // Try to get user from cookies first (by calling the API)
-        const res = await fetch('/api/auth/me');
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include' // Send cookies with the request
+        });
+        
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.user) {
             setUser(data.user);
+            localStorage.setItem('user', JSON.stringify(data.user));
           } else {
             // Try localStorage as fallback for existing sessions
             const storedUser = localStorage.getItem('user');
@@ -99,9 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setLoading(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include' 
+      });
       setUser(null);
       localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
       router.push('/login');
     } catch (err) {
       console.error('Logout error:', err);

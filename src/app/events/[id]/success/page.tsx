@@ -234,7 +234,7 @@ export default function SuccessPage() {
                   返回首頁
                 </button>
                 <button
-                  onClick={() => router.push('/tickets')}
+                  onClick={() => router.push(`/user/${user?.userId}/order`)}
                   className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded transition-colors"
                 >
                   查看我的票券

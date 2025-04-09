@@ -1,7 +1,7 @@
 interface AlertProps {
   type?: 'info' | 'success' | 'warning' | 'error';
   title?: string;
-  message: string;
+  message: [] | string;
   onClose?: () => void;
   className?: string;
 }

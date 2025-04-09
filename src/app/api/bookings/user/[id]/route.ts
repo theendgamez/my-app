@@ -3,11 +3,11 @@ import db from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // updated to await params
 ) {
   try {
-    // Get the user ID from the URL parameters
-    const userId = context.params.id;
+
+    const { id: userId } = await context.params;
     
     // Get status query parameter
     const { searchParams } = new URL(request.url);
