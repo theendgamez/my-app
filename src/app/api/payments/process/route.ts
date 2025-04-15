@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
             eventId: booking.eventId,
             eventName: event.eventName,
             eventDate: event.eventDate,
+            eventLocation: event.location,
             userId: user.userId,
             zone: booking.zone,
             seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`, // Random seat for demo
@@ -179,6 +180,11 @@ export async function POST(request: NextRequest) {
         );
       }
       await Promise.all(ticketPromises);
+      
+      await trx.bookings.update(booking.bookingToken, {
+        paymentId, // Add the payment ID reference
+        status: 'completed' // Update the status
+      } as never);
     });
 
     // Return payment details

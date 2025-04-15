@@ -226,7 +226,7 @@ export default function SuccessPage() {
                 </div>
               )}
 
-              <div className="p-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex space-x-4">
                 <button
                   onClick={() => router.push('/')}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded transition-colors"
@@ -234,10 +234,10 @@ export default function SuccessPage() {
                   返回首頁
                 </button>
                 <button
-                  onClick={() => router.push(`/user/${user?.userId}/order`)}
+                  onClick={() => router.push('/user/order')}
                   className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded transition-colors"
                 >
-                  查看我的票券
+                  我的票券
                 </button>
               </div>
             </>

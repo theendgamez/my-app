@@ -19,63 +19,82 @@ export default function ProfilePage() {
   const [user, setUser] = useState<Users | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
   const params = useParams();
-  const userId = params.id as string;
+  
+  // Get userId from URL params or from localStorage if not provided
+  const urlUserId = params.id as string | undefined;
 
   useEffect(() => {
     const fetchUserData = async () => {
+      setLoading(true);
+      
       // First try to get from localStorage for the current user
       const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsedUser: Users = JSON.parse(storedUser);
-        
-        // Check if the URL id matches the logged-in user
-        if (parsedUser.userId === userId) {
+      
+      if (!storedUser) {
+        // No user in localStorage, redirect to login
+        router.push('/login');
+        return;
+      }
+      
+      const parsedUser: Users = JSON.parse(storedUser);
+      let targetUserId = urlUserId || parsedUser.userId;
+      
+      // If URL has userId and it's different from logged-in user, verify access rights
+      if (urlUserId && urlUserId !== parsedUser.userId) {
+        // Here you could add logic to check if the current user has permission
+        // to view/edit another user's profile (e.g., for admin users)
+        // For now, we'll just use the current user's ID
+        targetUserId = parsedUser.userId;
+      }
+      
+      try {
+        if (targetUserId === parsedUser.userId) {
+          // Use local data for the current user
           setUser(parsedUser);
           setValue('userName', parsedUser.userName || '');
           setValue('email', parsedUser.email || '');
           setValue('phoneNumber', parsedUser.phoneNumber || '');
-          return;
-        }
-      }
-      
-      // If no match or no local storage, try to fetch the user data from API
-      try {
-        const response = await fetchWithAuth(`/api/users/${userId}`);
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          setValue('userName', userData.userName || '');
-          setValue('email', userData.email || '');
-          setValue('phoneNumber', userData.phoneNumber || '');
         } else {
-          // User not found or not authorized
-          router.push('/login');
+          // Fetch data for a different user
+          const response = await fetchWithAuth(`/api/users/${targetUserId}`);
+          if (response.ok) {
+            const userData = await response.json();
+            setUser(userData);
+            setValue('userName', userData.userName || '');
+            setValue('email', userData.email || '');
+            setValue('phoneNumber', userData.phoneNumber || '');
+          } else {
+            throw new Error('User not found');
+          }
         }
       } catch (err) {
         console.error('Failed to fetch user:', err);
         setError('無法載入用戶資料');
-        router.push('/login');
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (userId) {
-      fetchUserData();
-    } else {
-      router.push('/login');
-    }
-  }, [router, setValue, userId]);
+    fetchUserData();
+  }, [router, setValue, urlUserId]);
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setError('');
     setSuccess('');
 
+    if (!user) {
+      setError('用戶資料不存在');
+      return;
+    }
+
     try {
       const response = await fetchWithAuth('/api/users/edit', {
         method: 'POST',
         body: JSON.stringify({
-          userId: userId,
+          userId: user.userId,
           ...data,
         }),
       });
@@ -87,7 +106,7 @@ export default function ProfilePage() {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
           const parsedUser: Users = JSON.parse(storedUser);
-          if (parsedUser.userId === userId) {
+          if (parsedUser.userId === user.userId) {
             localStorage.setItem('user', JSON.stringify({...parsedUser, ...result.user}));
           }
         }
@@ -111,7 +130,11 @@ export default function ProfilePage() {
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         {success && <p className="text-green-500 text-sm mb-4">{success}</p>}
         
-        {user ? (
+        {loading ? (
+          <div className="flex justify-center items-center h-48">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
+          </div>
+        ) : user ? ( 
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-md">
             <div className="mb-4">
               <label htmlFor="userName" className="block text-gray-700 mb-2">
@@ -157,8 +180,14 @@ export default function ProfilePage() {
             </button>
           </form>
         ) : (
-          <div className="flex justify-center items-center h-48">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
+          <div className="text-center">
+            <p className="text-red-500">無法載入用戶資料，請重新登入</p>
+            <button
+              onClick={() => router.push('/login')}
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              返回登入頁面
+            </button>
           </div>
         )}
       </main>

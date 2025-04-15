@@ -26,7 +26,7 @@ const UserMenu = ({ user, onLogout }: { user: Users; onLogout: () => void }) => 
           <MenuItem>
             {({ active }) => (
               <Link
-                href={`/user/${user.userId}/profile`}
+                href="/user/profile"
                 className={`${active ? 'bg-gray-100' : ''} block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-200`}
               >
                 個人資料
@@ -36,7 +36,7 @@ const UserMenu = ({ user, onLogout }: { user: Users; onLogout: () => void }) => 
           <MenuItem>
             {({ active }) => (
               <Link
-                href={`/user/${user.userId}/order`}
+                href="/user/order"
                 className={`${active ? 'bg-gray-100' : ''} block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-200`}
               >
                 我的票券

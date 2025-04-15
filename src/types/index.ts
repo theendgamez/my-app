@@ -75,6 +75,7 @@ export interface Ticket {
   eventId: string;
   eventName: string;
   eventDate: string;
+  eventLocation: string;
   zone: string;
   userId: string;
   paymentId: string;

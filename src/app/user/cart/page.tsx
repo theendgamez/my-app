@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import { Alert } from '@/components/ui/Alert';
@@ -18,25 +18,19 @@ interface BookingWithEvent extends Booking {
 
 export default function CartPage() {
   const router = useRouter();
-  const params = useParams();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<BookingWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Verify the user is accessing their own cart
+  // Verify user is authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      router.push(`/login?redirect=${encodeURIComponent("/user/cart")}`);
       return;
     }
-
-    if (user && params.id !== user.userId) {
-      router.push(`/user/${user.userId}/cart`);
-      return;
-    }
-  }, [authLoading, isAuthenticated, router, user, params.id]);
+  }, [authLoading, isAuthenticated, router]);
 
   // Fetch user's bookings
   useEffect(() => {
@@ -123,6 +117,11 @@ export default function CartPage() {
     }
   };
 
+  const handleNavigate = (e: React.MouseEvent<HTMLButtonElement>, path: string) => {
+    e.preventDefault(); // Prevent any default behavior
+    router.push(path);
+  };
+
   if (loading || authLoading) {
     return (
       <>
@@ -147,7 +146,7 @@ export default function CartPage() {
             <div className="bg-white p-6 rounded-lg shadow-md text-center">
               <p className="text-gray-600 mb-4">您沒有待付款的訂單</p>
               <button
-                onClick={() => router.push('/events')}
+                onClick={(e) => handleNavigate(e, '/events')}
                 className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 瀏覽活動
@@ -209,14 +208,20 @@ export default function CartPage() {
                   
                   <div className="flex gap-3 justify-end">
                     <button
-                      onClick={() => cancelBooking(booking.bookingToken)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        cancelBooking(booking.bookingToken);
+                      }}
                       disabled={actionInProgress === booking.bookingToken}
                       className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-50 disabled:opacity-50"
                     >
                       {actionInProgress === booking.bookingToken ? '處理中...' : '取消訂單'}
                     </button>
                     <button
-                      onClick={() => proceedToPayment(booking)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        proceedToPayment(booking);
+                      }}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
                       前往付款

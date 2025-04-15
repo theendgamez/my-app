@@ -65,7 +65,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <div className="hidden lg:flex items-center space-x-6">
             {user && (
-              <Link href={`/user/${user.userId}/cart`} className=" text-white">
+              <Link href={`/user/cart`} className=" text-white">
                 購物車
               </Link>
             )}
