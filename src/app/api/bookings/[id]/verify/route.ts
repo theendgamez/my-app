@@ -1,34 +1,33 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const { searchParams } = new URL(request.url);
-    const token = searchParams.get('token');
+    // Fix: await the params object before destructuring
+    const { id } = await context.params;
     
-    if (!token) {
+    if (!id) {
       return NextResponse.json({ error: 'Missing token' }, { status: 400 });
     }
     
     // Try to find the booking
     let booking = null;
     
-    if (!booking) {
-      try {
-        booking = await db.bookings.findIntentByToken(token);
-      } catch (e) {
-        console.error('Error in findIntentByToken:', e);
-      }
+    try {
+      booking = await db.bookings.findIntentByToken(id);
+    } catch (e) {
+      console.error('Error in findIntentByToken:', e);
     }
-    
     if (!booking) {
       // Last resort - try a direct scan of the Bookings table
       try {
         const allBookings = await db.scanTable('Bookings');
         
         // Find our token
-        const matchingBooking = allBookings?.find(b => b.bookingToken === token);
+        const matchingBooking = allBookings?.find(b => b.bookingToken === id);
         if (matchingBooking) {
           console.log('Found booking via scan!');
           booking = matchingBooking;
@@ -82,3 +81,4 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+

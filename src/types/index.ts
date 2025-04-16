@@ -99,6 +99,8 @@ export interface Booking {
 
 export interface BookingDetails {
   eventName: string;
+  eventDate: string;
+  eventLocation: string;
   zone: string;
   quantity: number;
   price: number;

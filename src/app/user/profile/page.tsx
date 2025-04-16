@@ -91,11 +91,12 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await fetchWithAuth('/api/users/edit', {
-        method: 'POST',
+      const response = await fetchWithAuth(`/api/users/${user.userId}`, {
+        method: "PATCH", // Use PATCH instead of POST
         body: JSON.stringify({
-          userId: user.userId,
-          ...data,
+          userName: data.userName,
+          email: data.email,
+          phoneNumber: data.phoneNumber
         }),
       });
 

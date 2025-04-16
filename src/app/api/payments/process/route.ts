@@ -18,13 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('Payment process request received', { 
-      headers: Object.fromEntries(request.headers.entries()),
-      requestBodySample: JSON.stringify({
-        userId: requestBody.userId,
-        bookingToken: requestBody.bookingToken?.substring(0, 10) + '...',
-      }, null, 2)
-    });
     
     // Directly check for userId in the request body - simplified authentication
     let user = null;
@@ -180,12 +173,7 @@ export async function POST(request: NextRequest) {
         );
       }
       await Promise.all(ticketPromises);
-      
-      await trx.bookings.update(booking.bookingToken, {
-        paymentId, // Add the payment ID reference
-        status: 'completed' // Update the status
-      } as never);
-    });
+      });
 
     // Return payment details
     return NextResponse.json({

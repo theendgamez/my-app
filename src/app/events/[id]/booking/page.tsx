@@ -72,11 +72,14 @@ const BookingPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     // Check authentication first
     if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/events/${id}/booking`)}`);
+      // Store the current path for redirect after login
+      const currentPath = `/events/${id}/booking`;
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
       return;
     }
 
@@ -110,6 +113,9 @@ const BookingPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Prevent multiple submissions
+    if (isProcessing) return;
+    
     // Additional validations
     if (!selectedZone) {
       setError('請選擇區域');
@@ -126,10 +132,10 @@ const BookingPage = () => {
     // Generate a session ID and create a booking intent
     const sessionId = crypto.randomUUID();
     
-    console.log('Creating booking intent with user:', user); // Debugging
+    setIsProcessing(true);
     
     // Create a secure booking token
-    fetch('/api/bookings/create-intent', {
+    fetch(`/api/bookings/create-intent`, {
       method: 'POST',
       credentials: 'include', // Ensure cookies are sent
       headers: {
@@ -150,8 +156,9 @@ const BookingPage = () => {
         // For 401 errors, attempt to refresh authentication
         if (res.status === 401) {
           console.error('Authentication failed - redirecting to login');
-          // Redirect to login page with return URL
-          router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+          // Store the current path including query params for redirect after login
+          const currentPath = `/events/${id}/booking`;
+          router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
           return { error: 'Please login to continue' };
         }
         // Get the error message from the response
@@ -165,14 +172,49 @@ const BookingPage = () => {
         throw new Error(data.error);
       }
       
+      // Save event data to sessionStorage before navigating
+      // This helps maintain context if the user needs to go back
+      try {
+        const eventStateToSave = {
+          eventName: event?.eventName,
+          eventDate: event?.eventDate,
+          selectedZone,
+          quantity,
+          price: {
+            ticketPrice: selectedZoneDetails?.price || 0,
+            platformFee: PLATFORM_FEE,
+            total: totalPrice
+          }
+        };
+        sessionStorage.setItem(`booking_${id}`, JSON.stringify(eventStateToSave));
+      } catch (err) {
+        console.warn('Could not save booking state to session storage', err);
+      }
+      
       // Navigate to payment page with the secure booking token
       router.push(`/events/${id}/payment?bookingToken=${data.bookingToken}`);
     })
     .catch(err => {
       console.error('Booking intent error:', err);
       setError(err.message || 'Unable to create booking. Please try again.');
+    })
+    .finally(() => {
+      setIsProcessing(false);
     });
   };
+
+  // Handle back navigation properly
+  const handleBackNavigation = () => {
+    // Try to go back to event details instead of using browser history
+    router.push(`/events/${id}`);
+  };
+
+  // Calculate prices outside the if-statements to avoid duplication
+  const selectedZoneDetails = event?.zones?.find(z => z.name === selectedZone);
+  const ticketPrice = selectedZoneDetails ? Number(selectedZoneDetails.price) : 0;
+  const platformFeeTotal = PLATFORM_FEE * quantity;
+  const subtotal = ticketPrice * quantity;
+  const totalPrice = subtotal + platformFeeTotal;
 
   if (loading || authLoading) {
     return (
@@ -193,10 +235,10 @@ const BookingPage = () => {
           <Alert type="error" title="Error" message={error} />
           <div className="mt-4 flex justify-center">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/events')}
               className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
             >
-              返回
+              返回活動列表
             </button>
           </div>
         </div>
@@ -211,17 +253,17 @@ const BookingPage = () => {
         <div className="container mx-auto p-4 pt-20">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold mb-6">找不到活動</h1>
+            <button
+              onClick={() => router.push('/events')}
+              className="px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600"
+            >
+              瀏覽其他活動
+            </button>
           </div>
         </div>
       </>
     );
   }
-
-  const selectedZoneDetails = event.zones?.find(z => z.name === selectedZone);
-  const ticketPrice = selectedZoneDetails ? Number(selectedZoneDetails.price) : 0;
-  const platformFeeTotal = PLATFORM_FEE * quantity;
-  const subtotal = ticketPrice * quantity;
-  const totalPrice = subtotal + platformFeeTotal;
 
   return (
     <>
@@ -350,17 +392,17 @@ const BookingPage = () => {
                 <div className="flex justify-between gap-4">
                   <button
                     type="button"
-                    onClick={() => router.back()}
+                    onClick={handleBackNavigation}
                     className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
                   >
                     返回
                   </button>
                   <button
                     type="submit"
-                    disabled={!selectedZone || loading}
+                    disabled={!selectedZone || loading || isProcessing}
                     className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
                   >
-                    前往付款
+                    {isProcessing ? '處理中...' : '前往付款'}
                   </button>
                 </div>
               </form>

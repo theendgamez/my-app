@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log('Creating booking intent with userId:', userId);
     
     // Verify the user exists (simplified authentication)
     const user = await db.users.findById(userId);
@@ -50,7 +49,6 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
     
-    console.log('User found:', user.userId);
 
     // Check if event exists
     const event = await db.events.findById(eventId);
@@ -107,7 +105,6 @@ export async function POST(request: NextRequest) {
       status: 'pending'
     });
     
-    console.log('Created booking intent with token:', bookingToken);
     
     return NextResponse.json({ 
       bookingToken,

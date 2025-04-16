@@ -67,7 +67,7 @@ class Transaction {
       this.writeItems.push({
         Put: {
           TableName: 'Payments',
-          Item: marshall(payment)
+          Item: marshall(payment, { removeUndefinedValues: true })
         }
       });
     }
@@ -83,7 +83,7 @@ class Transaction {
           TableName: 'Bookings',
           Key: marshall({ bookingToken }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames
         }
       });
@@ -117,7 +117,7 @@ class Transaction {
       this.writeItems.push({
         Put: {
           TableName: 'Tickets',
-          Item: marshall(ticket)
+          Item: marshall(ticket, { removeUndefinedValues: true })
         }
       });
     }

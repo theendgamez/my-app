@@ -42,7 +42,7 @@ export default function OrderPage() {
         const accessToken = localStorage.getItem('accessToken');
         
         // Fetch tickets using user ID
-        const res = await fetch(`/api/tickets/user/${user.userId}`, {
+        const res = await fetch(`/api/users/${user.userId}/tickets`, {
           headers: {
             'Content-Type': 'application/json',
             // Add authorization header if token exists

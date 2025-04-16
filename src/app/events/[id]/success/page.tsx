@@ -97,7 +97,7 @@ export default function SuccessPage() {
         setPayment(paymentData);
         
         // Fetch associated tickets
-        const ticketsRes = await fetch(`/api/tickets/payment/${paymentId}`, requestOptions);
+        const ticketsRes = await fetch(`/api/payments/${paymentId}/tickets`, requestOptions);
         if (ticketsRes.ok) {
           const ticketsData = await ticketsRes.json();
           setTickets(ticketsData);
@@ -201,7 +201,7 @@ export default function SuccessPage() {
                   </div>
                   <div className="flex justify-between text-lg font-bold pt-2 border-t">
                     <span>總金額:</span>
-                    <span>HKD {payment.totalAmount.toLocaleString('en-HK')}</span>
+                    <span>HKD {typeof payment.totalAmount === 'number' ? payment.totalAmount.toLocaleString('zh-HK') : payment.totalAmount}</span>
                   </div>
                 </div>
               </div>

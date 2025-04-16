@@ -3,10 +3,10 @@ import db from '@/lib/db';
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const bookingId = params.id;
+        const { id: bookingId } = await params;
         
         // Get request body
         const body = await request.json();
@@ -57,11 +57,10 @@ export async function POST(
 // Also fix the DELETE handler
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Get booking ID from URL parameter
-        const bookingId = params.id;
+        const { id: bookingId } = await params;
         
         // Check if booking exists
         const booking = await db.bookings.findIntentByToken(bookingId);

@@ -73,7 +73,7 @@ const CreateEventPage = () => {
       // Added category field
       formData.append("category", data.category || "default");
 
-      const response = await fetch("/api/cre-events", {
+      const response = await fetch("/api/events", {
         method: "POST",
         body: formData,
       });
