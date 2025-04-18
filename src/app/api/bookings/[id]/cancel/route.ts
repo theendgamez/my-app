@@ -3,10 +3,10 @@ import db from '@/lib/db';
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise <{id: string }> } // Correct type signature
 ) {
     try {
-        const { id: bookingId } = await params;
+        const bookingId = (await params).id; // Access id directly
         
         // Get request body
         const body = await request.json();

@@ -5,10 +5,10 @@ import { getCurrentUser } from '@/lib/auth';
 // GET user by ID
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // Correct type signature
 ) {
   try {
-    const userId = context.params.id;
+    const userId = (await params).id; // Access id directly
     
     // Add authentication/authorization checks...
     const currentUser = await getCurrentUser(request);
@@ -41,10 +41,10 @@ export async function GET(
 // PATCH to update user profile (replaces /api/users/edit POST)
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // Correct type signature
 ) {
   try {
-    const userId = context.params.id;
+    const userId = (await params).id;
     const { userName, email, phoneNumber } = await request.json();
 
     // Verify the user is authorized to make this edit
@@ -72,10 +72,10 @@ export async function PATCH(
 // DELETE user (admin only)
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // Standardized parameter pattern
 ) {
   try {
-    const userId = context.params.id;
+    const userId = (await params).id;
     
     // Verify the request is from an admin
     const currentUser = await getCurrentUser(request);

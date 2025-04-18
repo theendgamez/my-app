@@ -12,8 +12,9 @@ import {
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 import { Events, Users, Payment, Ticket, Booking } from '@/types';
 
-
-// Initialize DynamoDB client
+/**
+ * Initialize DynamoDB client with environment credentials
+ */
 const client = new DynamoDBClient({
   region: process.env.NEXT_PUBLIC_AWS_REGION,
   credentials: {
@@ -22,7 +23,11 @@ const client = new DynamoDBClient({
   },
 });
 
-// Utility functions
+/**
+ * Creates a DynamoDB update expression from an object of updates
+ * @param updates - Object containing fields to update
+ * @returns Object with expression components for DynamoDB update
+ */
 const createUpdateExpression = <T>(updates: Partial<T>) => {
   const updateExpressions: string[] = [];
   const expressionAttributeValues: Record<string, unknown> = {};
@@ -43,7 +48,12 @@ const createUpdateExpression = <T>(updates: Partial<T>) => {
   };
 };
 
-// Error handling wrapper
+/**
+ * Error handling wrapper for database operations
+ * @param operation - Async function to execute
+ * @returns Result of the operation
+ * @throws Enhanced error with context
+ */
 async function executeDbCommand<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -53,7 +63,9 @@ async function executeDbCommand<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-// Transaction implementation
+/**
+ * Transaction implementation for atomic operations
+ */
 class Transaction {
   private writeItems: TransactWriteItem[] = [];
   private client: DynamoDBClient;
@@ -62,7 +74,14 @@ class Transaction {
     this.client = client;
   }
 
+  /**
+   * Payment operations within a transaction
+   */
   payments = {
+    /**
+     * Creates a payment within the transaction
+     * @param payment - Payment data
+     */
     create: async (payment: Payment): Promise<void> => {
       this.writeItems.push({
         Put: {
@@ -73,7 +92,15 @@ class Transaction {
     }
   };
 
+  /**
+   * Booking operations within a transaction
+   */
   bookings = {
+    /**
+     * Updates a booking within the transaction
+     * @param bookingToken - Booking token identifier
+     * @param updates - Fields to update
+     */
     update: async (bookingToken: string, updates: Partial<Booking>): Promise<void> => {
       const { updateExpressions, expressionAttributeValues, expressionAttributeNames } = 
         createUpdateExpression(updates);
@@ -90,7 +117,16 @@ class Transaction {
     }
   };
 
+  /**
+   * Event operations within a transaction
+   */
   events = {
+    /**
+     * Updates zone remaining tickets within the transaction
+     * @param eventId - Event identifier
+     * @param zoneName - Zone name to update
+     * @param newRemaining - New remaining tickets count
+     */
     updateZoneRemaining: async (eventId: string, zoneName: string, newRemaining: number): Promise<void> => {
       // First we need to get the current event to find the zone index
       const currentEvent = await db.events.findById(eventId);
@@ -112,7 +148,14 @@ class Transaction {
     }
   };
 
+  /**
+   * Ticket operations within a transaction
+   */
   tickets = {
+    /**
+     * Creates a ticket within the transaction
+     * @param ticket - Ticket data
+     */
     create: async (ticket: Ticket): Promise<void> => {
       this.writeItems.push({
         Put: {
@@ -123,6 +166,10 @@ class Transaction {
     }
   };
 
+  /**
+   * Commits the transaction to the database
+   * @throws Error if the transaction fails
+   */
   async commit(): Promise<void> {
     if (this.writeItems.length === 0) {
       return;
@@ -145,10 +192,18 @@ class Transaction {
   }
 }
 
-// Database handlers by entity
+/**
+ * Database handler with operations for all entity types
+ */
 const db = {
-  // Events operations
+  /**
+   * Event-related database operations
+   */
   events: {
+    /**
+     * Retrieves all events
+     * @returns Array of events
+     */
     findMany: async (): Promise<Events[]> => {
       return executeDbCommand(async () => {
         const command = new ScanCommand({ TableName: 'Events' });
@@ -157,6 +212,11 @@ const db = {
       });
     },
 
+    /**
+     * Creates a new event
+     * @param data - Event data
+     * @returns Created event
+     */
     create: async (data: Events): Promise<Events> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -168,6 +228,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds an event by ID
+     * @param eventId - Event identifier
+     * @returns Event or null if not found
+     */
     findById: async (eventId: string): Promise<Events | null> => {
       return executeDbCommand(async () => {
         const command = new GetItemCommand({
@@ -179,6 +244,12 @@ const db = {
       });
     },
 
+    /**
+     * Updates an event
+     * @param eventId - Event identifier
+     * @param updates - Fields to update
+     * @returns Updated event
+     */
     update: async (eventId: string, updates: Partial<Events>): Promise<Events> => {
       return executeDbCommand(async () => {
         // First get the current state
@@ -202,6 +273,10 @@ const db = {
       });
     },
 
+    /**
+     * Deletes an event
+     * @param eventId - Event identifier
+     */
     delete: async (eventId: string): Promise<void> => {
       return executeDbCommand(async () => {
         const command = new DeleteItemCommand({
@@ -212,6 +287,14 @@ const db = {
       });
     },
 
+    /**
+     * Updates a specific property of an event zone
+     * @param eventId - Event identifier
+     * @param zoneName - Zone name
+     * @param propertyName - Property to update
+     * @param newValue - New value
+     * @returns Object with updated details
+     */
     updateZoneProperty: async (
       eventId: string, 
       zoneName: string,
@@ -244,17 +327,36 @@ const db = {
       });
     },
     
+    /**
+     * Updates the maximum tickets for a zone
+     * @param eventId - Event identifier
+     * @param zoneName - Zone name
+     * @param newMax - New maximum value
+     */
     updateZoneMax: async (eventId: string, zoneName: string, newMax: number) => {
       return db.events.updateZoneProperty(eventId, zoneName, 'max', newMax);
     },
     
+    /**
+     * Updates the remaining tickets for a zone
+     * @param eventId - Event identifier
+     * @param zoneName - Zone name
+     * @param newRemaining - New remaining value
+     */
     updateZoneRemaining: async (eventId: string, zoneName: string, newRemaining: number) => {
       return db.events.updateZoneProperty(eventId, zoneName, 'remaining', newRemaining);
     }
   },
 
-  // Users operations
+  /**
+   * User-related database operations
+   */
   users: {
+    /**
+     * Finds a user by verification code
+     * @param verificationCode - Verification code
+     * @returns User or null if not found
+     */
     findByVerificationCode: async (verificationCode: string): Promise<Users | null> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -272,6 +374,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds a user by email
+     * @param email - User email
+     * @returns User or null if not found
+     */
     findByEmail: async (email: string): Promise<Users | null> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -289,6 +396,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds a user by ID
+     * @param userId - User identifier
+     * @returns User or null if not found
+     */
     findById: async (userId: string): Promise<Users | null> => {
       return executeDbCommand(async () => {
         const command = new GetItemCommand({
@@ -301,6 +413,11 @@ const db = {
       });
     },
 
+    /**
+     * Creates a new user
+     * @param data - User data
+     * @returns Created user
+     */
     create: async (data: Users): Promise<Users> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -312,6 +429,12 @@ const db = {
       });
     },
 
+    /**
+     * Updates a user
+     * @param userId - User identifier
+     * @param updates - Fields to update
+     * @returns Updated user
+     */
     update: async (userId: string, updates: Partial<Users>): Promise<Users> => {
       return executeDbCommand(async () => {
         const currentUser = await db.users.findById(userId);
@@ -334,6 +457,10 @@ const db = {
       });
     },
 
+    /**
+     * Deletes a user
+     * @param userId - User identifier
+     */
     delete: async (userId: string): Promise<void> => {
       return executeDbCommand(async () => {
         const command = new DeleteItemCommand({
@@ -344,6 +471,10 @@ const db = {
       });
     },
 
+    /**
+     * Finds admin users
+     * @returns Admin user or null if not found
+     */
     getAdmin: async (): Promise<Users | null> => {
       return executeDbCommand(async () => {
         const command = new ScanCommand({
@@ -361,8 +492,15 @@ const db = {
     }
   },
 
-  // Payments operations
+  /**
+   * Payment-related database operations
+   */
   payments: {
+    /**
+     * Creates a new payment
+     * @param paymentData - Payment data
+     * @returns Created payment
+     */
     create: async (paymentData: Payment): Promise<Payment> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -374,6 +512,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds a payment by ID
+     * @param paymentId - Payment identifier
+     * @returns Payment or null if not found
+     */
     findById: async (paymentId: string): Promise<Payment | null> => {
       return executeDbCommand(async () => {
         const command = new GetItemCommand({
@@ -386,6 +529,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds payments by user
+     * @param userId - User identifier
+     * @returns Array of payments
+     */
     findByUser: async (userId: string): Promise<Payment[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -401,8 +549,15 @@ const db = {
     }
   },
 
-  // Tickets operations
+  /**
+   * Ticket-related database operations
+   */
   tickets: {
+    /**
+     * Creates a new ticket
+     * @param ticketData - Ticket data
+     * @returns Created ticket
+     */
     create: async (ticketData: Ticket): Promise<Ticket> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -414,6 +569,10 @@ const db = {
       });
     },
 
+    /**
+     * Retrieves all tickets
+     * @returns Array of tickets
+     */
     findMany: async (): Promise<Ticket[]> => {
       return executeDbCommand(async () => {
         const command = new ScanCommand({
@@ -425,6 +584,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds tickets by user
+     * @param userId - User identifier
+     * @returns Array of tickets
+     */
     findByUser: async (userId: string): Promise<Ticket[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -439,6 +603,12 @@ const db = {
       });
     },
 
+    /**
+     * Finds tickets by event and zone
+     * @param eventId - Event identifier
+     * @param zone - Zone name
+     * @returns Array of tickets
+     */
     findByEvent: async (eventId: string, zone: string): Promise<Ticket[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -457,6 +627,13 @@ const db = {
       });
     },
 
+    /**
+     * Finds available tickets by event and zone
+     * @param eventId - Event identifier
+     * @param zone - Zone name
+     * @param quantity - Maximum number of tickets to return
+     * @returns Array of available tickets
+     */
     findAvailableByEvent: async (eventId: string, zone: string, quantity: number): Promise<Ticket[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -480,6 +657,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds a ticket by ID
+     * @param ticketId - Ticket identifier
+     * @returns Ticket or null if not found
+     */
     findById: async (ticketId: string): Promise<Ticket | null> => {
       return executeDbCommand(async () => {
         const command = new GetItemCommand({
@@ -492,6 +674,11 @@ const db = {
       });
     },
 
+    /**
+     * Finds tickets by payment
+     * @param paymentId - Payment identifier
+     * @returns Array of tickets
+     */
     findByPayment: async (paymentId: string): Promise<Ticket[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -506,6 +693,12 @@ const db = {
       });
     },
 
+    /**
+     * Updates a ticket
+     * @param ticketId - Ticket identifier
+     * @param updates - Fields to update
+     * @returns Updated ticket
+     */
     update: async (ticketId: string, updates: Partial<Ticket>): Promise<Ticket> => {
       return executeDbCommand(async () => {
         const currentTicket = await db.tickets.findById(ticketId);
@@ -529,7 +722,15 @@ const db = {
     }
   },
 
+  /**
+   * Booking-related database operations
+   */
   bookings: {
+    /**
+     * Creates a new booking
+     * @param bookingData - Booking data
+     * @returns Created booking
+     */
     create: async (bookingData: Booking): Promise<Booking> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -540,6 +741,12 @@ const db = {
         return bookingData;
       });
     },
+
+    /**
+     * Creates a booking intent (preliminary booking)
+     * @param bookingData - Booking data
+     * @returns Created booking intent
+     */
     createIntent: async (bookingData: Booking): Promise<Booking> => {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
@@ -550,6 +757,12 @@ const db = {
         return bookingData;
       });
     },
+
+    /**
+     * Finds a booking intent by token
+     * @param bookingToken - Booking token
+     * @returns Booking or null if not found
+     */
     findIntentByToken: async (bookingToken: string): Promise<Booking | null> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -566,6 +779,11 @@ const db = {
           : null;
       });
     },
+
+    /**
+     * Retrieves all bookings
+     * @returns Array of bookings
+     */
     scanAllBookings: async (): Promise<Booking[]> => {
       return executeDbCommand(async () => {
         console.log('Scanning all bookings...');
@@ -578,6 +796,12 @@ const db = {
         return result.Items?.map(item => unmarshall(item) as Booking) || [];
       });
     },
+
+    /**
+     * Finds bookings by user
+     * @param userId - User identifier
+     * @returns Array of bookings
+     */
     findByUser: async (userId: string): Promise<Booking[]> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -591,6 +815,11 @@ const db = {
         return result.Items?.map(item => unmarshall(item) as Booking) || [];
       });
     },
+
+    /**
+     * Deletes a booking
+     * @param bookingToken - Booking token
+     */
     delete: async (bookingToken: string): Promise<void> => {
       return executeDbCommand(async () => {
         const command = new DeleteItemCommand({
@@ -602,6 +831,11 @@ const db = {
     },
   },
   
+  /**
+   * Scans a table for all items
+   * @param tableName - Table name
+   * @returns Array of items
+   */
   scanTable: async (tableName: string): Promise<unknown[]> => {
     return executeDbCommand(async () => {
       console.log(`Scanning table: ${tableName}`);
@@ -615,6 +849,10 @@ const db = {
     });
   },
 
+  /**
+   * Executes operations within a transaction
+   * @param callback - Function containing operations to execute
+   */
   transaction: async (callback: (transaction: Transaction) => Promise<void>): Promise<void> => {
     const transaction = new Transaction(client);
     try {

@@ -10,6 +10,7 @@ import Navbar from '@/components/navbar/Navbar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { AuthProvider } from '@/context/AuthContext'; // Import AuthProvider
+import { Suspense } from 'react';
 
 interface FormData {
   email: string;
@@ -178,7 +179,9 @@ function LoginForm() {
                 >
                   {isSubmitting ? (
                     <>
-                      <LoadingSpinner size="small" className="mr-2" />
+                      <div className="mr-2">
+                        <LoadingSpinner size="small" />
+                      </div>
                       處理中...
                     </>
                   ) : '登入'}
@@ -203,7 +206,12 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <AuthProvider>
-      <LoginForm />
+      <Navbar />
+      <div className="flex justify-center items-center min-h-screen">
+        <Suspense fallback={<LoadingSpinner size="large" />}>
+          <LoginForm />
+        </Suspense>
+      </div>
     </AuthProvider>
   );
 }

@@ -3,10 +3,10 @@ import db from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // Correct type signature
 ) {
-  try {
-    const { id } = await context.params;
+  try { // Added try...catch block for error handling
+    const id = (await params).id; // Access id directly
     if (!id) {
       return NextResponse.json(
         { error: "活動ID未提供" },
@@ -27,7 +27,7 @@ export async function GET(
     // Return the event data
     return NextResponse.json(event);
     
-  } catch (error) {
+  } catch (error) { // Added catch block
     console.error('Error fetching event details:', error);
     return NextResponse.json(
       { error: '獲取活動詳情時出錯', details: error instanceof Error ? error.message : 'Unknown error' },

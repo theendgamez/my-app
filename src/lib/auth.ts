@@ -100,9 +100,6 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
       ? authHeader.substring(7) 
       : null;
     
-    // If both fail, try session ID
-    const sessionId = req.headers.get('x-session-id');
-    
     if (accessToken) {
       // Use cookie auth
       const decoded = verifyToken(accessToken);
@@ -124,12 +121,6 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
       // Verify token version to ensure token hasn't been invalidated
       if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
         return user;
-      }
-    } else if (sessionId) {
-      // Use session lookup
-      const session = await db.sessions.findById(sessionId);
-      if (session && session.expiresAt > new Date()) {
-        return await db.users.findById(session.userId);
       }
     }
     

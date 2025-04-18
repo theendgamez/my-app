@@ -4,11 +4,10 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params:  Promise<{ id: string }> } // Correct type signature
 ) {
   try {
-    const params = await context.params;
-    const userId = params.id;
+    const userId = (await params).id; // Access id directly
 
     if (!userId) {
       return NextResponse.json({ error: '未提供用戶ID' }, { status: 400 });

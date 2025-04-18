@@ -4,11 +4,10 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  context:  { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // Correct type signature
 ) {
   try {
-    const params = await context.params;
-    const paymentId = params.id;
+    const paymentId = (await params).id; // Access id directly
     
     if (!paymentId) {
       return NextResponse.json({ error: '未提供付款ID' }, { status: 400 });

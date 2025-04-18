@@ -6,12 +6,20 @@ import Navbar from '@/components/navbar/Navbar';
 import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
+// Define a specific type for the user
+interface UserData {
+  userId: string;
+  userName?: string;
+  email?: string;
+  role?: string;
+}
+
 export default function OrderPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserData | null>(null);
 
   useEffect(() => {
     // Check for user authentication first

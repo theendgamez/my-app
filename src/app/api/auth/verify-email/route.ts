@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
       return createResponse({ error: '驗證令牌已過期，請重新獲取' }, 400);
     }
 
-    // Update user status
+    // Update user status and delete verification code
     await db.users.update(user.userId, {
       isEmailVerified: true,
-      verificationCode: undefined,
-      verificationTimestamp: undefined
+      verificationCode: undefined,  // 成功驗證後，刪除驗證碼
+      verificationTimestamp: undefined  // 同時刪除驗證時間戳
     });
 
     // Generate tokens
@@ -75,4 +75,5 @@ export async function POST(request: NextRequest) {
     console.error('Email verification error:', error);
     return createResponse({ error: '內部伺服器錯誤' }, 500);
   }
+
 }

@@ -3,11 +3,10 @@ import db from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> } // updated to await params
+  { params }: { params: Promise <{id: string }> } // Correct type signature
 ) {
   try {
-
-    const { id: userId } = await context.params;
+    const userId = (await params).id; // Access id directly
     
     // Get status query parameter
     const { searchParams } = new URL(request.url);

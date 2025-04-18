@@ -4,12 +4,10 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> } // Correct type signature
 ) {
   try {
-    // Await params before accessing the id property
-    const params = await context.params;
-    const id = params.id;
+    const id = (await params).id; // Await the Promise, then access id
 
     if (!id) {
       return NextResponse.json(

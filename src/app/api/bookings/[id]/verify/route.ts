@@ -1,20 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Define a type for booking objects
+interface Booking {
+  eventId: string;
+  zone: string;
+  quantity: number;
+  expiresAt: string | number;
+  bookingToken: string;
+}
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params:  Promise<{ id: string }> }
 ) {
   try {
-    // Fix: await the params object before destructuring
-    const { id } = await context.params;
+    const id = (await params).id;
     
     if (!id) {
       return NextResponse.json({ error: 'Missing token' }, { status: 400 });
     }
     
     // Try to find the booking
-    let booking = null;
+    let booking: Booking | null = null;
     
     try {
       booking = await db.bookings.findIntentByToken(id);
@@ -27,10 +35,10 @@ export async function GET(
         const allBookings = await db.scanTable('Bookings');
         
         // Find our token
-        const matchingBooking = allBookings?.find(b => b.bookingToken === id);
+        const matchingBooking = allBookings?.find((b) => (b as { bookingToken: string }).bookingToken === id);
         if (matchingBooking) {
           console.log('Found booking via scan!');
-          booking = matchingBooking;
+          booking = matchingBooking as Booking;
         }
       } catch (e) {
         console.error('Error in scan attempt:', e);

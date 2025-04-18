@@ -1,11 +1,10 @@
-import { NextRequest } from 'next/server';
 import { clearAuthCookies, createResponse } from '@/lib/auth';
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   const response = createResponse({ message: '登出成功' });
   
   if (response) {
     return response;
   }
-  return   clearAuthCookies(response);
+  return clearAuthCookies(response);
 }

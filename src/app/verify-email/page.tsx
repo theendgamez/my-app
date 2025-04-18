@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialToken = searchParams.get('token');
@@ -69,28 +69,36 @@ export default function VerifyEmailPage() {
   };
 
   return (
-    <div>
+    <main className="p-8 flex flex-col items-center">
+      <h1 className="text-2xl font-bold mb-4">驗證您的電子郵件</h1>
+
+      {message && <p className="text-green-500 text-lg mb-4">{message}</p>}
+      {error && <p className="text-red-500 text-lg mb-4">{error}</p>}
+
+      <form onSubmit={handleVerify} className="mt-4">
+        <input
+          type="text"
+          placeholder="輸入驗證碼"
+          value={inputToken}
+          onChange={(e) => setInputToken(e.target.value)}
+          className="border border-black p-2 rounded"
+          required
+        />
+        <button type="submit" className="ml-2 bg-blue-500 text-white p-2 rounded" disabled={isLoading}>
+          {isLoading ? '驗證中...' : '驗證'}
+        </button>
+      </form>
+    </main>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <>
       <Navbar />
-      <main className="p-8 flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">驗證您的電子郵件</h1>
-
-        {message && <p className="text-green-500 text-lg mb-4">{message}</p>}
-        {error && <p className="text-red-500 text-lg mb-4">{error}</p>}
-
-        <form onSubmit={handleVerify} className="mt-4">
-          <input
-            type="text"
-            placeholder="輸入驗證碼"
-            value={inputToken}
-            onChange={(e) => setInputToken(e.target.value)}
-            className="border border-black p-2 rounded"
-            required
-          />
-          <button type="submit" className="ml-2 bg-blue-500 text-white p-2 rounded" disabled={isLoading}>
-            {isLoading ? '驗證中...' : '驗證'}
-          </button>
-        </form>
-      </main>
-    </div>
+      <Suspense fallback={<div className="flex justify-center items-center min-h-screen">載入中...</div>}>
+        <VerifyEmailContent />
+      </Suspense>
+    </>
   );
 }
