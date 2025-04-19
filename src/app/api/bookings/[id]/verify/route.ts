@@ -48,6 +48,7 @@ export async function GET(
     if (!booking) {
       return NextResponse.json({ 
         error: 'Booking not found',
+        code: 'BOOKING_NOT_FOUND',
         details: 'The booking token was not found in the database.' 
       }, { status: 404 });
     }
@@ -57,6 +58,7 @@ export async function GET(
     if (!event) {
       return NextResponse.json({ 
         error: 'Event not found',
+        code: 'EVENT_NOT_FOUND',
         details: `Event ID ${booking.eventId} does not exist.`
       }, { status: 404 });
     }
@@ -66,6 +68,7 @@ export async function GET(
     if (!zoneDetails) {
       return NextResponse.json({ 
         error: 'Zone not found',
+        code: 'ZONE_NOT_FOUND',
         details: `Zone ${booking.zone} not found in event ${booking.eventId}`
       }, { status: 404 });
     }

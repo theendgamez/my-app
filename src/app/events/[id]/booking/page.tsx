@@ -75,12 +75,26 @@ const BookingPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // Check authentication first
-    if (!authLoading && !isAuthenticated) {
+    // Check if we're in a redirect loop
+    const redirectAttempt = sessionStorage.getItem('redirectAttempt');
+    
+    // Check authentication first, but only if not in a redirect loop
+    if (!authLoading && !isAuthenticated && !redirectAttempt) {
+      // Store a flag to prevent redirect loops
+      sessionStorage.setItem('redirectAttempt', 'true');
+      
       // Store the current path for redirect after login
       const currentPath = `/events/${id}/booking`;
-      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}&t=${timestamp}`);
       return;
+    }
+    
+    // If authenticated, clear the redirect flag
+    if (isAuthenticated) {
+      sessionStorage.removeItem('redirectAttempt');
     }
 
     const fetchEventDetails = async () => {
@@ -105,7 +119,8 @@ const BookingPage = () => {
       }
     };
 
-    if (isAuthenticated) {
+    // Try to fetch event details even if not fully authenticated in case of redirect loop
+    if (isAuthenticated || redirectAttempt) {
       fetchEventDetails();
     }
   }, [id, isAuthenticated, authLoading, router]);
@@ -129,29 +144,40 @@ const BookingPage = () => {
       return;
     }
 
+    // Validate user is logged in
+    if (!user || !user.userId) {
+      setError('請先登入以繼續購票');
+      return;
+    }
+
     // Generate a session ID and create a booking intent
     const sessionId = crypto.randomUUID();
     
     setIsProcessing(true);
     
+    // Create request payload and validate all fields are present
+    const payload = {
+      eventId: id,
+      userId: user.userId,
+      zone: selectedZone,
+      quantity,
+      sessionId
+    };
+    
+    // Log the payload for debugging
+    console.log('Sending booking request payload:', payload);
+    
     // Create a secure booking token
     fetch(`/api/bookings/create-intent`, {
       method: 'POST',
-      credentials: 'include', // Ensure cookies are sent
       headers: {
         'Content-Type': 'application/json',
-        // Add Authorization header as backup authentication method
-        ...(user ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}` } : {})
+        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
       },
-      body: JSON.stringify({
-        eventId: id,
-        userId: user?.userId,
-        zone: selectedZone,
-        quantity,
-        sessionId
-      })
+      credentials: 'omit', // Don't send cookies
+      body: JSON.stringify(payload)
     })
-    .then(async res => {
+    .then(async res => {      
       if (!res.ok) {
         // For 401 errors, attempt to refresh authentication
         if (res.status === 401) {
@@ -163,6 +189,7 @@ const BookingPage = () => {
         }
         // Get the error message from the response
         const errorData = await res.json();
+        console.error('Booking API error:', errorData);
         throw new Error(errorData.error || `API error: ${res.status}`);
       }
       return res.json();
@@ -175,6 +202,9 @@ const BookingPage = () => {
       // Save event data to sessionStorage before navigating
       // This helps maintain context if the user needs to go back
       try {
+        sessionStorage.removeItem('redirectCount');
+        sessionStorage.removeItem('redirectAttempt');
+        
         const eventStateToSave = {
           eventName: event?.eventName,
           eventDate: event?.eventDate,
@@ -186,6 +216,7 @@ const BookingPage = () => {
             total: totalPrice
           }
         };
+        
         sessionStorage.setItem(`booking_${id}`, JSON.stringify(eventStateToSave));
       } catch (err) {
         console.warn('Could not save booking state to session storage', err);
@@ -281,7 +312,6 @@ const BookingPage = () => {
                 為確保訂票過程公平，所選區域內的座位將會由系統隨機分配。座位號碼將在付款完成後即時顯示。
               </p>
             </div>
-
             <table className="w-full mb-6">
               <tbody className="divide-y">
                 <tr className="py-2">
@@ -337,8 +367,8 @@ const BookingPage = () => {
 
               <div className="max-w-xs">
                 <label className="block mb-2 font-semibold">數量:</label>
-                <select 
-                  value={quantity} 
+                <select
+                  value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                   className="w-full p-2 border rounded"
                   required
@@ -389,23 +419,23 @@ const BookingPage = () => {
                 </div>
               )}
 
-                <div className="flex justify-between gap-4">
-                  <button
-                    type="button"
-                    onClick={handleBackNavigation}
-                    className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                  >
-                    返回
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!selectedZone || loading || isProcessing}
-                    className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? '處理中...' : '前往付款'}
-                  </button>
-                </div>
-              </form>
+              <div className="flex justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={handleBackNavigation}
+                  className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                >
+                  返回
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedZone || loading || isProcessing}
+                  className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? '處理中...' : '前往付款'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

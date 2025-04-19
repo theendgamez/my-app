@@ -3,11 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
-import { useAuth } from '@/context/AuthContext';
 import { Alert } from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Booking, Events } from '@/types';
-import { fetchWithAuth } from '@/utils/fetchWithAuth';
+
+// Define user interface to match the localStorage structure
+interface UserData {
+  userId: string;
+  name?: string;
+  email?: string;
+}
 
 interface BookingWithEvent extends Booking {
   event?: Events;
@@ -18,42 +23,88 @@ interface BookingWithEvent extends Booking {
 
 export default function CartPage() {
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const [user, setUser] = useState<UserData | null>(null);
   const [bookings, setBookings] = useState<BookingWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Verify user is authenticated
+  // Check for user authentication from localStorage directly
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent("/user/cart")}`);
+    // Skip this effect during server-side rendering
+    if (typeof window === 'undefined') return;
+
+    // Check for user data in localStorage
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      // Redirect to login with a return path
+      const redirectUrl = `/login?redirect=${encodeURIComponent("/user/cart")}&t=${Date.now()}`;
+      router.push(redirectUrl);
       return;
     }
-  }, [authLoading, isAuthenticated, router]);
 
-  // Fetch user's bookings
+    try {
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+    } catch (err) {
+      console.error('Error parsing user data:', err);
+      router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
+      return;
+    }
+  }, [router]);
+
+  // Fetch user's bookings once we have user data
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!user) return;
 
     const fetchBookings = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetchWithAuth(`/api/bookings/user/${user.userId}`);
+        // Get access token if available
+        const accessToken = localStorage.getItem('accessToken');
+
+        // Fetch bookings using user ID with proper authorization
+        const response = await fetch(`/api/bookings/user/${user.userId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            // Add authorization header if token exists
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+            // Fallback header with user ID
+            'x-user-id': user.userId
+          },
+          // Don't include cookies for localStorage-only auth
+          credentials: 'omit'
+        });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
+            return;
+          }
           throw new Error('Failed to fetch bookings');
         }
 
         const data = await response.json();
-        
+
         // Fetch event details for each booking
         const bookingsWithEvents = await Promise.all(
           data.map(async (booking: BookingWithEvent) => {
             try {
-              const eventResponse = await fetchWithAuth(`/api/events/${booking.eventId}`);
+              // Get access token if available
+              const accessToken = localStorage.getItem('accessToken');
+
+              const eventResponse = await fetch(`/api/events/${booking.eventId}`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+                  'x-user-id': user.userId
+                },
+                // Don't include cookies for localStorage-only auth
+                credentials: 'omit'
+              });
+
               if (eventResponse.ok) {
                 const event = await eventResponse.json();
                 const zone = event.zones?.find((z: { name: string; price: string | number }) => z.name === booking.zone);
@@ -82,27 +133,46 @@ export default function CartPage() {
     };
 
     fetchBookings();
-  }, [isAuthenticated, user]);
+  }, [user, router]);
+
+  const handleNavigate = (e: React.MouseEvent<HTMLButtonElement>, path: string) => {
+    e.preventDefault(); // Prevent any default behavior
+    router.push(path);
+  };
 
   const proceedToPayment = (booking: BookingWithEvent) => {
     router.push(`/events/${booking.eventId}/payment?bookingToken=${booking.bookingToken}`);
   };
 
   const cancelBooking = async (bookingToken: string) => {
-    if (actionInProgress) return;
-    
+    if (actionInProgress || !user) return;
+
     if (!confirm('確定要取消此訂單嗎？此操作無法撤銷。')) {
       return;
     }
 
     try {
       setActionInProgress(bookingToken);
-      const response = await fetchWithAuth(`/api/bookings/${bookingToken}/cancel`, {
+      // Get access token if available
+      const accessToken = localStorage.getItem('accessToken');
+
+      const response = await fetch(`/api/bookings/${bookingToken}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ userId: user?.userId })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+          'x-user-id': user.userId
+        },
+        body: JSON.stringify({ userId: user.userId }),
+        // Don't include cookies for localStorage-only auth
+        credentials: 'omit'
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
+          return;
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || '取消訂單失敗');
       }
@@ -117,12 +187,7 @@ export default function CartPage() {
     }
   };
 
-  const handleNavigate = (e: React.MouseEvent<HTMLButtonElement>, path: string) => {
-    e.preventDefault(); // Prevent any default behavior
-    router.push(path);
-  };
-
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <>
         <Navbar />
@@ -139,9 +204,9 @@ export default function CartPage() {
       <div className="container mx-auto p-4 pt-20">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">待付款訂單</h1>
-          
+
           {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
-          
+
           {bookings.length === 0 ? (
             <div className="bg-white p-6 rounded-lg shadow-md text-center">
               <p className="text-gray-600 mb-4">您沒有待付款的訂單</p>
@@ -155,8 +220,8 @@ export default function CartPage() {
           ) : (
             <div className="space-y-4">
               {bookings.map((booking) => (
-                <div 
-                  key={booking.bookingToken} 
+                <div
+                  key={booking.bookingToken}
                   className="bg-white p-6 rounded-lg shadow-md"
                 >
                   <div className="flex justify-between items-start mb-4">
@@ -165,8 +230,8 @@ export default function CartPage() {
                         {booking.event?.eventName || '未知活動'}
                       </h2>
                       <p className="text-gray-600">
-                        {booking.event?.eventDate 
-                          ? new Date(booking.event.eventDate).toLocaleString() 
+                        {booking.event?.eventDate
+                          ? new Date(booking.event.eventDate).toLocaleString()
                           : '日期未知'}
                       </p>
                     </div>
@@ -176,7 +241,7 @@ export default function CartPage() {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="border-t border-b py-3 mb-4">
                     <div className="grid grid-cols-2 gap-2 mb-2">
                       <span className="text-gray-600">區域:</span>
@@ -205,7 +270,7 @@ export default function CartPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex gap-3 justify-end">
                     <button
                       onClick={(e) => {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Users } from '@/types';
 import SearchBar from './SearchBar';
 import UserMenu from './UserMenu';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth hook
 
 const NavbarLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <Link href={href} className="block w-full px-4 py-2 text-white hover:bg-gray-700 transition duration-200">
@@ -18,6 +19,7 @@ const Navbar = () => {
   const [user, setUser] = useState<Users | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const { logout } = useAuth(); // Get logout function directly from AuthContext
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -34,11 +36,20 @@ const Navbar = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    router.push('/login');
-    setIsMobileMenuOpen(false);
+  const handleLogout = async () => {
+    try {
+      // Call the AuthContext logout function directly
+      await logout();
+
+      // Clear UI state
+      setUser(null);
+      setIsMobileMenuOpen(false);
+
+      // Force navigation to login page
+      router.push('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   return (

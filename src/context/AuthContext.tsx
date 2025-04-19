@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface User {
   userId: string;
@@ -30,29 +29,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if user is stored in localStorage only
     const checkAuth = async () => {
       try {
-        // Try to get user from cookies first (by calling the API)
-        const res = await fetch('/api/auth/me', {
-          credentials: 'include' // Send cookies with the request
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.user) {
-            setUser(data.user);
-            localStorage.setItem('user', JSON.stringify(data.user));
-          } else {
-            // Try localStorage as fallback for existing sessions
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-              setUser(JSON.parse(storedUser));
-            }
-          }
+        // Directly check localStorage for user data
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
         }
       } catch (err) {
         console.error('Auth check error:', err);
@@ -71,18 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Ensure cookies are stored
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setUser(data.user);
-        // Also store access token if available in the response
+        localStorage.setItem('user', JSON.stringify(data.user));
         if (data.accessToken) {
           localStorage.setItem('accessToken', data.accessToken);
         }
-        localStorage.setItem('user', JSON.stringify(data.user));
       } else {
         setError(data.error || '登入失敗');
         throw new Error(data.error || '登入失敗');
@@ -103,14 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setLoading(true);
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include' 
-      });
+      // Just clear local state without making an API call
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
-      router.push('/login');
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
