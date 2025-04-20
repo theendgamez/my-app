@@ -10,6 +10,7 @@ import { Users } from '@/types';
 interface RegistrationData {
   userName?: string;
   email?: string;
+  realName?: string;
   password?: string;
   phoneNumber?: string;
 }
@@ -24,6 +25,9 @@ function validateRegistrationInput(data: RegistrationData) {
   
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     errors.email = '請輸入有效的電子郵件地址';
+  }
+  if (!data.realName || data.realName.trim().length < 2) {
+    errors.realName = '真實姓名至少需要2個字符';
   }
   
   if (!data.password || data.password.length < 6) {
@@ -81,6 +85,7 @@ export async function POST(request: NextRequest) {
     const userData: Users = {
       userId,
       userName: data.userName,
+      realName: data.realName,
       email: data.email,
       password: hashedPassword,
       phoneNumber: data.phoneNumber,

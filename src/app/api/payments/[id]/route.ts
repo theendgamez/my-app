@@ -4,10 +4,10 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // Correct type signature
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = (await params).id; // Await the Promise, then access id
+    const id = (await params).id;
 
     if (!id) {
       return NextResponse.json(
@@ -16,11 +16,6 @@ export async function GET(
       );
     }
 
-    // Handle authentication with fallback
-    const user = await getCurrentUser(request);
-    const fallbackUserId = !user ? request.headers.get('x-user-id') : null;
-    const userId = user?.userId || fallbackUserId;
-    
     // Fetch payment from database
     const payment = await db.payments.findById(id);
 
@@ -31,15 +26,19 @@ export async function GET(
       );
     }
 
-    // Check if the user has permission to access this payment
-    if (payment.userId !== userId) {
+    // Authentication: allow access if user is owner or admin
+    const user = await getCurrentUser(request);
+    const fallbackUserId = !user ? request.headers.get('x-user-id') : null;
+    const userId = user?.userId || fallbackUserId;
+    const userRole = user?.role;
+
+    if (payment.userId !== userId && userRole !== 'admin') {
       return NextResponse.json(
-        { error: '無權訪問此付款資訊', code: 'FORBIDDEN' }, 
+        { error: '無權訪問此付款資訊', code: 'FORBIDDEN' },
         { status: 403 }
       );
     }
 
-    // Return the payment data
     return NextResponse.json(payment, { status: 200 });
   } catch (error) {
     console.error('Error fetching payment:', error);

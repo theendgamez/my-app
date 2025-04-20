@@ -6,43 +6,28 @@ import Navbar from '@/components/navbar/Navbar';
 import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-// Define a specific type for the user
-interface UserData {
-  userId: string;
-  userName?: string;
-  email?: string;
-  role?: string;
-}
-
 export default function OrderPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<UserData | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for user authentication first
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
+    const storedUserId = localStorage.getItem('userId');
+    if (!storedUserId) {
       // Redirect to login with a return path
       router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
-    } catch (err) {
-      console.error('Error parsing user data:', err);
-      router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
-      return;
-    }
+    setUserId(storedUserId);
   }, [router]);
 
   useEffect(() => {
-    // Only fetch tickets if we have a user
-    if (!user) return;
+    // Only fetch tickets if we have a userId
+    if (!userId) return;
     
     const fetchTickets = async () => {
       try {
@@ -50,14 +35,15 @@ export default function OrderPage() {
         const accessToken = localStorage.getItem('accessToken');
         
         // Fetch tickets using user ID
-        const res = await fetch(`/api/users/${user.userId}/tickets`, {
+        const res = await fetch(`/api/users/${userId}/tickets`, {
           headers: {
             'Content-Type': 'application/json',
             // Add authorization header if token exists
             ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
             // Fallback header with user ID
-            'x-user-id': user.userId
-          }
+            'x-user-id': userId
+          },
+          credentials: 'omit'
         });
         
         if (!res.ok) {
@@ -78,7 +64,7 @@ export default function OrderPage() {
     };
 
     fetchTickets();
-  }, [user, router]);
+  }, [userId, router]);
 
   return (
     <>

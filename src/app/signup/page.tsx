@@ -7,6 +7,7 @@ import { useState } from "react";
 
 interface FormData {
   userName: string;
+  realName: string;
   email: string;
   phoneNumber: string;
   password: string;
@@ -68,6 +69,19 @@ export default function SignUpPage() {
                 {errors.userName && <p className="text-red-500 text-sm mb-3">{errors.userName.message}</p>}
               </div>
             </div>
+
+            <div>
+            <label className="block text-sm/6 font-medium text-gray-900">真實姓名</label>
+            <div className="mt-2">
+              <input
+                type="text"
+                placeholder="真實姓名"
+                {...register("realName", { required: "真實姓名是必填的。" })}
+                className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+              />
+              {errors.realName && <p className="text-red-500 text-sm mb-3">{errors.realName.message}</p>}
+            </div>
+          </div>
 
             <div>
               <label className="block text-sm/6 font-medium text-gray-900">電子郵件</label>

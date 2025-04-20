@@ -172,22 +172,62 @@ const BookingPage = () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+        'x-user-id': user.userId // Add user ID as backup authentication method
       },
       credentials: 'omit', // Don't send cookies
       body: JSON.stringify(payload)
     })
     .then(async res => {      
       if (!res.ok) {
-        // For 401 errors, attempt to refresh authentication
+        // Check if token has expired (401 Unauthorized)
         if (res.status === 401) {
-          console.error('Authentication failed - redirecting to login');
-          // Store the current path including query params for redirect after login
-          const currentPath = `/events/${id}/booking`;
-          router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
-          return { error: 'Please login to continue' };
+          console.error('Authentication failed - token may have expired');
+          
+          try {
+            // Try to refresh the token
+            const refreshResponse = await fetch('/api/auth/refresh', {
+              method: 'GET',
+              credentials: 'include' // Include cookies for refresh token
+            });
+            
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              
+              // If token was refreshed successfully, store new token and retry
+              if (refreshData.accessToken) {
+                localStorage.setItem('accessToken', refreshData.accessToken);
+                
+                // Retry the original request with new token
+                const retryResponse = await fetch(`/api/bookings/create-intent`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${refreshData.accessToken}`,
+                    'x-user-id': user.userId
+                  },
+                  body: JSON.stringify(payload)
+                });
+                
+                if (retryResponse.ok) {
+                  return retryResponse.json();
+                }
+              }
+            }
+            
+            // If refresh failed or retry failed, redirect to login
+            const currentPath = `/events/${id}/booking`;
+            router.push(`/login?redirect=${encodeURIComponent(currentPath)}&session=expired`);
+            return { error: 'Your session has expired. Please log in again.' };
+          } catch (refreshError) {
+            console.error('Token refresh error:', refreshError);
+            const currentPath = `/events/${id}/booking`;
+            router.push(`/login?redirect=${encodeURIComponent(currentPath)}&session=expired`);
+            return { error: 'Please login to continue' };
+          }
         }
-        // Get the error message from the response
+        
+        // Handle other API errors
         const errorData = await res.json();
         console.error('Booking API error:', errorData);
         throw new Error(errorData.error || `API error: ${res.status}`);
@@ -200,7 +240,6 @@ const BookingPage = () => {
       }
       
       // Save event data to sessionStorage before navigating
-      // This helps maintain context if the user needs to go back
       try {
         sessionStorage.removeItem('redirectCount');
         sessionStorage.removeItem('redirectAttempt');

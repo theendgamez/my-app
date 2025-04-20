@@ -41,21 +41,19 @@ function VerifyEmailContent() {
       const result = await response.json();
 
       if (response.ok) {
-        // 設置 Cookie
-        document.cookie = `authToken=${result.token}; path=/;`;
-
-        // 儲存用戶資訊到 localStorage
-        localStorage.setItem('user', JSON.stringify({
-          userId: result.user.userId,
-          userName: result.user.userName,
-          email: result.user.email,
-          role: result.user.role,
-          phoneNumber: result.user.phoneNumber
-        }));
+        // Store only userId
+        if (result.user && result.user.userId) {
+          localStorage.setItem('userId', result.user.userId);
+          
+          // Store token if provided
+          if (result.token) {
+            localStorage.setItem('accessToken', result.token);
+          }
+        }
 
         setMessage(result.message || '驗證成功！正在跳轉...');
         
-        // 導航到首頁
+        // Navigate to home page
         setTimeout(() => router.push('/'), 2000);
       } else {
         setError(result.error || '驗證失敗，請檢查您的驗證碼是否正確。');

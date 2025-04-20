@@ -108,6 +108,7 @@ export default function PaymentPage() {
     try {
       // Validate that the booking hasn't expired
       if (bookingDetails.expiresAt < Date.now()) {
+        setProcessing(false);
         throw new Error('您的預訂已過期，請重新選擇座位');
       }
 

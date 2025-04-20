@@ -78,17 +78,25 @@ export const setAuthCookies = (response: NextResponse, accessToken: string, refr
   });
 };
 
-// Verify JWT token
+// Verify JWT token with improved error handling
 export const verifyToken = (token: string, secret = JWT_SECRET): JWTPayload | null => {
   try {
     return jwt.verify(token, secret) as JWTPayload;
   } catch (error) {
-    console.error('Token verification failed:', error);
+    // Only log detailed errors in development
+    if (process.env.NODE_ENV !== 'production') {
+      if (error instanceof jwt.TokenExpiredError) {
+        // For expired tokens, log a more concise message
+        console.log('Token expired:', (error as jwt.TokenExpiredError).expiredAt);
+      } else {
+        console.error('Token verification failed:', error);
+      }
+    }
     return null;
   }
 };
 
-// Get current user from request
+// Get current user from request with more robust fallback
 export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
   try {
     // Try cookies first
@@ -99,27 +107,32 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
     const headerToken = authHeader?.startsWith('Bearer ') 
       ? authHeader.substring(7) 
       : null;
+
+    // New: Add userId header as fallback auth method
+    const userIdHeader = req.headers.get('x-user-id');
     
-    if (accessToken) {
-      // Use cookie auth
-      const decoded = verifyToken(accessToken);
-      if (!decoded) return null;
+    let user: Users | null = null;
+    
+    // Try token authentication first
+    if (accessToken || headerToken) {
+      const token = accessToken || headerToken;
+      const decoded = token ? verifyToken(token) : null;
       
-      const user = await db.users.findById(decoded.userId);
-      
-      // Verify token version to ensure token hasn't been invalidated
-      if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
-        return user;
+      if (decoded?.userId) {
+        user = await db.users.findById(decoded.userId);
+        
+        // Verify token version to ensure token hasn't been invalidated
+        if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
+          return user;
+        }
       }
-    } else if (headerToken) {
-      // Use header auth
-      const decoded = verifyToken(headerToken);
-      if (!decoded) return null;
-      
-      const user = await db.users.findById(decoded.userId);
-      
-      // Verify token version to ensure token hasn't been invalidated
-      if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
+    }
+    
+    // Fall back to userIdHeader if token auth failed
+    if (!user && userIdHeader) {
+      // Use userId header as backup authentication
+      user = await db.users.findById(userIdHeader);
+      if (user) {
         return user;
       }
     }

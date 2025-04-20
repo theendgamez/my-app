@@ -1,15 +1,16 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
-import { Users, Events as EventType } from '@/types';
+import { Events as EventType } from '@/types';
 import Sidebar from '@/components/ui/Sidebar';
 import PromoCarousel from '@/components/ui/PromoCarousel';
 import Events from '@/components/event/Event';
 
 export default function Home() {
-  const [user, setUser] = useState<Users | null>(null);
+  // Removed unused 'user' state
   const [events, setEvents] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const promoImages = [
     '/img/0fa38ee3-2eba-4791-add7-e7e51875aa99-8c562be975bedfb29f99876ef156d434042172ff.jpg',
@@ -18,10 +19,33 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    // Load user from local storage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    // Get userId from localStorage
+    const userId = localStorage.getItem('userId');
+    
+    if (userId) {
+      // Fetch user data from API
+      const fetchUserData = async () => {
+        try {
+          const accessToken = localStorage.getItem('accessToken');
+          const response = await fetch(`/api/users/${userId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+              'x-user-id': userId
+            },
+            credentials: 'omit'
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            setIsAdmin(userData.role === 'admin');
+          }
+        } catch (error) {
+          console.error('Failed to fetch user data:', error);
+        }
+      };
+      
+      fetchUserData();
     }
 
     // Fetch events
@@ -41,8 +65,6 @@ export default function Home() {
 
     fetchEvents();
   }, []);
-
-  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="min-h-screen flex flex-col">

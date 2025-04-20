@@ -5,7 +5,6 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter, useParams } from 'next/navigation';
 import { Users } from '@/types/index';
-import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface FormData {
   userName: string;
@@ -23,52 +22,51 @@ export default function ProfilePage() {
   const router = useRouter();
   const params = useParams();
   
-  // Get userId from URL params or from localStorage if not provided
+  // Get userId from URL params or from localStorage
   const urlUserId = params.id as string | undefined;
 
   useEffect(() => {
     const fetchUserData = async () => {
       setLoading(true);
       
-      // First try to get from localStorage for the current user
-      const storedUser = localStorage.getItem('user');
+      // Get userId from localStorage
+      const storedUserId = localStorage.getItem('userId');
       
-      if (!storedUser) {
-        // No user in localStorage, redirect to login
+      if (!storedUserId) {
+        // No userId in localStorage, redirect to login
         router.push('/login');
         return;
       }
       
-      const parsedUser: Users = JSON.parse(storedUser);
-      let targetUserId = urlUserId || parsedUser.userId;
-      
-      // If URL has userId and it's different from logged-in user, verify access rights
-      if (urlUserId && urlUserId !== parsedUser.userId) {
-        // Here you could add logic to check if the current user has permission
-        // to view/edit another user's profile (e.g., for admin users)
-        // For now, we'll just use the current user's ID
-        targetUserId = parsedUser.userId;
-      }
+      // Use URL userId if provided, otherwise use stored userId
+      const targetUserId = urlUserId || storedUserId;
       
       try {
-        if (targetUserId === parsedUser.userId) {
-          // Use local data for the current user
-          setUser(parsedUser);
-          setValue('userName', parsedUser.userName || '');
-          setValue('email', parsedUser.email || '');
-          setValue('phoneNumber', parsedUser.phoneNumber || '');
+        // Fetch user data from API
+        const accessToken = localStorage.getItem('accessToken');
+        const response = await fetch(`/api/users/${targetUserId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+            'x-user-id': storedUserId
+          },
+          credentials: 'omit'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+        
+        const userData = await response.json();
+        
+        // Type guard to ensure we have valid user data
+        if (userData && typeof userData === 'object' && 'userId' in userData) {
+          setUser(userData as Users);
+          setValue('userName', userData.userName || '');
+          setValue('email', userData.email || '');
+          setValue('phoneNumber', userData.phoneNumber || '');
         } else {
-          // Fetch data for a different user
-          const response = await fetchWithAuth(`/api/users/${targetUserId}`);
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-            setValue('userName', userData.userName || '');
-            setValue('email', userData.email || '');
-            setValue('phoneNumber', userData.phoneNumber || '');
-          } else {
-            throw new Error('User not found');
-          }
+          throw new Error('Invalid user data received');
         }
       } catch (err) {
         console.error('Failed to fetch user:', err);
@@ -91,27 +89,22 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await fetchWithAuth(`/api/users/${user.userId}`, {
+      const response = await fetch(`/api/users/${user.userId}`, {
         method: "PATCH", // Use PATCH instead of POST
         body: JSON.stringify({
           userName: data.userName,
           email: data.email,
           phoneNumber: data.phoneNumber
         }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        // Update localStorage only if this is the current user
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const parsedUser: Users = JSON.parse(storedUser);
-          if (parsedUser.userId === user.userId) {
-            localStorage.setItem('user', JSON.stringify({...parsedUser, ...result.user}));
-          }
-        }
-        
         setUser(prev => prev ? {...prev, ...result.user} : result.user);
         setSuccess('個人資料更新成功');
       } else {

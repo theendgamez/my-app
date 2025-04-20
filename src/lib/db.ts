@@ -830,6 +830,157 @@ const db = {
       });
     },
   },
+
+  registration: {
+    /**
+     * Finds a registration by token
+     * @param registrationToken - Registration token
+     * @returns Registration or null if not found
+     */
+    findByToken: async (registrationToken: string): Promise<unknown | null> => {
+      return executeDbCommand(async () => {
+        try {
+          // Use GetItemCommand instead of QueryCommand since registrationToken is the primary key
+          const command = new GetItemCommand({
+            TableName: 'Registration',
+            Key: marshall({ registrationToken })
+          });
+          
+          const result = await client.send(command);
+          return result.Item ? unmarshall(result.Item) : null;
+        } catch (error) {
+          // If primary key access fails for some reason, fall back to scan
+          console.warn('Primary key lookup failed, falling back to scan:', error);
+          const scanCommand = new ScanCommand({
+            TableName: 'Registration',
+            FilterExpression: 'registrationToken = :token',
+            ExpressionAttributeValues: marshall({ ':token': registrationToken }),
+            Limit: 1
+          });
+          
+          const scanResult = await client.send(scanCommand);
+          return scanResult.Items && scanResult.Items.length > 0 
+            ? unmarshall(scanResult.Items[0]) 
+            : null;
+        }
+      });
+    },
+    create: async (data: unknown): Promise<unknown> => {
+      return executeDbCommand(async () => {
+        const command = new PutItemCommand({
+          TableName: 'Registration',
+          Item: marshall(data)
+        });
+        await client.send(command);
+        return data;
+      });
+    },
+    update: async (registrationToken: string, updates: Partial<unknown>): Promise<unknown> => {
+      return executeDbCommand(async () => {
+        const currentRegistration = await db.registration.findByToken(registrationToken);
+        if (!currentRegistration) throw new Error(`Registration with token ${registrationToken} not found`);
+        
+        const { updateExpressions, expressionAttributeValues, expressionAttributeNames } = 
+          createUpdateExpression(updates);
+
+        const command = new UpdateItemCommand({
+          TableName: 'Registration',
+          Key: marshall({ registrationToken }),
+          UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? unmarshall(result.Attributes) : { ...currentRegistration, ...updates };
+      });
+    },
+    delete: async (registrationToken: string): Promise<void> => {
+      return executeDbCommand(async () => {
+        const command = new DeleteItemCommand({
+          TableName: 'Registration',
+          Key: marshall({ registrationToken })
+        });
+        await client.send(command);
+      });
+    },
+    findByUser: async (userId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Registration',
+          IndexName: 'userId-index',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: marshall({ ':userId': userId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    },
+    findByEvent: async (eventId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Registration',
+          IndexName: 'eventId-index',
+          KeyConditionExpression: 'eventId = :eventId',
+          ExpressionAttributeValues: marshall({ ':eventId': eventId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    },
+    findByEventAndUser: async (eventId: string, userId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        // First, try to query using the userId index which is more likely to exist
+        try {
+          const command = new QueryCommand({
+            TableName: 'Registration',
+            IndexName: 'userId-index',
+            KeyConditionExpression: 'userId = :userId',
+            FilterExpression: 'eventId = :eventId',
+            ExpressionAttributeValues: marshall({ 
+              ':userId': userId,
+              ':eventId': eventId 
+            })
+          });
+          
+          const result = await client.send(command);
+          return result.Items?.map(item => unmarshall(item)) || [];
+        } catch (error) {
+          console.warn('Failed to query by userId-index with filter, falling back to scan:', error);
+          
+          // If the above fails, fall back to a scan operation with filters
+          // This is less efficient but more reliable if indexes are missing
+          const command = new ScanCommand({
+            TableName: 'Registration',
+            FilterExpression: 'eventId = :eventId AND userId = :userId',
+            ExpressionAttributeValues: marshall({ 
+              ':eventId': eventId,
+              ':userId': userId 
+            })
+          });
+          
+          const result = await client.send(command);
+          return result.Items?.map(item => unmarshall(item)) || [];
+        }
+      });
+    },
+    findByEventAndStatus: async (eventId: string, status: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Registration',
+          IndexName: 'eventId-status-index',
+          KeyConditionExpression: 'eventId = :eventId AND status = :status',
+          ExpressionAttributeValues: marshall({ ':eventId': eventId, ':status': status })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    }
+  },
   
   /**
    * Scans a table for all items
@@ -864,5 +1015,7 @@ const db = {
     }
   }
 };
+
+
 
 export default db;

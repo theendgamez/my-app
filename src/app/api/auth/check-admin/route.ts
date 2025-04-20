@@ -1,25 +1,28 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth';
+import db from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authToken = cookieStore.get('authToken')?.value;
-    const roleCookie = cookieStore.get('role')?.value;
+    // First, try to get the user using standard auth methods
+    const user = await getCurrentUser(request);
     
-    // First check for role cookie (faster path)
-    if (roleCookie === 'admin') {
-      // Verify auth token as well for extra security
-      if (authToken) {
-        const decodedToken = verifyToken(authToken);
-        if (decodedToken && decodedToken.role === 'admin') {
-          return NextResponse.json({ isAdmin: true });
-        }
+    if (user && user.role === 'admin') {
+      return NextResponse.json({ isAdmin: true });
+    }
+    
+    // If standard auth fails, try to check using the user ID header
+    const userIdHeader = request.headers.get('x-user-id');
+    if (userIdHeader) {
+      // Fetch user directly from the database
+      const dbUser = await db.users.findById(userIdHeader);
+      
+      if (dbUser && dbUser.role === 'admin') {
+        return NextResponse.json({ isAdmin: true });
       }
     }
     
-    // If we don't have matching role cookie and valid auth token
+    // If no admin user was found through any method
     return NextResponse.json({ isAdmin: false });
   } catch (error) {
     console.error('Admin check error:', error);

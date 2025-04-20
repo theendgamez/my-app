@@ -1,15 +1,13 @@
 /**
  * Utility function to make authenticated API requests
- * Automatically adds authentication headers from localStorage and cookies
+ * Automatically adds authentication headers from localStorage
  */
 export async function fetchWithAuth(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  // Get the user from localStorage if available
-  const userDataStr = localStorage.getItem('user');
-  const userData = userDataStr ? JSON.parse(userDataStr) : null;
-  const userId = userData?.userId;
+  // Get the userId from localStorage
+  const userId = localStorage.getItem('userId');
 
   // Get access token from localStorage if available
   const accessToken = localStorage.getItem('accessToken');
@@ -25,15 +23,28 @@ export async function fetchWithAuth(
     (headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  // Add user ID header as fallback authentication method
+  // Always add user ID header as fallback authentication method
   if (userId) {
     (headers as Record<string, string>)['x-user-id'] = userId;
   }
 
   // Make the authenticated request
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
-    credentials: 'include', // Always include cookies for cookie-based auth
+    credentials: 'omit', // Don't include cookies for localStorage-based auth
   });
+
+  // Handle auth errors automatically
+  if (response.status === 401 || response.status === 403) {
+    console.warn('Authentication error accessing:', url);
+    
+    // Clear tokens on auth error if configured to do so
+    if (options.method !== 'GET') {
+      // Only clear tokens for non-GET requests
+      localStorage.removeItem('accessToken');
+    }
+  }
+
+  return response;
 }

@@ -2,6 +2,7 @@
 export interface Users {
   userId: string;
   userName: string;
+  realName: string;
   email: string;
   password: string;
   phoneNumber?: string;
@@ -52,6 +53,8 @@ export interface Events {
   createdAt: string;
   status: string;
   category: string;
+  isDrawn?: boolean;
+  drawnAt?: string | null;
 }
 
 // Payment and ticket related types
@@ -68,6 +71,10 @@ export interface Payment {
   cardDetails: {
     lastFourDigits: string;
   };
+  amount: number;
+  paymentMethod: string;
+  relatedTo : 'lottery_registration' | 'ticket_purchase';
+  
 }
 
 export interface Ticket {
@@ -106,7 +113,24 @@ export interface BookingDetails {
   price: number;
   expiresAt: number;
 }
-
 export interface ProcessedPayment {
   paymentId: string;
+}
+
+export interface Registration {
+  registrationToken: string;
+  eventId: string;
+  userId: string;
+  eventName: string;
+  zoneName: string;
+  quantity: number;
+  platformFee: number;
+  totalAmount: number;
+  createdAt: string;
+  status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost';
+  paymentStatus: 'pending' | 'paid' | 'refunded';
+  paymentId: string;
+  paidAt: string;
+  drawDate: string;
+  isDrawn: boolean;
 }

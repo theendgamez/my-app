@@ -5,14 +5,29 @@ import { getCurrentUser } from '@/lib/auth';
 // GET user by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // Correct type signature
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = (await params).id; // Access id directly
+    const userId = (await params).id;
+    
+    // Get userId from header as fallback auth mechanism
+    const requestUserId = request.headers.get('x-user-id');
     
     // Add authentication/authorization checks...
     const currentUser = await getCurrentUser(request);
-    if (!currentUser || (currentUser.userId !== userId && currentUser.role !== 'admin')) {
+    
+    // Allow access if:
+    // 1. User is authenticated and is requesting their own data
+    // 2. User is authenticated as admin
+    // 3. User ID in header matches requested ID (fallback auth)
+    if (!currentUser && (!requestUserId || requestUserId !== userId)) {
+      console.log('Unauthorized access: No user found', { requestedId: userId });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+    
+    // If there's a currentUser but they're not requesting their own data and not an admin
+    if (currentUser && currentUser.userId !== userId && currentUser.role !== 'admin') {
+      console.log('Unauthorized access: Wrong user', { currentUser: currentUser?.userId, requestedId: userId });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     
@@ -32,6 +47,7 @@ export async function GET(
       isPhoneVerified: user.isPhoneVerified,
       createdAt: user.createdAt
     });
+    
   } catch (error) {
     console.error('Error fetching user:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

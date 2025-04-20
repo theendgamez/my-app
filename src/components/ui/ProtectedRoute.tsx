@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
@@ -16,12 +16,29 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    // If the authentication is still loading, wait
+    if (loading) return;
+
+    // If user is not authenticated, redirect to login
+    if (!isAuthenticated) {
       router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
-    } else if (!loading && requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {
-      router.push('/');
+      return;
+    }
+
+    // If there's a required role, check if user has it (or is an admin)
+    if (requiredRole) {
+      if (user?.role === requiredRole || user?.role === 'admin') {
+        setHasPermission(true);
+      } else {
+        // Redirect to home if user doesn't have required role
+        router.push('/');
+      }
+    } else {
+      // No role required, user is authenticated
+      setHasPermission(true);
     }
   }, [loading, isAuthenticated, user, requiredRole, router]);
 
@@ -33,13 +50,6 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  if (requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {
-    return null;
-  }
-
-  return <>{children}</>;
+  // Only render children if user has permission
+  return hasPermission ? <>{children}</> : null;
 }

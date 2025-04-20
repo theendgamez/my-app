@@ -13,10 +13,6 @@ export async function GET(request: NextRequest) {
     return createResponse({
       user: {
         userId: user.userId,
-        userName: user.userName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role
       }
     }, 200);
   } catch (error) {

@@ -8,12 +8,6 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Booking, Events } from '@/types';
 
 // Define user interface to match the localStorage structure
-interface UserData {
-  userId: string;
-  name?: string;
-  email?: string;
-}
-
 interface BookingWithEvent extends Booking {
   event?: Events;
   price?: number;
@@ -23,7 +17,7 @@ interface BookingWithEvent extends Booking {
 
 export default function CartPage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserData | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [bookings, setBookings] = useState<BookingWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,28 +28,21 @@ export default function CartPage() {
     // Skip this effect during server-side rendering
     if (typeof window === 'undefined') return;
 
-    // Check for user data in localStorage
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
+    // Check for userId in localStorage
+    const storedUserId = localStorage.getItem('userId');
+    if (!storedUserId) {
       // Redirect to login with a return path
       const redirectUrl = `/login?redirect=${encodeURIComponent("/user/cart")}&t=${Date.now()}`;
       router.push(redirectUrl);
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
-    } catch (err) {
-      console.error('Error parsing user data:', err);
-      router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
-      return;
-    }
+    setUserId(storedUserId);
   }, [router]);
 
   // Fetch user's bookings once we have user data
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const fetchBookings = async () => {
       try {
@@ -66,13 +53,13 @@ export default function CartPage() {
         const accessToken = localStorage.getItem('accessToken');
 
         // Fetch bookings using user ID with proper authorization
-        const response = await fetch(`/api/bookings/user/${user.userId}`, {
+        const response = await fetch(`/api/bookings/user/${userId}`, {
           headers: {
             'Content-Type': 'application/json',
             // Add authorization header if token exists
             ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
             // Fallback header with user ID
-            'x-user-id': user.userId
+            'x-user-id': userId
           },
           // Don't include cookies for localStorage-only auth
           credentials: 'omit'
@@ -99,7 +86,7 @@ export default function CartPage() {
                 headers: {
                   'Content-Type': 'application/json',
                   ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-                  'x-user-id': user.userId
+                  'x-user-id': userId
                 },
                 // Don't include cookies for localStorage-only auth
                 credentials: 'omit'
@@ -133,7 +120,7 @@ export default function CartPage() {
     };
 
     fetchBookings();
-  }, [user, router]);
+  }, [userId, router]);
 
   const handleNavigate = (e: React.MouseEvent<HTMLButtonElement>, path: string) => {
     e.preventDefault(); // Prevent any default behavior
@@ -145,7 +132,7 @@ export default function CartPage() {
   };
 
   const cancelBooking = async (bookingToken: string) => {
-    if (actionInProgress || !user) return;
+    if (actionInProgress || !userId) return;
 
     if (!confirm('確定要取消此訂單嗎？此操作無法撤銷。')) {
       return;
@@ -161,9 +148,9 @@ export default function CartPage() {
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-          'x-user-id': user.userId
+          'x-user-id': userId
         },
-        body: JSON.stringify({ userId: user.userId }),
+        body: JSON.stringify({ userId }),
         // Don't include cookies for localStorage-only auth
         credentials: 'omit'
       });

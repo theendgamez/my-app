@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+// Fix the import path using the @ alias which points to /src
+import { verifyToken } from '@/lib/auth';
 
 // Basic security checks middleware
 export async function middleware(request: NextRequest) {
@@ -34,8 +36,26 @@ export async function middleware(request: NextRequest) {
 
   // Protect admin routes with stricter validation
   if (isProtectedRoute(pathname, 'admin')) {
-    const role = request.cookies.get('role')?.value;
-    if (role !== 'admin') {
+    // Get the authorization header or access token from cookie
+    const authHeader = request.headers.get('authorization');
+    const accessToken = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7)
+      : request.cookies.get('accessToken')?.value;
+    
+    let isAdmin = false;
+    
+    if (accessToken) {
+      // Verify token and check role
+      try {
+        const decoded = verifyToken(accessToken);
+        isAdmin = decoded?.role === 'admin';
+      } catch (e) {
+        console.error('Token verification error:', e);
+      }
+    }
+
+    // If not admin, redirect to home
+    if (!isAdmin) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }

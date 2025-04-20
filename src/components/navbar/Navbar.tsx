@@ -22,10 +22,44 @@ const Navbar = () => {
   const { logout } = useAuth(); // Get logout function directly from AuthContext
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    // Check if user is authenticated based on userId
+    const fetchUserData = async () => {
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) return;
+      
+      try {
+        // Fetch full user data from API including role
+        const accessToken = localStorage.getItem('accessToken');
+        const response = await fetch(`/api/users/${userId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+            'x-user-id': userId
+          },
+          credentials: 'omit'
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          
+          // Type guard for userData
+          if (userData && typeof userData === 'object' && 'userId' in userData) {
+            setUser(userData as Users);
+          } else {
+            console.error('Invalid user data structure:', userData);
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setUser(null);
+      }
+    };
+    
+    fetchUserData();
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
