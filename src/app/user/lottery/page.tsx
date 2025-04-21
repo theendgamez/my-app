@@ -7,26 +7,13 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import Link from 'next/link';
-
-interface LotteryRegistration {
-  registrationToken: string;
-  eventId: string;
-  eventName: string;
-  zoneName: string;
-  quantity: number;
-  status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost';
-  paymentStatus: 'pending' | 'paid' | 'refunded';
-  platformFee: number;
-  totalAmount: number;
-  createdAt: string;
-  drawDate: string;
-}
+import { Registration } from '@/types';
 
 export default function UserLotteryPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
-  const [registrations, setRegistrations] = useState<LotteryRegistration[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,7 +134,9 @@ export default function UserLotteryPage() {
                           <div className="text-sm text-gray-900">{reg.quantity} 張</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{new Date(reg.drawDate).toLocaleDateString()}</div>
+                          <div className="text-sm text-gray-900">
+                            {reg.drawDate ? new Date(reg.drawDate).toLocaleDateString() : '—'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(reg.status, reg.paymentStatus)}

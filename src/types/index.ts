@@ -73,8 +73,7 @@ export interface Payment {
   };
   amount: number;
   paymentMethod: string;
-  relatedTo : 'lottery_registration' | 'ticket_purchase';
-  
+  relatedTo: 'lottery_registration' | 'ticket_purchase';
 }
 
 export interface Ticket {
@@ -99,7 +98,7 @@ export interface Booking {
   eventId: string;
   zone: string;
   quantity: number;
-  userId: string
+  userId: string;
   expiresAt: string;
   status: 'pending' | 'completed';
 }
@@ -113,15 +112,17 @@ export interface BookingDetails {
   price: number;
   expiresAt: number;
 }
+
 export interface ProcessedPayment {
   paymentId: string;
 }
 
+// 統一抽籤登記型別，供所有 API 使用
 export interface Registration {
   registrationToken: string;
   eventId: string;
   userId: string;
-  eventName: string;
+  eventName?: string;
   zoneName: string;
   quantity: number;
   platformFee: number;
@@ -129,8 +130,9 @@ export interface Registration {
   createdAt: string;
   status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost';
   paymentStatus: 'pending' | 'paid' | 'refunded';
-  paymentId: string;
-  paidAt: string;
-  drawDate: string;
-  isDrawn: boolean;
+  paymentId?: string;
+  paidAt?: string;
+  drawDate?: string;
+  isDrawn?: boolean;
+  sessionId?: string;
 }

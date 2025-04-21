@@ -7,18 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
-
-interface LotteryRegistration {
-  registrationToken: string;
-  eventId: string;
-  userId: string;
-  eventName: string;
-  zoneName: string;
-  quantity: number;
-  platformFee: number;
-  totalAmount: number;
-  createdAt: string;
-}
+import { Registration } from '@/types';
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
@@ -29,7 +18,7 @@ export default function LotteryPaymentPage() {
   const registrationToken = searchParams.get('registrationToken');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
-  const [registration, setRegistration] = useState<LotteryRegistration | null>(null);
+  const [registration, setRegistration] = useState<Registration | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);

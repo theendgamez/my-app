@@ -9,7 +9,6 @@ import { Alert } from '@/components/ui/Alert';
 import Link from 'next/link';
 import { Registration } from '@/types';
 
-
 export default function LotteryConfirmationPage() {
   const router = useRouter();
   const { id } = useParams();
