@@ -25,7 +25,10 @@ export async function GET(
     const zoneDetails = event.zones?.find(z => z.name === registration.zoneName);
 
     return NextResponse.json({
-      registration,
+      registration: {
+        ...registration,
+        phoneNumber: registration.phoneNumber || '',
+      },
       event: {
         eventId: event.eventId,
         eventName: event.eventName,

@@ -5,7 +5,7 @@ export interface Users {
   realName: string;
   email: string;
   password: string;
-  phoneNumber?: string;
+  phoneNumber: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   verificationCode?: string;
@@ -122,6 +122,7 @@ export interface Registration {
   registrationToken: string;
   eventId: string;
   userId: string;
+  phoneNumber?: string;
   eventName?: string;
   zoneName: string;
   quantity: number;

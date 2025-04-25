@@ -11,6 +11,7 @@ interface LotteryRegistrationRequest {
   zone: string;
   quantity: number;
   sessionId: string;
+  phoneNumber?: string; // 新增
 }
 
 export async function POST(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data: LotteryRegistrationRequest = await request.json();
-    const { eventId, zone, quantity, sessionId } = data;
+    const { eventId, zone, quantity, sessionId, phoneNumber } = data;
     
     // Basic validation
     if (!eventId || !zone || !quantity || !sessionId) {
@@ -87,7 +88,8 @@ export async function POST(request: NextRequest) {
       totalAmount,
       paymentStatus: 'pending',
       createdAt: new Date().toISOString(),
-      sessionId
+      sessionId,
+      phoneNumber: phoneNumber || user.phoneNumber || '', // 儲存電話號碼
     });
 
     return NextResponse.json({

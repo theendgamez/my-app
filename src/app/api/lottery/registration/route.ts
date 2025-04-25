@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
             platformFee: registration.platformFee || 18,
             totalAmount: registration.totalAmount || 0,
             quantity: registration.quantity || 1,
-            zoneName: registration.zoneName || '未知區域'
+            zoneName: registration.zoneName || '未知區域',
+            phoneNumber: registration.phoneNumber || '', // 新增
           };
         } catch (error) {
           console.error(`Error enhancing registration data for ${registration.registrationToken}:`, error);

@@ -59,7 +59,10 @@ export async function GET(
     }
 
     // Return registration data
-    return NextResponse.json(registration);
+    return NextResponse.json({
+      ...registration,
+      phoneNumber: registration.phoneNumber || '',
+    });
   } catch (error) {
     console.error('Error fetching lottery registration:', error);
     return NextResponse.json({ error: '獲取抽籤登記詳情時出錯' }, { status: 500 });

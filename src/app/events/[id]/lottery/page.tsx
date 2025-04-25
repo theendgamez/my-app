@@ -31,6 +31,7 @@ const LotteryPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showMoreLegal, setShowMoreLegal] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   // Add refs to track authentication state and prevent loops
   const redirectAttemptedRef = useRef(false);
@@ -45,6 +46,13 @@ const LotteryPage = () => {
       }
     };
   }, []);
+
+  // 預設帶入用戶電話號碼
+  useEffect(() => {
+    if (user && user.phoneNumber) {
+      setPhoneNumber(user.phoneNumber);
+    }
+  }, [user]);
 
   // Memoize the fetch event details function to prevent recreating on each render
   const fetchEventDetails = useCallback(async () => {
@@ -157,6 +165,7 @@ const LotteryPage = () => {
         zone: selectedZone,
         quantity,
         sessionId,
+        phoneNumber, // 新增
       }),
     })
       .then(async (res) => {
@@ -191,6 +200,7 @@ const LotteryPage = () => {
                       zone: selectedZone,
                       quantity,
                       sessionId,
+                      phoneNumber, // 新增
                     }),
                   });
 
@@ -391,6 +401,18 @@ const LotteryPage = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="max-w-xs">
+                <label className="block mb-2 font-semibold">聯絡電話（如需修改請至個人資料頁）:</label>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={e => setPhoneNumber(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  required
+                  disabled // 不允許直接修改，僅顯示
+                />
               </div>
 
               {selectedZone && (
