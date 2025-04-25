@@ -1,17 +1,16 @@
 {
   "name": "fyp-tickets-platform",
   "compatibility_date": "2025-04-25",
+  "main": "_worker.js",
   "workers_dev": true,
-  "routes": [
-    { "pattern": "*", "zone_name": "fyp-tickets-platform.pages.dev" }
-  ],
   "site": {
-    "bucket": "./.next/standalone",
-    "include": ["./.next/static/*"]
+    "bucket": "./.next/static"
   },
   "build": {
     "command": "npm run build",
-    "cwd": "."
+    "upload": {
+      "format": "service-worker"
+    }
   },
   "env": {
     "NODE_ENV": "production"
