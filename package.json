@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --experimental-https --turbopack",
-    "build": "next build && npm run build:worker",
-    "build:worker": "wrangler publish --dry-run",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "deploy": "wrangler deploy"
