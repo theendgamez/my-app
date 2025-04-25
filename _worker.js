@@ -10,7 +10,7 @@ const DEBUG = false;
 /**
  * Handle all requests to your Cloudflare Workers application
  */
-export default {
+const worker = {
   async fetch(request, env, ctx) {
     try {
       // Get the URL from the request
@@ -45,3 +45,5 @@ export default {
     }
   },
 };
+
+export default worker;
