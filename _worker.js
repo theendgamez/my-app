@@ -1,6 +1,6 @@
 import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 
-const DEBUG = false;
+const DEBUG = true;
 
 const worker = {
   async fetch(request, env, ctx) {
@@ -27,11 +27,41 @@ const worker = {
           );
         } catch (e) {
           if (url.pathname === '/favicon.ico' || url.pathname === '/robots.txt') {
-            const publicRequest = new Request(url.origin + '/public' + url.pathname, request);
-            return await getAssetFromKV(
-              { request: publicRequest, waitUntil: ctx.waitUntil.bind(ctx) },
-              options
-            );
+            try {
+              const publicRequest = new Request(url.origin + '/public' + url.pathname, request);
+              return await getAssetFromKV(
+                { request: publicRequest, waitUntil: ctx.waitUntil.bind(ctx) },
+                options
+              );
+            } catch {
+              // Final fallback for favicon.ico: return a valid empty icon
+              if (url.pathname === '/favicon.ico') {
+                return new Response(
+                  Uint8Array.from([
+                    0x00,0x00,0x01,0x00,0x01,0x00,0x10,0x10,0x00,0x00,0x01,0x00,0x04,0x00,0x28,0x01,
+                    0x00,0x00,0x16,0x00,0x00,0x00,0x28,0x00,0x00,0x00,0x10,0x00,0x00,0x00,0x20,0x00,
+                    0x00,0x00,0x01,0x00,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                  ]),
+                  {
+                    headers: {
+                      'Content-Type': 'image/x-icon',
+                      'Cache-Control': 'public, max-age=86400'
+                    }
+                  }
+                );
+              }
+              // robots.txt fallback
+              if (url.pathname === '/robots.txt') {
+                return new Response('User-agent: *\nAllow: /', {
+                  headers: { 'Content-Type': 'text/plain' }
+                });
+              }
+            }
           }
           throw e;
         }
@@ -43,7 +73,6 @@ const worker = {
       }
 
       // Fallback: serve Next.js SSR HTML for dynamic routes
-      // Try .next/server/app{pathname}/index.html or .next/server/app{pathname}.html
       let pagePath = url.pathname.endsWith('/')
         ? `/index.html`
         : `.html`;
@@ -62,13 +91,22 @@ const worker = {
             { request: pageRequest, waitUntil: ctx.waitUntil.bind(ctx) },
             options
           );
-        } catch (e) {
+        } catch {
           // Try next path
         }
       }
 
-      // If all else fails, return 404
-      return new Response('Not Found', { status: 404 });
+      // As a last resort, try serving /index.html from the static bucket
+      try {
+        const indexRequest = new Request(url.origin + '/index.html', request);
+        return await getAssetFromKV(
+          { request: indexRequest, waitUntil: ctx.waitUntil.bind(ctx) },
+          options
+        );
+      } catch {
+        // If not found, return 404
+        return new Response('Not Found', { status: 404 });
+      }
     } catch (e) {
       if (DEBUG) {
         return new Response(e.message || e.toString(), { status: 500 });
