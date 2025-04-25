@@ -1,5 +1,5 @@
 {
-  "name": "fyp-tickets-platform",
+  "name": "steveapp",
   "compatibility_date": "2025-04-25",
   "main": "_worker.js",
   "workers_dev": true,
