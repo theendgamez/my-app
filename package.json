@@ -8,9 +8,12 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "nextConfig": {
+    "output": "standalone"
+  },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.705.0",
-    "@aws-sdk/util-dynamodb": "^3.712.0",
+    "@aws-sdk/util-dynamodb": "^3.796.0",
     "@ethersproject/providers": "^5.7.2",
     "@headlessui/react": "^2.2.2",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
@@ -38,6 +41,7 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.9",
+    "@types/aws-lambda": "^8.10.149",
     "@types/body-parser": "^1.19.5",
     "@types/connect": "^3.4.38",
     "@types/node": "^20",
