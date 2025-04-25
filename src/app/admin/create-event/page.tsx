@@ -3,8 +3,8 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import Navbar from '@/components/navbar/Navbar'; // Ensure correct path casing
-import Sidebar from "@/components/Sidebar";
+import Navbar from '@/components/navbar/Navbar';
+import Sidebar from "@/components/ui/Sidebar";
 import type { Zone } from '@/types';
 
 interface FormData {
@@ -13,13 +13,10 @@ interface FormData {
   description: string;
   location: string;
   isDrawMode: boolean;
-  // Draw mode fields
   registerDate?: string;
   endregisterDate?: string;
   drawDate?: string;
-  // Direct sale field
   onSaleDate?: string;
-  // Common fields
   zones: Zone[];
   photo: FileList;
   status?: 'Prepare' | 'OnSale' | 'SoldOut';
@@ -76,7 +73,7 @@ const CreateEventPage = () => {
       // Added category field
       formData.append("category", data.category || "default");
 
-      const response = await fetch("/api/cre-events", {
+      const response = await fetch("/api/events", {
         method: "POST",
         body: formData,
       });
@@ -240,15 +237,15 @@ const CreateEventPage = () => {
                     placeholder="Max Tickets"
                   />
                   <input className="block text-sm font-medium text-gray-700 mb-2"
-                    {...register(`zones.${index}.remaining`, { required: "Remaining Tickets is required" })}
-                    placeholder="Remaining Tickets"
+                    {...register(`zones.${index}.zoneQuantity`, { required: "Tickets Quantity is required" })}
+                    placeholder="Tickets Quantity"
                   />
                   <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => remove(index)}>
                     Remove
                   </button>
                 </div>
               ))}
-              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", remaining: "" , max: "" })}>
+              <button className="block text-sm font-medium text-gray-700 mb-2" type="button" onClick={() => append({ name: "", price: "", zoneQuantity: 0, max: "" })}>
                 Add Zone
               </button>
             </div>
