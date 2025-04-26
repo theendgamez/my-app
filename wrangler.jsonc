@@ -7,12 +7,10 @@
     "bucket": "./.next/static"
   },
   "build": {
-    "command": "npm run build",
-    "upload": {
-      "format": "service-worker"
-    }
+    "command": "npm run build"
   },
   "env": {
-    "NODE_ENV": "production"
+    "vars": {
+    }
   }
 }

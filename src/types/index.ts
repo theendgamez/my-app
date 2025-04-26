@@ -8,8 +8,8 @@ export interface Users {
   phoneNumber: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
-  verificationCode?: string;
-  verificationTimestamp?: string;
+  verificationCode: string;
+  verificationTimestamp: string;
   createdAt: string;
   role: string;
   tokenVersion?: number;

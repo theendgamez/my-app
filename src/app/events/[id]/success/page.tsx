@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -31,7 +34,8 @@ const sanitizeRedirectUrl = (url: string): string => {
 
 export default function SuccessPage() {
   const searchParams = useSearchParams();
-  const { id: eventId } = useParams();
+  const params = useParams();
+  const eventId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
   const router = useRouter();
   
   const { isAuthenticated, loading: authLoading, user } = useAuth();
@@ -42,7 +46,7 @@ export default function SuccessPage() {
   const [error, setError] = useState<string | null>(null);
   const [fetchAttempted, setFetchAttempted] = useState(false);
   
-  const paymentId = searchParams.get('paymentId');
+  const paymentId = searchParams?.get('paymentId');
 
   useEffect(() => {
     // If authentication is still loading, wait

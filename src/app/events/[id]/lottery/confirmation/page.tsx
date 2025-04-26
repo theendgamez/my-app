@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
@@ -11,9 +14,10 @@ import { Registration } from '@/types';
 
 export default function LotteryConfirmationPage() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
+  const id = params && typeof params.id === 'string' ? params.id : Array.isArray(params?.id) ? params?.id[0] : '';
   const searchParams = useSearchParams();
-  const registrationToken = searchParams.get('registrationToken');
+  const registrationToken = searchParams?.get('registrationToken');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [details, setDetails] = useState<Registration | null>(null);
@@ -23,7 +27,8 @@ export default function LotteryConfirmationPage() {
   useEffect(() => {
     // Check authentication first
     if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      // Use window.location.href instead of router.push to force full page reload
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
 

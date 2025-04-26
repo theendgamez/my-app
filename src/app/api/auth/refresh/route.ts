@@ -1,12 +1,14 @@
-import { NextRequest } from 'next/server';
-import { handleTokenRefresh, createResponse } from '@/lib/auth';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  const response = await handleTokenRefresh(request);
-  
-  if (response) {
-    return response;
-  }
-  
-  return createResponse({ error: '無效的重新整理令牌' }, 401);
+// This path cannot be properly statically exported, so we're using a simple static response
+export async function GET() {
+  // Return a static response for static builds
+  return NextResponse.json({
+    error: 'Token refresh is not available in static builds',
+    message: 'Please implement client-side token refresh or redirection to login',
+    staticBuild: true
+  }, { status: 401 });
 }
+
+// Add the necessary export config to prevent this route from being included in static builds
+export const dynamic = 'force-dynamic';

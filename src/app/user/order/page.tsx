@@ -1,12 +1,15 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import NextDynamic from 'next/dynamic';
 
-export default function OrderPage() {
+// Create a client-only component for the main content
+const OrderPageClient = () => {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +31,7 @@ export default function OrderPage() {
   useEffect(() => {
     // Only fetch tickets if we have a userId
     if (!userId) return;
-    
+
     const fetchTickets = async () => {
       try {
         // Get access token if available
@@ -38,9 +41,7 @@ export default function OrderPage() {
         const res = await fetch(`/api/users/${userId}/tickets`, {
           headers: {
             'Content-Type': 'application/json',
-            // Add authorization header if token exists
             ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-            // Fallback header with user ID
             'x-user-id': userId
           },
           credentials: 'omit'
@@ -125,4 +126,14 @@ export default function OrderPage() {
       </div>
     </>
   );
+};
+
+// Use dynamic import with ssr: false to prevent server-side rendering
+const ClientOnlyOrderPage = NextDynamic(() => Promise.resolve(OrderPageClient), {
+  ssr: false,
+});
+
+// Export a simple static component that will load the dynamic component on the client
+export default function OrderPage() {
+  return <ClientOnlyOrderPage />;
 }

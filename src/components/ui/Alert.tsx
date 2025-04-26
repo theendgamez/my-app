@@ -1,7 +1,9 @@
+import React from 'react';
+
 interface AlertProps {
   type?: 'info' | 'success' | 'warning' | 'error';
   title?: string;
-  message: [] | string;
+  message?: string | React.ReactNode;
   onClose?: () => void;
   className?: string;
 }
@@ -64,7 +66,9 @@ export function Alert({
         <div className="flex-shrink-0">{style.icon}</div>
         <div className="ml-3 flex-1">
           {title && <h3 className={`text-sm font-medium ${style.text}`}>{title}</h3>}
-          <div className={`text-sm ${style.text} mt-1`}>{message}</div>
+          <div className={`text-sm ${style.text} mt-1`}>
+            {typeof message === 'string' || React.isValidElement(message) ? message : null}
+          </div>
         </div>
         {onClose && (
           <div className="ml-auto pl-3">

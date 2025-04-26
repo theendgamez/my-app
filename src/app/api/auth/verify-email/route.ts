@@ -1,79 +1,118 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { 
-  createResponse, 
-  generateTokens, 
-  setAuthCookies, 
-  verificationRateLimiter 
-} from '@/lib/auth';
-
-// Verification token expiry in milliseconds (10 minutes)
-const TOKEN_EXPIRY_MS = 10 * 60 * 1000;
+import { verifyToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
-  // Get client IP for rate limiting
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  
-  // Check rate limit
-  const rateLimit = verificationRateLimiter.check(`verify:${ip}`);
-  if (!rateLimit.allowed) {
-    return createResponse({ error: '嘗試次數過多，請稍後再試' }, 429);
-  }
-
   try {
-    const { token } = await request.json();
-
-    if (!token || typeof token !== 'string' || token.length !== 6) {
-      return createResponse({ error: '驗證令牌無效' }, 400);
-    }
-
-    // Find user by verification code
-    const user = await db.users.findByVerificationCode(token);
-    if (!user) {
-      return createResponse({ error: '無效的驗證令牌' }, 400);
-    }
-
-    // Check if the token has expired
-    const verificationTimestamp = user.verificationTimestamp ? new Date(user.verificationTimestamp).getTime() : 0;
-    const now = Date.now();
+    const body = await request.json();
+    const { token } = body;
     
-    if (now - verificationTimestamp > TOKEN_EXPIRY_MS) {
-      return createResponse({ error: '驗證令牌已過期，請重新獲取' }, 400);
+    if (!token) {
+      return NextResponse.json({ error: '缺少驗證碼' }, { status: 400 });
     }
 
-    // Update user status and delete verification code
-    await db.users.update(user.userId, {
-      isEmailVerified: true,
-      verificationCode: undefined,  // 成功驗證後，刪除驗證碼
-      verificationTimestamp: undefined  // 同時刪除驗證時間戳
-    });
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user);
-    
-    // Create response with user data
-    const response = createResponse({
-      user: {
-        userId: user.userId,
-        userName: user.userName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
+    // First, try to handle it as a verification code (6-digit number)
+    if (/^\d{6}$/.test(token)) {
+      // It looks like a 6-digit verification code
+      const user = await db.users.findByVerificationCode(token);
+      
+      if (!user) {
+        return NextResponse.json({ error: '無效的驗證碼' }, { status: 400 });
       }
-    }, 200, '驗證成功！');
+      
+      // Check if the verification code has expired (10 minutes)
+      if (!user.verificationTimestamp) {
+        return NextResponse.json({ 
+          error: '驗證碼時間缺失',
+          details: '請重新發送驗證碼'
+        }, { status: 400 });
+      }
+      const verificationTime = new Date(user.verificationTimestamp).getTime();
+      const now = Date.now();
+      const expirationTime = 10 * 60 * 1000; // 10 minutes in milliseconds
+      
+      if (now - verificationTime > expirationTime) {
+        return NextResponse.json({ 
+          error: '驗證碼已過期',
+          details: '請重新發送驗證碼'
+        }, { status: 400 });
+      }
+      
+      // Check if already verified
+      if (user.isEmailVerified) {
+        return NextResponse.json({ 
+          message: '電子郵件已驗證',
+          success: true
+        }, { status: 200 });
+      }
+      
+      // Update user to mark email as verified
+      await db.users.update(user.userId, {
+        isEmailVerified: true,
+        verificationCode: "", // Use empty string instead of null
+        verificationTimestamp: "" // Use empty string instead of null
+      });
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: '電子郵件驗證成功'
+      });
+    }
     
-    // Set auth cookies
-    setAuthCookies(response, accessToken, refreshToken);
-    
-    // Set HTTPS security headers
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
-    
-    return response;
+    // Handle it as a JWT token
+    try {
+      const decoded = verifyToken(token);
+      
+      // Make sure it's an email verification token
+      if (!decoded || decoded.type !== 'email_verification') {
+        return NextResponse.json({ 
+          error: '無效的令牌類型',
+          details: '此令牌不能用於電子郵件驗證'
+        }, { status: 400 });
+      }
+      
+      const userId = decoded.userId;
+      if (!userId) {
+        return NextResponse.json({ error: '無效的令牌：缺少用戶ID' }, { status: 400 });
+      }
+      
+      // Check if user exists
+      const user = await db.users.findById(userId);
+      if (!user) {
+        return NextResponse.json({ error: '找不到用戶' }, { status: 404 });
+      }
+      
+      // Check if already verified
+      if (user.isEmailVerified) {
+        return NextResponse.json({ 
+          message: '電子郵件已驗證',
+          success: true
+        }, { status: 200 });
+      }
+      
+      // Update user to mark email as verified
+      await db.users.update(userId, {
+        isEmailVerified: true,
+        verificationCode: "", // Use empty string instead of null
+        verificationTimestamp: "" // Use empty string instead of null
+      });
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: '電子郵件驗證成功'
+      });
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return NextResponse.json({ 
+        error: '無效或過期的驗證令牌',
+        details: '驗證鏈接可能已過期。請重新發送驗證郵件。'
+      }, { status: 400 });
+    }
   } catch (error) {
     console.error('Email verification error:', error);
-    return createResponse({ error: '內部伺服器錯誤' }, 500);
+    return NextResponse.json({ 
+      error: '電子郵件驗證失敗',
+      details: error instanceof Error ? error.message : '未知錯誤'
+    }, { status: 500 });
   }
-
 }

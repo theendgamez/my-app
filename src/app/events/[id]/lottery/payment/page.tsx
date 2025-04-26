@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
@@ -13,9 +16,10 @@ const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
 export default function LotteryPaymentPage() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams() as Record<string, string | undefined>;
+  const id = params?.id;
   const searchParams = useSearchParams();
-  const registrationToken = searchParams.get('registrationToken');
+  const registrationToken = searchParams?.get('registrationToken');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [registration, setRegistration] = useState<Registration | null>(null);

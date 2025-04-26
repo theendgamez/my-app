@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
@@ -48,7 +51,8 @@ const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { id: eventId } = useParams();
+  const params = useParams();
+  const eventId = params && typeof params.id === 'string' ? params.id : Array.isArray(params?.id) ? params?.id[0] : '';
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
@@ -56,7 +60,7 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
   
-  const bookingToken = searchParams.get('bookingToken');
+  const bookingToken = searchParams?.get('bookingToken');
 
   useEffect(() => {
     // Check authentication first

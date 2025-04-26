@@ -4,6 +4,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { Events } from '@/types';
 import path from 'path';
 
+
 export async function GET() {
   try {
     const events = await db.events.findMany();

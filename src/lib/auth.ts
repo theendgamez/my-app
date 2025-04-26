@@ -13,6 +13,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Types
 export interface JWTPayload {
+  type: string;
   userId: string;
   email: string;
   role: string;
@@ -38,6 +39,7 @@ export const createResponse = <T extends Record<string, unknown>>(data: T = {} a
 // Generate tokens
 export const generateTokens = (user: Users) => {
   const payload: JWTPayload = {
+    type: 'access', // or 'refresh' if you want to distinguish token types
     userId: user.userId,
     email: user.email,
     role: user.role || 'user',

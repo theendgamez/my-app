@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
@@ -65,7 +68,8 @@ async function getEventDetails(eventId: string) {
 
 const BookingPage = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
+  const id = params && typeof params.id === 'string' ? params.id : Array.isArray(params?.id) ? params?.id[0] : '';
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [event, setEvent] = useState<Events | null>(null);
   const [loading, setLoading] = useState(true);

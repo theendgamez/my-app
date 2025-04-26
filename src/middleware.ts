@@ -21,7 +21,13 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  response.headers.set('Content-Security-Policy', "default-src 'self'");
+  // Allow inline scripts for Next.js dev mode (remove 'unsafe-inline' for production)
+  response.headers.set(
+    'Content-Security-Policy',
+    process.env.NODE_ENV === 'production'
+      ? "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://dynamodb.ap-southeast-1.amazonaws.com"
+      : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dynamodb.ap-southeast-1.amazonaws.com"
+  );
   
   // Prevent path traversal attacks - block requests with suspicious path patterns
   const pathTraversalPattern = /\.\./;

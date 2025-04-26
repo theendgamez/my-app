@@ -1,5 +1,8 @@
 'use client';
 
+// Add dynamic directive to prevent static rendering
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
@@ -22,7 +25,8 @@ async function getEventDetails(eventId: string) {
 
 const LotteryPage = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams() as { id?: string };
+  const id = params.id;
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [event, setEvent] = useState<Events | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,31 +99,23 @@ const LotteryPage = () => {
 
     // If user is not authenticated and we haven't attempted redirect yet
     if (!isAuthenticated && !redirectAttemptedRef.current) {
-      // Store flag in ref to prevent multiple redirects
       redirectAttemptedRef.current = true;
-
-      // Save the current path for redirect after login
       const redirectPath = `/events/${id}/lottery`;
-
-      // Add a slight delay to prevent rapid redirect loops
       timerRef.current = setTimeout(() => {
-        // Store the redirect flag in session storage to prevent loops
         if (!sessionStorage.getItem('redirectAttempt')) {
           sessionStorage.setItem('redirectAttempt', 'true');
           sessionStorage.setItem('redirectTime', Date.now().toString());
-          router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+          // Force full reload for login redirect
+          window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`;
         } else {
-          // Check if the last redirect was more than 5 seconds ago
           const lastRedirect = parseInt(sessionStorage.getItem('redirectTime') || '0');
           const now = Date.now();
-
           if (now - lastRedirect > 5000) {
             sessionStorage.setItem('redirectTime', now.toString());
-            router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+            window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`;
           }
         }
       }, 100);
-
       return;
     }
 
@@ -211,12 +207,12 @@ const LotteryPage = () => {
               }
 
               // If token refresh failed or retry failed, redirect to login
-              router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+              window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
               // Return an object to prevent further processing instead of throwing
               return { error: 'Please login to continue', redirected: true };
             } catch (refreshError) {
               console.error('Token refresh error:', refreshError);
-              router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+              window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
               return { error: 'Please login to continue', redirected: true };
             }
           }
