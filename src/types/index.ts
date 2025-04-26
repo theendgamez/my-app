@@ -23,6 +23,7 @@ export interface AuthResponse {
 }
 
 export interface JWTPayload {
+  type: string; // Add the type field which is used for token verification
   userId: string;
   email: string;
   role: string;

@@ -8,7 +8,11 @@ import path from 'path';
 export async function GET() {
   try {
     const events = await db.events.findMany();
-    return NextResponse.json(events);
+    return NextResponse.json(events, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=120'
+      }
+    });
   } catch (error) {
     console.error('Error fetching events:', error);
     return NextResponse.json(
