@@ -11,11 +11,11 @@ const nextConfig: import('next').NextConfig = {
     domains: ['localhost'],
   },
   
-  // Use hybrid rendering approach
+  // Change output to hybrid for Cloudflare compatibility
   output: 'standalone',
   
   // Properly configure the build directory
-  distDir: 'build',
+  distDir: '.next',
   
   // Configure page extensions
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
@@ -28,6 +28,9 @@ const nextConfig: import('next').NextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
+
+  // Add Cloudflare-specific optimizations
+  swcMinify: true,
 }
  
 module.exports = nextConfig

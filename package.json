@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "deploy:cloudflare": "next build && wrangler pages deploy .next/static"
   },
   "nextConfig": {
     "output": "standalone"

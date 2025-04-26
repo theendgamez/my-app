@@ -1,6 +1,6 @@
 import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 
-const DEBUG = true;
+const DEBUG = false; // Set to false for production
 
 const worker = {
   async fetch(request, env, ctx) {
@@ -10,15 +10,28 @@ const worker = {
 
       if (DEBUG) {
         options.cacheControl = { bypassCache: true };
+      } else {
+        // Use caching in production
+        options.cacheControl = {
+          browserTTL: 60 * 60 * 24, // 1 day
+          edgeTTL: 60 * 60 * 24 * 7, // 7 days
+          bypassCache: false
+        };
+      }
+
+      // Handle API routes specially
+      if (url.pathname.startsWith('/api/')) {
+        return fetch(request);
       }
 
       // Serve static assets (including favicon.ico, robots.txt, etc.)
+      const assetPathRegex = /\.(js|css|png|jpg|jpeg|gif|svg|ico|webp|webm|mp4|woff|woff2|ttf|otf|txt)$/;
       if (
         url.pathname.startsWith('/_next/') ||
         url.pathname.startsWith('/static/') ||
         url.pathname === '/favicon.ico' ||
         url.pathname === '/robots.txt' ||
-        url.pathname.match(/\.[a-zA-Z0-9]+$/)
+        url.pathname.match(assetPathRegex)
       ) {
         try {
           return await getAssetFromKV(
@@ -37,16 +50,7 @@ const worker = {
               // Final fallback for favicon.ico: return a valid empty icon
               if (url.pathname === '/favicon.ico') {
                 return new Response(
-                  Uint8Array.from([
-                    0x00,0x00,0x01,0x00,0x01,0x00,0x10,0x10,0x00,0x00,0x01,0x00,0x04,0x00,0x28,0x01,
-                    0x00,0x00,0x16,0x00,0x00,0x00,0x28,0x00,0x00,0x00,0x10,0x00,0x00,0x00,0x20,0x00,
-                    0x00,0x00,0x01,0x00,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                  ]),
+                  new Uint8Array([0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 4, 0, 40, 1, 0, 0, 22, 0, 0, 0]),
                   {
                     headers: {
                       'Content-Type': 'image/x-icon',
@@ -63,49 +67,49 @@ const worker = {
               }
             }
           }
-          throw e;
         }
       }
 
-      // Handle API routes by passing through to Next.js
-      if (url.pathname.startsWith('/api/')) {
-        return fetch(request);
-      }
-
-      // Fallback: serve Next.js SSR HTML for dynamic routes
-      let pagePath = url.pathname.endsWith('/')
-        ? `/index.html`
-        : `.html`;
-
-      let tryPaths = [
-        `/.next/server/app${url.pathname}${pagePath}`,
-        `/.next/server/app${url.pathname}.html`,
-        `/.next/server/pages${url.pathname}${pagePath}`,
-        `/.next/server/pages${url.pathname}.html`
-      ];
-
-      for (const path of tryPaths) {
+      // Try to serve the HTML page from KV
+      try {
+        // First try an exact match
+        return await getAssetFromKV(
+          { request, waitUntil: ctx.waitUntil.bind(ctx) },
+          options
+        );
+      } catch (e) {
+        // Then try the path + "/index.html"
         try {
-          const pageRequest = new Request(url.origin + path, request);
+          const url = new URL(request.url);
+          if (!url.pathname.endsWith('/')) {
+            url.pathname += '/';
+          }
+          url.pathname += 'index.html';
+          const indexRequest = new Request(url.toString(), request);
           return await getAssetFromKV(
-            { request: pageRequest, waitUntil: ctx.waitUntil.bind(ctx) },
+            { request: indexRequest, waitUntil: ctx.waitUntil.bind(ctx) },
             options
           );
         } catch {
-          // Try next path
+          // Finally, try serving /index.html as a fallback for SPA routing
+          try {
+            const indexRequest = new Request(new URL('/index.html', request.url).toString(), request);
+            const response = await getAssetFromKV(
+              { request: indexRequest, waitUntil: ctx.waitUntil.bind(ctx) },
+              options
+            );
+            return new Response(response.body, {
+              ...response,
+              status: 200,
+              headers: {
+                ...response.headers,
+                'Content-Type': 'text/html; charset=UTF-8',
+              }
+            });
+          } catch (e) {
+            return new Response('Not Found', { status: 404 });
+          }
         }
-      }
-
-      // As a last resort, try serving /index.html from the static bucket
-      try {
-        const indexRequest = new Request(url.origin + '/index.html', request);
-        return await getAssetFromKV(
-          { request: indexRequest, waitUntil: ctx.waitUntil.bind(ctx) },
-          options
-        );
-      } catch {
-        // If not found, return 404
-        return new Response('Not Found', { status: 404 });
       }
     } catch (e) {
       if (DEBUG) {
