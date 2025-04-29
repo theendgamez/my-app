@@ -2,11 +2,22 @@
 
 import Link from 'next/link';
 import { Fragment } from 'react';
-import { Users } from '@/types';
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { FiChevronDown } from 'react-icons/fi';
 
-const UserMenu = ({ user, onLogout }: { user: Users; onLogout: () => void }) => (
+// Use the appropriate type from auth context
+interface UserMenuProps {
+  user: {
+    userId: string;
+    userName: string;
+    email: string;
+    role: string;
+    phoneNumber?: string;
+  };
+  onLogout: () => void;
+}
+
+const UserMenu = ({ user, onLogout }: UserMenuProps) => (
   <Menu as="div" className="relative">
     <MenuButton className="flex items-center space-x-2 transition duration-200 text-white">
       <span>歡迎，{user.userName}</span>

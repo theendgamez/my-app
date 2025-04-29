@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
 import db from '@/lib/db';
 import { createResponse, registrationRateLimiter } from '@/lib/auth';
-import sendVerificationCode from '@/utils/sendVerifcationCode';
+import sendVerificationCode from '@/utils/sendVerificationCode';
 import { Users } from '@/types';
 
 // Define registration data interface

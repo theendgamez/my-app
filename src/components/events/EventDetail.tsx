@@ -98,12 +98,13 @@ export default function EventDetail() {
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="relative h-64 sm:h-96">
+          <div className="relative aspect-[16/9] w-full">
             <Image
               src={event.photoUrl || '/images/default-event.jpg'}
               alt={event.eventName}
-              className="object-cover"
+              className="object-contain"
               fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               priority
             />
           </div>

@@ -357,6 +357,14 @@ const db = {
      * @param verificationCode - Verification code
      * @returns User or null if not found
      */
+
+    findMany: async (): Promise<Users[]> => { 
+      return executeDbCommand(async () => {
+        const command = new ScanCommand({ TableName: 'Users' });
+        const data = await client.send(command);
+        return data.Items?.map((item) => unmarshall(item) as Users) || [];
+      });
+    },
     findByVerificationCode: async (verificationCode: string): Promise<Users | null> => {
       return executeDbCommand(async () => {
         const command = new QueryCommand({
@@ -779,6 +787,15 @@ const db = {
           : null;
       });
     },
+    findMany: async (): Promise<Booking[]> => {
+      return executeDbCommand(async () => {
+        const command = new ScanCommand({ TableName: 'Bookings' });
+        const data = await client.send(command);
+        return data.Items?.map((item) => unmarshall(item) as Booking) || [];
+      }
+      );
+    }
+    ,
 
     /**
      * Retrieves all bookings
@@ -835,7 +852,7 @@ const db = {
     /**
      * Finds a registration by token
      * @param registrationToken - Registration token
-     * @returns Registration or null if not found
+     *s     * @returns Registration or null if not found
      */
     findByToken: async (registrationToken: string): Promise<unknown | null> => {
       return executeDbCommand(async () => {

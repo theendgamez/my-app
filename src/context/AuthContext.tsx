@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface User {
   userId: string;
@@ -25,7 +26,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Skip during server-side rendering
+        if (typeof window === 'undefined') return;
+
         // Get userId from localStorage
         const userId = localStorage.getItem('userId');
 
@@ -57,18 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isFetchingRef.current = true;
         lastFetchTimeRef.current = now;
 
-        // Fetch complete user data including role from API
+        // Use fetchWithAuth utility for better error handling
         try {
-          const accessToken = localStorage.getItem('accessToken');
-          const response = await fetch(`/api/users/${userId}`, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-              'x-user-id': userId
-            },
-            credentials: 'omit'
-          });
-
+          const response = await fetchWithAuth(`/api/users/${userId}`);
+          
+          // Check for network/redirect loop errors 
+          const errorType = response.headers.get('X-Error-Type');
+          const isNetworkOrTimeoutError = errorType === 'network' || errorType === 'timeout';
+          const isRedirectLoop = response.status === 508;
+          
+          if (isNetworkOrTimeoutError || isRedirectLoop) {
+            console.warn('Network issue or redirect loop when checking auth, retaining current state');
+            return;
+          }
+          
           if (response.ok) {
             const userData = await response.json();
             // Ensure userData conforms to User type
@@ -78,14 +88,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.error('Invalid user data structure received:', userData);
               setUser(null);
             }
-          } else {
-            // Handle authentication failure
+          } else if (response.status === 401 || response.status === 403) {
+            // Handle authentication errors as before
             localStorage.removeItem('userId');
             localStorage.removeItem('accessToken');
+            setUser(null);
+          } else {
+            console.warn(`API error: ${response.status}`);
+            // Don't clear auth data for other server errors
           }
         } catch (err) {
-          console.error('Error fetching user data:', err);
-          setUser(null);
+          console.error('Error checking auth status:', err);
+          // Only clear auth data for non-network errors
+          if (!(err instanceof TypeError && 
+              (err.message.includes('Failed to fetch') || 
+               err.message.includes('NetworkError')))) {
+            setUser(null);
+          }
         } finally {
           // Reset fetching flag when done
           isFetchingRef.current = false;
@@ -118,14 +137,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
       if (res.ok) {
-        setUser(data.user);
-
         // Store only userId in localStorage
         localStorage.setItem('userId', data.user.userId);
 
         // Store access token if provided
         if (data.accessToken) {
           localStorage.setItem('accessToken', data.accessToken);
+        }
+
+        // 新增：登入後自動 fetch 完整 user profile
+        try {
+          const profileRes = await fetch(`/api/users/${data.user.userId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(data.accessToken ? { 'Authorization': `Bearer ${data.accessToken}` } : {}),
+              'x-user-id': data.user.userId
+            },
+            credentials: 'omit'
+          });
+          if (profileRes.ok) {
+            const userProfile = await profileRes.json();
+            setUser(userProfile);
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
         }
       } else {
         setError(data.error || '登入失敗');
@@ -236,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

@@ -1,10 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import sendVerificationCode from '@/utils/sendVerifcationCode';
-import { RateLimiter } from '@/lib/auth';
+// Import with correct filename
+import sendVerificationCode from '@/utils/sendVerificationCode';
+
+// Simple in-memory rate limiter class
+class EdgeRateLimiter {
+  private windowMs: number;
+  private max: number;
+  private attempts: Map<string, number[]>;
+
+  constructor(windowMs: number, max: number) {
+    this.windowMs = windowMs;
+    this.max = max;
+    this.attempts = new Map();
+  }
+
+  check(key: string) {
+    const now = Date.now();
+    const windowStart = now - this.windowMs;
+    const timestamps = this.attempts.get(key) || [];
+    const recent = timestamps.filter(ts => ts > windowStart);
+    recent.push(now);
+    this.attempts.set(key, recent);
+    return { allowed: recent.length <= this.max };
+  }
+}
 
 // Rate limiter: 5 attempts per 5 minutes
-const resendVerificationRateLimiter = new RateLimiter(5 * 60 * 1000, 5);
+const resendVerificationRateLimiter = new EdgeRateLimiter(5 * 60 * 1000, 5);
 
 export async function POST(request: NextRequest) {
   // Get client IP for rate limiting

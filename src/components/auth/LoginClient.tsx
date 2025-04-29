@@ -41,20 +41,44 @@ const LoginForm = () => {
       localStorage.removeItem('last_redirect_time');
     }
     
-    // Check for userId in localStorage instead of full user object
+    // 检查 localStorage 里的 userId，如果有则进一步校验用户有效性
     const userId = localStorage.getItem('userId');
     if (!userId) return;
     
-    // If userId exists, user is logged in
     setIsProcessingRedirect(true);
     
-    if (redirectPath) {
-      setTimeout(() => {
-        router.push(redirectPath);
-      }, 100);
-    } else {
-      router.push('/');
-    }
+    // 新增：用 API 校验 userId 是否有效
+    fetch(`/api/users/${userId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('accessToken') ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` } : {}),
+        'x-user-id': userId
+      },
+      credentials: 'omit'
+    })
+      .then(async res => {
+        if (res.ok) {
+          // 用户有效，跳转
+          if (redirectPath) {
+            setTimeout(() => {
+              router.push(redirectPath);
+            }, 100);
+          } else {
+            router.push('/');
+          }
+        } else {
+          // 用户无效，清除 localStorage，停留在登录页
+          localStorage.removeItem('userId');
+          localStorage.removeItem('accessToken');
+          setIsProcessingRedirect(false);
+        }
+      })
+      .catch(() => {
+        // 网络错误也清除 localStorage
+        localStorage.removeItem('userId');
+        localStorage.removeItem('accessToken');
+        setIsProcessingRedirect(false);
+      });
   }, [redirectPath, router, isProcessingRedirect]);
 
   const onSubmit = async (data: FormData) => {

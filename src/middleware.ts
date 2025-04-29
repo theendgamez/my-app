@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-// Fix the import path using the @ alias which points to /src
-import { verifyToken } from '@/lib/auth';
 
 // Basic security checks middleware
 export async function middleware(request: NextRequest) {
@@ -33,44 +31,32 @@ export async function middleware(request: NextRequest) {
   const pathTraversalPattern = /\.\./;
   if (pathTraversalPattern.test(pathname)) {
     return new NextResponse('Bad Request', { status: 400 });
-  }
+  } 
 
   // Check for bypass attempts using URL or Unicode tricks
   if (containsBypassAttempts(rawPathname)) {
     return new NextResponse('Bad Request', { status: 400 });
   }
 
-  // Protect admin routes with stricter validation
+  // Only run authentication for /admin and /api routes
   if (isProtectedRoute(pathname, 'admin')) {
-    // Get the authorization header or access token from cookie
+    // Only check for the presence of an access token or header, do not verify JWT here
     const authHeader = request.headers.get('authorization');
     const accessToken = authHeader?.startsWith('Bearer ') 
       ? authHeader.substring(7)
       : request.cookies.get('accessToken')?.value;
-    
-    let isAdmin = false;
-    
-    if (accessToken) {
-      // Verify token and check role
-      try {
-        const decoded = verifyToken(accessToken);
-        isAdmin = decoded?.role === 'admin';
-      } catch (e) {
-        console.error('Token verification error:', e);
-      }
-    }
 
-    // If not admin, redirect to home
-    if (!isAdmin) {
+    // If no token, redirect to home (actual admin check is done in server-side logic)
+    if (!accessToken) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
-  // Block requests to API routes that have suspicious patterns
   if (isProtectedRoute(pathname, 'api') && containsSuspiciousPatterns(pathname)) {
     return new NextResponse('Bad Request', { status: 400 });
   }
 
+  // For all other pages, just set security headers and return response
   return response;
 }
 

@@ -88,8 +88,7 @@ export const verifyToken = (token: string, secret = JWT_SECRET): JWTPayload | nu
     // Only log detailed errors in development
     if (process.env.NODE_ENV !== 'production') {
       if (error instanceof jwt.TokenExpiredError) {
-        // For expired tokens, log a more concise message
-        console.log('Token expired:', (error as jwt.TokenExpiredError).expiredAt);
+        // Removed token expiration logging
       } else {
         console.error('Token verification failed:', error);
       }
