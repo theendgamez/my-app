@@ -4,7 +4,8 @@ import Navbar from '@/components/navbar/Navbar';
 import { Events as EventType } from '@/types';
 import Sidebar from '@/components/ui/Sidebar';
 import PromoCarousel from '@/components/ui/PromoCarousel';
-import Events from '@/components/event/Event';
+import Events from '@/components/eventCompo/Event';
+
 
 export default function Home() {
   // Removed unused 'user' state
