@@ -50,6 +50,20 @@ const LoginForm = () => {
     
     // If userId exists, user is logged in
     setIsProcessingRedirect(true);
+    
+    // Add redirect loop protection - track redirect attempts
+    const redirectAttemptCount = parseInt(localStorage.getItem('redirect_attempt_count') || '0');
+    if (redirectAttemptCount > 5) {
+      // Too many redirects, send user to home page to break the loop
+      console.warn('Too many redirect attempts detected. Breaking redirect loop.');
+      localStorage.removeItem('redirect_attempt_count');
+      router.push('/');
+      return;
+    }
+    
+    // Increment redirect counter
+    localStorage.setItem('redirect_attempt_count', (redirectAttemptCount + 1).toString());
+    
     if (redirectPath) {
       setTimeout(() => {
         router.push(redirectPath);

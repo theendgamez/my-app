@@ -33,16 +33,35 @@ const CreateEventPage = () => {
   const [success, setSuccess] = useState<string>('');
   const [isDrawMode, setIsDrawMode] = useState(false);
 
-  // Check if user is admin, redirect if not
+  // Update the authentication check effect
   useEffect(() => {
-    if (!authLoading && isAuthenticated && !isAdmin) {
-      // Not admin, redirect to home
-      router.push('/');
+    // Skip effect during server-side rendering
+    if (typeof window === 'undefined') return;
+    
+    // If still loading auth state, don't do anything yet
+    if (authLoading) return;
+    
+    // Prevent redirect loops by checking if we've just been redirected
+    const lastLoginRedirectTime = parseInt(localStorage.getItem('last_redirect_time') || '0');
+    const now = Date.now();
+    
+    // If we were just redirected to login within the last 3 seconds, don't redirect again
+    const recentlyRedirected = now - lastLoginRedirectTime < 3000;
+    
+    if (!isAuthenticated && !recentlyRedirected) {
+      // Mark redirection time to prevent loops
+      localStorage.setItem('last_redirect_time', now.toString());
+      localStorage.setItem('redirected_to_login', 'true');
+      
+      // Not logged in, redirect to login with intended destination
+      const encodedRedirect = encodeURIComponent('/admin/create-event');
+      router.push(`/login?redirect=${encodedRedirect}`);
+      return;
     }
     
-    if (!authLoading && !isAuthenticated) {
-      // Not logged in, redirect to login
-      router.push('/login?redirect=/admin/create-event');
+    // If authenticated but not admin, redirect to home
+    if (isAuthenticated && !isAdmin) {
+      router.push('/');
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
 

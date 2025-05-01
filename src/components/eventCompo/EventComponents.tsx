@@ -1,13 +1,27 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Events } from '../../types';
+import { Events as EventsType } from '@/types';
 
-interface ListItemProps {
-  event: Events;
+// EventList Component
+interface EventListProps {
+  children: React.ReactNode;
 }
 
-export default function ListItem({ event }: ListItemProps) {
+export function EventList({ children }: EventListProps) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-6">
+      {children}
+    </div>
+  );
+}
+
+// EventListItem Component
+interface ListItemProps {
+  event: EventsType;
+}
+
+export function ListItem({ event }: ListItemProps) {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -58,5 +72,20 @@ export default function ListItem({ event }: ListItemProps) {
         </div>
       </div>
     </Link>
+  );
+}
+
+// Events Component (Main export)
+interface EventsProps {
+  events: EventsType[];
+}
+
+export default function Events({ events }: EventsProps) {
+  return (
+    <EventList>
+      {events.map((evt) => (
+        <ListItem key={evt.eventId} event={evt} /> 
+      ))}
+    </EventList>
   );
 }

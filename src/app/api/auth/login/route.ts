@@ -53,17 +53,20 @@ export async function POST(request: NextRequest) {
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokens(user);
     
-    // Create response with minimal user data - only the user ID
-    // This ensures the client only has access to the ID, not sensitive user data
+    // Create response with user data and access token
     const response = createResponse({
       user: {
         userId: user.userId,
+        role: user.role, // Include role so client knows if user is admin
       },
-      accessToken // Include access token for API requests
+      accessToken
     }, 200, '登入成功');
     
-    // Set cookies
+    // Set cookies with secure flags
     setAuthCookies(response, accessToken, refreshToken);
+    
+    // Add security headers
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     
     return response;
   } catch (error) {
