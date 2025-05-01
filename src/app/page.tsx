@@ -37,8 +37,14 @@ export default function Home() {
           });
           
           if (response.ok) {
-            const userData = await response.json();
-            setIsAdmin(userData.role === 'admin');
+            try {
+              // Check if the response has content before parsing
+              const text = await response.text();
+              const userData = text ? JSON.parse(text) : {};
+              setIsAdmin(userData.role === 'admin');
+            } catch (parseError) {
+              console.error('Failed to parse user data:', parseError);
+            }
           }
         } catch (error) {
           console.error('Failed to fetch user data:', error);
@@ -53,8 +59,15 @@ export default function Home() {
       try {
         const response = await fetch('/api/events');
         if (response.ok) {
-          const data = await response.json();
-          setEvents(data || []);
+          try {
+            // Check if the response has content before parsing
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : [];
+            setEvents(data || []);
+          } catch (parseError) {
+            console.error('Failed to parse events data:', parseError);
+            setEvents([]);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch events:', error);

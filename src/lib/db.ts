@@ -353,6 +353,19 @@ const db = {
    */
   users: {
     /**
+     * Retrieves all users
+     * @returns Array of users
+     */
+    findMany: async (): Promise<Users[]> => {
+      return executeDbCommand(async () => {
+        const command = new ScanCommand({ TableName: 'Users' });
+        const data = await client.send(command);
+        return data.Items?.map((item) => unmarshall(item) as Users) || [];
+      });
+    },
+
+
+    /**
      * Finds a user by verification code
      * @param verificationCode - Verification code
      * @returns User or null if not found
@@ -545,6 +558,17 @@ const db = {
         
         const result = await client.send(command);
         return result.Items?.map(item => unmarshall(item) as Payment) || [];
+      });
+    },
+
+    findMany : async (): Promise<Payment[]> => {
+      return executeDbCommand(async () => {
+        const command = new ScanCommand({
+          TableName: 'Payments'
+        });
+        
+        const data = await client.send(command);
+        return data.Items?.map((item) => unmarshall(item) as Payment) || [];
       });
     }
   },
@@ -979,7 +1003,21 @@ const db = {
         const result = await client.send(command);
         return result.Items?.map(item => unmarshall(item)) || [];
       });
-    }
+    },
+    /**
+     * Retrieves all registrations
+     * @returns Array of registrations
+     */
+    findMany: async (): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new ScanCommand({
+          TableName: 'Registration'
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    },
   },
   
   /**

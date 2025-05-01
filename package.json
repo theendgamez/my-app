@@ -27,6 +27,7 @@
     "ethers": "^6.7.0",
     "ethers-utils": "^2.1.11",
     "hardhat": "^2.22.17",
+    "jose": "^4.15.9",
     "jsonwebtoken": "^9.0.2",
     "next": "^15.3.0",
     "nodemailer": "^6.9.16",

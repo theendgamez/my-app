@@ -20,6 +20,11 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Add padding to main content to prevent navbar overlap */
+main, .main-content, [class*="container"] {
+  padding-top: 4rem; /* This is equivalent to pt-16 in Tailwind */
+}
+
 @media print {
   @page {
     size: A4;

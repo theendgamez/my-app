@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { jwtVerify, SignJWT } from 'jose';
 import jwt from 'jsonwebtoken';
 import db from '@/lib/db';
 import { Users } from '@/types';
 
 // Configuration constants
-const JWT_SECRET = process.env.JWT_SECRET!;
+export const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
@@ -36,7 +37,7 @@ export const createResponse = <T extends Record<string, unknown>>(data: T = {} a
 };
 
 // Generate tokens
-export const generateTokens = (user: Users) => {
+export const generateTokens = async (user: Users) => {
   const payload: JWTPayload = {
     userId: user.userId,
     email: user.email,
@@ -44,14 +45,14 @@ export const generateTokens = (user: Users) => {
     tokenVersion: user.tokenVersion || 0
   };
   
-  const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
-  const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  const accessToken = await signToken(payload, ACCESS_TOKEN_EXPIRY, JWT_SECRET);
+  const refreshToken = await signToken(payload, REFRESH_TOKEN_EXPIRY, REFRESH_TOKEN_SECRET);
   
   return { accessToken, refreshToken };
 };
 
 // Set auth cookies
-export const setAuthCookies = (response: NextResponse, accessToken: string, refreshToken: string) => {
+export const setAuthCookies = async (response: NextResponse, accessToken: string, refreshToken: string) => {
   response.cookies.set('accessToken', accessToken, {
     httpOnly: true,
     secure: IS_PRODUCTION,
@@ -67,9 +68,16 @@ export const setAuthCookies = (response: NextResponse, accessToken: string, refr
     maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
     path: '/'
   });
-  
+
   // Non-HTTP-only cookie for UI purposes
-  response.cookies.set('userRole', (jwt.decode(accessToken) as JWTPayload)?.role || 'user', {
+  let role = 'user';
+  try {
+    const { payload } = await jwtVerify(accessToken, new TextEncoder().encode(JWT_SECRET));
+    role = typeof payload.role === 'string' ? payload.role : 'user';
+  } catch {
+    // fallback to 'user'
+  }
+  response.cookies.set('userRole', role, {
     httpOnly: false,
     secure: IS_PRODUCTION,
     sameSite: 'strict',
@@ -79,20 +87,47 @@ export const setAuthCookies = (response: NextResponse, accessToken: string, refr
 };
 
 // Verify JWT token with improved error handling
-export const verifyToken = (token: string, secret = JWT_SECRET): JWTPayload | null => {
+export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<JWTPayload | null> => {
   try {
-    return jwt.verify(token, secret) as JWTPayload;
+    // Check if we're in Edge Runtime environment
+    const isEdgeRuntime = typeof window === 'undefined' && !('NODE_ENV' in process.env);
+    
+    // Use jose for Edge Runtime and jwt for Node.js environment
+    if (!isEdgeRuntime) {
+      return jwt.verify(token, secret) as JWTPayload;
+    } else {
+      // Edge Runtime environment - use jose
+      const secretBytes = new TextEncoder().encode(secret);
+      const { payload } = await jwtVerify(token, secretBytes);
+      return payload as unknown as JWTPayload;
+    }
   } catch (error) {
     // Only log detailed errors in development
     if (process.env.NODE_ENV !== 'production') {
-      if (error instanceof jwt.TokenExpiredError) {
-        // For expired tokens, log a more concise message
-        console.log('Token expired:', (error as jwt.TokenExpiredError).expiredAt);
-      } else {
-        console.error('Token verification failed:', error);
-      }
+      console.error('Token verification failed:', error);
     }
     return null;
+  }
+};
+
+// Sign JWT token - fixed type issues
+export const signToken = async (payload: JWTPayload, expiresIn: string | number, secret = JWT_SECRET): Promise<string> => {
+  // Check if we're in Edge Runtime environment
+  const isEdgeRuntime = typeof window === 'undefined' && !('NODE_ENV' in process.env);
+  
+  if (!isEdgeRuntime) {
+    // Server environment - fix type issues with jwt.sign
+    const options = { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] };
+    return jwt.sign(payload as object, secret, options);
+  } else {
+    // Edge Runtime environment - use jose
+    const secretBytes = new TextEncoder().encode(secret);
+    const token = await new SignJWT(payload as unknown as Record<string, unknown>)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime(typeof expiresIn === 'string' ? expiresIn : `${expiresIn}s`)
+      .sign(secretBytes);
+    return token;
   }
 };
 
@@ -116,7 +151,7 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
     // Try token authentication first
     if (accessToken || headerToken) {
       const token = accessToken || headerToken;
-      const decoded = token ? verifyToken(token) : null;
+      const decoded = token ? await verifyToken(token) : null;
       
       if (decoded?.userId) {
         user = await db.users.findById(decoded.userId);
@@ -177,7 +212,7 @@ export const handleTokenRefresh = async (req: NextRequest): Promise<NextResponse
     const refreshToken = req.cookies.get('refreshToken')?.value;
     if (!refreshToken) return null;
     
-    const decoded = verifyToken(refreshToken, REFRESH_TOKEN_SECRET);
+    const decoded = await verifyToken(refreshToken, REFRESH_TOKEN_SECRET);
     if (!decoded) return null;
     
     const user = await db.users.findById(decoded.userId);
@@ -185,7 +220,7 @@ export const handleTokenRefresh = async (req: NextRequest): Promise<NextResponse
       return null;
     }
     
-    const tokens = generateTokens(user);
+    const tokens = await generateTokens(user);
     const response = createResponse({ message: 'Token refreshed' });
     
     setAuthCookies(response, tokens.accessToken, tokens.refreshToken);

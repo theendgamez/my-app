@@ -1,12 +1,12 @@
 "use client";
 
 import { useForm, useFieldArray } from "react-hook-form";
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import Sidebar from "@/components/ui/Sidebar";
 import { useAuth } from '@/context/AuthContext';
-import type { Zone } from '@/types';
+import type { Zone, Events } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface FormData {
@@ -20,39 +20,93 @@ interface FormData {
   drawDate?: string;
   onSaleDate?: string;
   zones: Zone[];
-  photo: FileList;
   status?: 'Prepare' | 'OnSale' | 'SoldOut';
-  category?: string; // Ensure this matches the Events interface
+  category?: string;
 }
 
-const CreateEventPage = () => {
+export default function EditEventPage() {
   const router = useRouter();
+  const { id } = useParams();
   const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [isDrawMode, setIsDrawMode] = useState(false);
-
-  // Check if user is admin, redirect if not
-  useEffect(() => {
-    if (!authLoading && isAuthenticated && !isAdmin) {
-      // Not admin, redirect to home
-      router.push('/');
-    }
-    
-    if (!authLoading && !isAuthenticated) {
-      // Not logged in, redirect to login
-      router.push('/login?redirect=/admin/create-event');
-    }
-  }, [authLoading, isAuthenticated, isAdmin, router]);
-
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormData>({
+  const [, setEvent] = useState<Events | null>(null);
+  
+  // Form setup
+  const { register, handleSubmit, control, setValue, reset, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       zones: [],
       status: 'Prepare',
       isDrawMode: false
     }
   });
+
+  // Check if user is admin, redirect if not
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !isAdmin) {
+      router.push('/');
+    }
+    
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?redirect=/admin/events/edit/' + id);
+    }
+  }, [authLoading, isAuthenticated, isAdmin, router, id]);
+
+  // Fetch event data
+  useEffect(() => {
+    if (id && !authLoading && isAdmin) {
+      fetchEventData();
+    }
+  }, [id, authLoading, isAdmin]);
+
+  const fetchEventData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/events/${id}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch event data');
+      }
+      
+      const eventData = await response.json();
+      setEvent(eventData);
+      
+      // Prepare dates for form input (YYYY-MM-DDTHH:mm)
+      const formatDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toISOString().slice(0, 16);
+      };
+      
+      // Populate form with event data
+      reset({
+        eventName: eventData.eventName,
+        eventDate: formatDate(eventData.eventDate),
+        description: eventData.description,
+        location: eventData.location,
+        isDrawMode: eventData.isDrawMode,
+        registerDate: formatDate(eventData.registerDate),
+        endregisterDate: formatDate(eventData.endregisterDate),
+        drawDate: formatDate(eventData.drawDate),
+        onSaleDate: formatDate(eventData.onSaleDate),
+        status: eventData.status || 'Prepare',
+        category: eventData.category,
+        zones: eventData.zones || []
+      });
+      
+      // Update isDrawMode state for UI
+      setIsDrawMode(eventData.isDrawMode);
+      
+    } catch (error) {
+      console.error('Error fetching event:', error);
+      setError('無法獲取活動資料');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Update the form value when isDrawMode changes
   useEffect(() => {
@@ -70,61 +124,49 @@ const CreateEventPage = () => {
     setSuccess('');
 
     try {
-      const formData = new FormData();
-
-      // Common fields
-      formData.append("name", data.eventName);
-      formData.append("date", data.eventDate);
-      formData.append("description", data.description);
-      formData.append("location", data.location);
-      formData.append("isDrawMode", isDrawMode ? "true" : "false");
-
-      // Mode-specific dates
-      if (data.isDrawMode) {
-        if (data.registerDate) formData.append("registerDate", data.registerDate);
-        if (data.endregisterDate) formData.append("endregisterDate", data.endregisterDate);
-        if (data.drawDate) formData.append("drawDate", data.drawDate);
-      } else {
-        if (data.onSaleDate) formData.append("onSaleDate", data.onSaleDate);
-      }
-
-      // Zones and photo
-      formData.append("zones", JSON.stringify(data.zones));
-      if (data.photo?.[0]) {
-        formData.append("photo", data.photo[0]);
-      }
-
-      // Added category field
-      formData.append("category", data.category || "default");
-
-      const response = await fetch("/api/events", {
-        method: "POST",
+      const response = await fetch(`/api/events/${id}`, {
+        method: "PATCH",
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
           'x-user-id': user?.userId || '',
         },
-        body: formData,
+        body: JSON.stringify({
+          eventName: data.eventName,
+          eventDate: data.eventDate,
+          description: data.description,
+          location: data.location,
+          isDrawMode: isDrawMode,
+          registerDate: isDrawMode ? data.registerDate : undefined,
+          endregisterDate: isDrawMode ? data.endregisterDate : undefined,
+          drawDate: isDrawMode ? data.drawDate : undefined,
+          onSaleDate: !isDrawMode ? data.onSaleDate : undefined,
+          status: data.status,
+          category: data.category,
+          zones: data.zones
+        }),
       });
 
       const result = await response.json();
+      
       if (response.ok) {
-        setSuccess('活動創建成功！');
-        // Redirect to event list after a brief delay
+        setSuccess('活動更新成功！');
+        // Redirect after delay
         setTimeout(() => {
           router.push('/admin/events');
         }, 2000);
       } else {
-        setError(result.error || '創建活動失敗');
+        setError(result.error || '更新活動失敗');
       }
     } catch (error) {
-      console.error("Error creating event:", error);
+      console.error("Error updating event:", error);
       setError('發生錯誤，請稍後再試');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (authLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <LoadingSpinner size="large" />
@@ -133,7 +175,7 @@ const CreateEventPage = () => {
   }
 
   if (!isAdmin) {
-    return null; // This will prevent flash of content before redirect
+    return null; // Prevent flash of content before redirect
   }
 
   return (
@@ -143,7 +185,7 @@ const CreateEventPage = () => {
         <Sidebar />
         <div className="container mx-auto p-8 ml-64">
           <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
-            <h1 className="text-2xl font-bold mb-6">創建新活動</h1>
+            <h1 className="text-2xl font-bold mb-6">編輯活動</h1>
             
             {success && (
               <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
@@ -205,7 +247,6 @@ const CreateEventPage = () => {
                   })}
                   rows={6}
                   className="w-full p-2 border rounded-md resize-y"
-                  placeholder="請詳細描述活動內容、規則等信息..."
                 />
                 {errors.description && (
                   <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>
@@ -222,35 +263,38 @@ const CreateEventPage = () => {
                 />
               </div>
 
-              {/* Draw Mode Button - Now clearer it's a toggle */}
+              {/* Event Status */}
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">活動狀態:</label>
+                <select
+                  {...register("status")}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="Prepare">準備中</option>
+                  <option value="OnSale">售票中</option>
+                  <option value="SoldOut">售罄</option>
+                </select>
+              </div>
+
+              {/* Draw Mode (disabled in edit mode) */}
               <div className="form-group">
                 <label className="block text-sm font-medium text-gray-700 mb-2">售票模式:</label>
                 <div className="flex space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsDrawMode(false)}
-                    className={`px-4 py-2 rounded-md ${!isDrawMode
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                      }`}
-                  >
+                  <div className={`px-4 py-2 rounded-md ${!isDrawMode
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700'
+                    }`}>
                     直接售票
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsDrawMode(true)}
-                    className={`px-4 py-2 rounded-md ${isDrawMode
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                      }`}
-                  >
+                  </div>
+                  <div className={`px-4 py-2 rounded-md ${isDrawMode
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700'
+                    }`}>
                     抽籤模式
-                  </button>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  {isDrawMode 
-                    ? '抽籤模式：用戶需要先登記參與抽籤，中籤後才能購買門票。' 
-                    : '直接售票：用戶可以直接購買門票，不需要抽籤。'}
+                <p className="text-xs text-gray-500 mt-1">
+                  售票模式無法在編輯時更改
                 </p>
               </div>
 
@@ -278,7 +322,6 @@ const CreateEventPage = () => {
                     </div>
                   </div>
 
-                  {/* Draw Date */}
                   <div className="form-group">
                     <label className="block text-sm font-medium text-gray-700 mb-2">抽籤日期:</label>
                     <input
@@ -370,16 +413,6 @@ const CreateEventPage = () => {
                 </button>
               </div>
 
-              {/* Photo Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Photo:</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  {...register("photo", { required: "Photo is required" })}
-                />
-              </div>
-
               <div className="flex justify-end mt-8">
                 <button
                   type="button"
@@ -396,7 +429,7 @@ const CreateEventPage = () => {
                     : "bg-blue-500 hover:bg-blue-600"
                     } text-white rounded transition-colors`}
                 >
-                  {isSubmitting ? "創建中..." : "創建活動"}
+                  {isSubmitting ? "更新中..." : "更新活動"}
                 </button>
               </div>
             </form>
@@ -406,5 +439,3 @@ const CreateEventPage = () => {
     </div>
   );
 }
-
-export default CreateEventPage;

@@ -1,35 +1,36 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { Users } from '@/types';
-import SearchBar from './SearchBar';
-import UserMenu from './UserMenu';
-import { useAuth } from '@/context/AuthContext'; // Import useAuth hook
+import { 
+  FiSearch, 
+  FiMenu, 
+  FiX, 
+  FiShoppingCart, 
+  FiUser, 
+  FiChevronDown,
+  FiLogOut,
+  FiTag
+} from 'react-icons/fi';
 
-const NavbarLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
-  <Link href={href} className="block w-full px-4 py-2 text-white hover:bg-gray-700 transition duration-200">
-    {children}
-  </Link>
-);
-
-const Navbar = () => {
+const Navbar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<Users | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { logout } = useAuth(); // Get logout function directly from AuthContext
+  const { logout } = useAuth();
 
   useEffect(() => {
-    // Check if user is authenticated based on userId
     const fetchUserData = async () => {
       const userId = localStorage.getItem('userId');
-      
       if (!userId) return;
       
       try {
-        // Fetch full user data from API including role
         const accessToken = localStorage.getItem('accessToken');
         const response = await fetch(`/api/users/${userId}`, {
           headers: {
@@ -41,13 +42,16 @@ const Navbar = () => {
         });
         
         if (response.ok) {
-          const userData = await response.json();
-          
-          // Type guard for userData
-          if (userData && typeof userData === 'object' && 'userId' in userData) {
-            setUser(userData as Users);
-          } else {
-            console.error('Invalid user data structure:', userData);
+          try {
+            const text = await response.text();
+            const userData = text ? JSON.parse(text) : null;
+            if (userData && typeof userData === 'object' && 'userId' in userData) {
+              setUser(userData as Users);
+            } else {
+              setUser(null);
+            }
+          } catch (parseError) {
+            console.error('Failed to parse user data:', parseError);
             setUser(null);
           }
         } else {
@@ -66,114 +70,251 @@ const Navbar = () => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-      setIsMobileMenuOpen(false);
+      setIsNavOpen(false);
     }
   };
 
   const handleLogout = async () => {
     try {
-      // Call the AuthContext logout function directly
       await logout();
-
-      // Clear UI state
       setUser(null);
-      setIsMobileMenuOpen(false);
-
-      // Force navigation to login page
+      setIsNavOpen(false);
+      setIsUserMenuOpen(false);
       router.push('/login');
     } catch (err) {
       console.error('Logout error:', err);
     }
   };
 
+  // Improved click-outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    // Only add the event listener if the menu is open
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
+
   return (
-    <nav className="bg-gray-800 shadow-lg fixed top-0 left-0 right-0 z-50">
-      <div className="container mx-auto px-4">
-        {/* Main navbar content */}
-        <div className="h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-xl font-bold text-white">
-              售票平台
+    <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg fixed top-0 left-0 right-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo and brand */}
+          <div className="flex-shrink-0 flex items-center">
+            <Link href="/" className="flex items-center">
+              <span className="text-white font-bold text-xl">票務系統</span>
             </Link>
-            <div className="hidden md:block">
-              <SearchBar
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onSubmit={handleSearch}
-              />
-            </div>
-            <div className="hidden md:flex space-x-6">
-            <NavbarLink href="/events">活動</NavbarLink>
-            </div>
           </div>
 
-          <div className="flex items-center">
-            <div className="hidden lg:flex items-center space-x-6">
-            {user && (
-              <Link href={`/user/cart`} className=" text-white">
-                購物車
-              </Link>
-            )}
-              {user ? (
-                <UserMenu user={user} onLogout={handleLogout} />
-              ) : (
-                <>
-                  <NavbarLink href="/login">登入</NavbarLink>
-                  <NavbarLink href="/signup">註冊</NavbarLink>
-                </>
-              )}
-            </div>
-
-            <button
-              className="lg:hidden ml-4 p-2 text-white hover:bg-gray-700 rounded-lg"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            <Link href="/events" className="text-gray-100 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
+              活動
+            </Link>
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜尋活動..."
+                className="w-64 bg-blue-700/30 text-white placeholder-gray-300 border border-blue-500 rounded-full py-1 px-4 focus:outline-none focus:ring-2 focus:ring-white"
+              />
+              <button 
+                type="submit" 
+                className="absolute right-0 top-0 h-full px-3 text-white"
               >
-                {isMobileMenuOpen ? (
-                  <path d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
+                <FiSearch />
+              </button>
+            </form>
+          </div>
+
+          {/* User section */}
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            {user ? (
+              <div className="relative flex items-center space-x-4">
+                <Link href="/user/cart" className="text-white hover:text-gray-200 transition-colors">
+                  <div className="relative">
+                    <FiShoppingCart className="h-6 w-6" />
+                  </div>
+                </Link>
+                
+                {/* User dropdown */}
+                <div className="relative" ref={userMenuRef}>
+                  <button 
+                    className="flex items-center space-x-1 text-gray-100 hover:text-white"
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  >
+                    <span>{user.userName || '用戶'}</span>
+                    <FiChevronDown className={`h-4 w-4 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {/* Dropdown menu */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
+                      <Link 
+                        href="/user/profile" 
+                        className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FiUser className="mr-2" />
+                        個人資料
+                      </Link>
+                      <Link 
+                        href="/user/order" 
+                        className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FiTag className="mr-2" />
+                        我的票券
+                      </Link>
+                      <Link 
+                        href="/user/lottery" 
+                        className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FiTag className="mr-2" />
+                        我的抽籤
+                      </Link>
+                      <button 
+                        onClick={handleLogout}
+                        className="flex w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center text-left"
+                      >
+                        <FiLogOut className="mr-2" />
+                        登出
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link href="/login" className="text-gray-100 hover:bg-blue-700 rounded px-3 py-2 transition-colors">
+                  登入
+                </Link>
+                <Link href="/signup" className="bg-white text-blue-700 hover:bg-gray-100 font-medium rounded-md px-3 py-2 transition-colors">
+                  註冊
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="flex md:hidden">
+            <button 
+              onClick={() => setIsNavOpen(!isNavOpen)}
+              className="text-gray-100 hover:text-white focus:outline-none"
+            >
+              {isNavOpen ? (
+                <FiX className="block h-6 w-6" />
+              ) : (
+                <FiMenu className="block h-6 w-6" />
+              )}
             </button>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden bg-gray-800 border-t border-gray-700">
-            <div className="px-4 py-3">
-              <SearchBar
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onSubmit={handleSearch}
-              />
-            </div>
-            <div className="border-t border-gray-700">
-              <NavbarLink href="/events">活動</NavbarLink>
-              {user ? (
-                <div className="px-4 py-2">
-                  <UserMenu user={user} onLogout={handleLogout} />
-                </div>
-              ) : (
-                <>
-                  <NavbarLink href="/login">登入</NavbarLink>
-                  <NavbarLink href="/signup">註冊</NavbarLink>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Mobile menu */}
+      {isNavOpen && (
+        <div className="md:hidden bg-blue-700">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            {/* Mobile search */}
+            <form onSubmit={handleSearch} className="flex p-2 mb-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜尋活動..."
+                className="w-full bg-blue-800 text-white placeholder-gray-300 border border-blue-600 rounded-l-md py-2 px-3 focus:outline-none"
+              />
+              <button 
+                type="submit" 
+                className="bg-blue-600 text-white px-4 py-2 rounded-r-md"
+              >
+                <FiSearch className="h-5 w-5" />
+              </button>
+            </form>
+            
+            <Link 
+              href="/events"
+              className="block text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+              onClick={() => setIsNavOpen(false)}
+            >
+              活動
+            </Link>
+            
+            {user ? (
+              <>
+                <Link 
+                  href="/user/cart"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <FiShoppingCart className="mr-2 h-5 w-5" />
+                  購物車
+                </Link>
+                <Link 
+                  href="/user/profile"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <FiUser className="mr-2 h-5 w-5" />
+                  個人資料
+                </Link>
+                <Link 
+                  href="/user/order"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <FiTag className="mr-2 h-5 w-5" />
+                  我的票券
+                </Link>
+                <Link 
+                  href="/user/lottery"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <FiTag className="mr-2 h-5 w-5" />
+                  我的抽籤
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center w-full text-left text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                >
+                  <FiLogOut className="mr-2 h-5 w-5" />
+                  登出
+                </button>
+              </>
+            ) : (
+              <>
+                <Link 
+                  href="/login"
+                  className="block text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  登入
+                </Link>
+                <Link 
+                  href="/signup"
+                  className="block text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  註冊
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
