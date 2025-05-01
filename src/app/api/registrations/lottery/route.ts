@@ -4,7 +4,6 @@ import { getCurrentUser } from '@/lib/auth';
 import { Registration } from '@/types';
 
 export const dynamic = 'force-dynamic'; // Don't cache this route 
-// Alternative options: 'auto' | 'force-static' | 'force-dynamic' | 'error' | 'force-static'
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
             totalAmount: registration.totalAmount || 0,
             quantity: registration.quantity || 1,
             zoneName: registration.zoneName || '未知區域',
-            phoneNumber: registration.phoneNumber || '', // 新增
+            phoneNumber: registration.phoneNumber || '',
           };
         } catch (error) {
           console.error(`Error enhancing registration data for ${registration.registrationToken}:`, error);

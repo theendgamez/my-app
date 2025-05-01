@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
-import Events from '@/components/eventCompo/Event';
+import Events from '@/components/eventCompo/EventCard';
 import db from '@/lib/db';
 import { Events as EventType } from '@/types';
 
