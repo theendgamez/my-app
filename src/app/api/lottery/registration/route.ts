@@ -3,6 +3,9 @@ import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { Registration } from '@/types';
 
+export const dynamic = 'force-dynamic'; // Don't cache this route 
+// Alternative options: 'auto' | 'force-static' | 'force-dynamic' | 'error' | 'force-static'
+
 export async function GET(request: NextRequest) {
   try {
     // 支援 cookie 或 header 認證
