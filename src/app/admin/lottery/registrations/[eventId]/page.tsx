@@ -53,58 +53,58 @@ export default function AdminLotteryRegistrationsPage() {
 
   // Fetch event and registrations data
   useEffect(() => {
+    const fetchEventAndRegistrations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get current access token
+        const accessToken = localStorage.getItem('accessToken') || '';
+        
+        // Fetch event details first
+        const eventResponse = await fetch(`/api/events/${eventId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'x-user-id': localStorage.getItem('userId') || ''
+          }
+        });
+        
+        if (!eventResponse.ok) {
+          throw new Error(`無法獲取活動資料: ${eventResponse.status}`);
+        }
+        
+        const eventData = await eventResponse.json();
+        setEvent(eventData);
+        
+        // Then fetch registrations for this event
+        const registrationsResponse = await fetch(`/api/admin/lottery/registrations/${eventId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'x-user-id': localStorage.getItem('userId') || ''
+          }
+        });
+        
+        if (!registrationsResponse.ok) {
+          throw new Error(`無法獲取抽籤登記: ${registrationsResponse.status}`);
+        }
+        
+        const registrationsData = await registrationsResponse.json();
+        setRegistrations(registrationsData.registrations || []);
+        
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError(err instanceof Error ? err.message : '獲取數據時發生錯誤');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (!authLoading && isAdmin && eventId) {
       fetchEventAndRegistrations();
     }
   }, [authLoading, isAdmin, eventId]);
-
-  const fetchEventAndRegistrations = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Get current access token
-      const accessToken = localStorage.getItem('accessToken') || '';
-      
-      // Fetch event details first
-      const eventResponse = await fetch(`/api/events/${eventId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': localStorage.getItem('userId') || ''
-        }
-      });
-      
-      if (!eventResponse.ok) {
-        throw new Error(`無法獲取活動資料: ${eventResponse.status}`);
-      }
-      
-      const eventData = await eventResponse.json();
-      setEvent(eventData);
-      
-      // Then fetch registrations for this event
-      const registrationsResponse = await fetch(`/api/admin/lottery/registrations/${eventId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': localStorage.getItem('userId') || ''
-        }
-      });
-      
-      if (!registrationsResponse.ok) {
-        throw new Error(`無法獲取抽籤登記: ${registrationsResponse.status}`);
-      }
-      
-      const registrationsData = await registrationsResponse.json();
-      setRegistrations(registrationsData.registrations || []);
-      
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err instanceof Error ? err.message : '獲取數據時發生錯誤');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {

@@ -37,52 +37,52 @@ export default function AdminLotteryPage() {
 
   // Fetch lottery events
   useEffect(() => {
+    const fetchLotteryEvents = async () => {
+      try {
+        setLoading(true);
+
+        // Get current access token
+        const accessToken = localStorage.getItem('accessToken') || '';
+
+        const response = await fetch('/api/admin/lottery/events', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'x-user-id': localStorage.getItem('userId') || ''
+          },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setEvents(data || []);
+        } else {
+          // Handle different error status codes
+          if (response.status === 403) {
+            setError('無權訪問抽籤管理。請確保您具有管理員權限。');
+            console.error('Admin lottery access denied. Check user role permissions.');
+
+            // Optional: could add redirect to login here
+            setTimeout(() => {
+              router.push('/login?redirect=/admin/lottery');
+            }, 2000);
+          } else {
+            setError(`無法獲取抽籤活動資料: ${response.status}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching lottery events:', err);
+        setError('獲取抽籤活動資料時發生錯誤');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (!authLoading && isAdmin) {
       fetchLotteryEvents();
     }
-  }, [authLoading, isAdmin]);
-
-  const fetchLotteryEvents = async () => {
-    try {
-      setLoading(true);
-      
-      // Get current access token
-      const accessToken = localStorage.getItem('accessToken') || '';
-      
-      const response = await fetch('/api/admin/lottery/events', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': localStorage.getItem('userId') || ''
-        },
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data || []);
-      } else {
-        // Handle different error status codes
-        if (response.status === 403) {
-          setError('無權訪問抽籤管理。請確保您具有管理員權限。');
-          console.error('Admin lottery access denied. Check user role permissions.');
-          
-          // Optional: could add redirect to login here
-          setTimeout(() => {
-            router.push('/login?redirect=/admin/lottery');
-          }, 2000);
-        } else {
-          setError(`無法獲取抽籤活動資料: ${response.status}`);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching lottery events:', err);
-      setError('獲取抽籤活動資料時發生錯誤');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [authLoading, isAdmin, router]);
 
   const getStatusClass = (status: string) => {
     switch (status) {

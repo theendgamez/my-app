@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user);
+    const { accessToken, refreshToken } = await generateTokens(user);
     
     // Create response with minimal user data - only the user ID
     // This ensures the client only has access to the ID, not sensitive user data

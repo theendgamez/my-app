@@ -42,55 +42,55 @@ export default function AdminDashboardPage() {
 
   // Fetch dashboard data
   useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        
+        // Get the most current access token
+        const accessToken = localStorage.getItem('accessToken') || '';
+        
+        // Fetch dashboard statistics from API
+        const response = await fetch('/api/admin/dashboard', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'x-user-id': user?.userId || '', // Add user ID as fallback authentication
+          },
+          // Include credentials to send cookies
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        } else {
+          // Handle different error status codes
+          if (response.status === 403) {
+            setError('無權訪問管理員儀表板。請確保您具有管理員權限。');
+            console.error('Admin access denied. Check user role permissions.');
+          } else {
+            setError(`無法獲取儀表板數據 (${response.status})`);
+          }
+          
+          // If unauthorized, might need to refresh token or re-login
+          if (response.status === 401 || response.status === 403) {
+            // Optional: Could add token refresh logic here
+            console.log('Authorization failed. Consider refreshing authentication.');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+        setError('獲取儀表板數據時發生錯誤');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (!authLoading && isAdmin) {
       fetchDashboardStats();
     }
-  }, [authLoading, isAdmin]);
-
-  const fetchDashboardStats = async () => {
-    try {
-      setLoading(true);
-      
-      // Get the most current access token
-      const accessToken = localStorage.getItem('accessToken') || '';
-      
-      // Fetch dashboard statistics from API
-      const response = await fetch('/api/admin/dashboard', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': user?.userId || '', // Add user ID as fallback authentication
-        },
-        // Include credentials to send cookies
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      } else {
-        // Handle different error status codes
-        if (response.status === 403) {
-          setError('無權訪問管理員儀表板。請確保您具有管理員權限。');
-          console.error('Admin access denied. Check user role permissions.');
-        } else {
-          setError(`無法獲取儀表板數據 (${response.status})`);
-        }
-        
-        // If unauthorized, might need to refresh token or re-login
-        if (response.status === 401 || response.status === 403) {
-          // Optional: Could add token refresh logic here
-          console.log('Authorization failed. Consider refreshing authentication.');
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching dashboard stats:', err);
-      setError('獲取儀表板數據時發生錯誤');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [authLoading, isAdmin, user]);
 
   if (authLoading) {
     return (

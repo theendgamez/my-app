@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       try {
-        const decoded = verifyToken(token);
+        const decoded = await verifyToken(token);
         if (decoded && decoded.userId) {
           console.log('Extracted userId from token:', decoded.userId);
           userId = decoded.userId;

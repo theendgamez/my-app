@@ -2,7 +2,7 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter, useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import Sidebar from "@/components/ui/Sidebar";
 import { useAuth } from '@/context/AuthContext';
@@ -44,25 +44,8 @@ export default function EditEventPage() {
     }
   });
 
-  // Check if user is admin, redirect if not
-  useEffect(() => {
-    if (!authLoading && isAuthenticated && !isAdmin) {
-      router.push('/');
-    }
-    
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login?redirect=/admin/events/edit/' + id);
-    }
-  }, [authLoading, isAuthenticated, isAdmin, router, id]);
-
-  // Fetch event data
-  useEffect(() => {
-    if (id && !authLoading && isAdmin) {
-      fetchEventData();
-    }
-  }, [id, authLoading, isAdmin]);
-
-  const fetchEventData = async () => {
+  // Memoize fetchEventData to use it in the dependency array
+  const fetchEventData = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/events/${id}`);
@@ -106,7 +89,25 @@ export default function EditEventPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, reset]);
+
+  // Check if user is admin, redirect if not
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !isAdmin) {
+      router.push('/');
+    }
+    
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?redirect=/admin/events/edit/' + id);
+    }
+  }, [authLoading, isAuthenticated, isAdmin, router, id]);
+
+  // Fetch event data
+  useEffect(() => {
+    if (id && !authLoading && isAdmin) {
+      fetchEventData();
+    }
+  }, [id, authLoading, isAdmin, fetchEventData]);
 
   // Update the form value when isDrawMode changes
   useEffect(() => {

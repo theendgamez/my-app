@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     
     if (accessToken) {
       // Verify token and check role
-      const decoded = verifyToken(accessToken);
+      const decoded = await verifyToken(accessToken);
       isAdmin = decoded?.role === 'admin';
     }
 

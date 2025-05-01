@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Check admin authentication
@@ -34,7 +34,8 @@ export async function GET(
       );
     }
 
-    const eventId = params.eventId;
+  
+    const eventId = (await params).eventId;
     if (!eventId) {
       return NextResponse.json(
         { error: '缺少活動ID' },
