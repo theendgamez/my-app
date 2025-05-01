@@ -1,6 +1,6 @@
 import React from 'react';
-import EventList from '@/components/eventCompo/EventList';
-import ListItem from '@/components/eventCompo/EventListItem';
+import EventList from '@/components/eventCompo/Eventlist';
+import ListItem from '@/components/eventCompo/Eventlistitem';
 import type { Events } from '@/types';
 
 interface Props {
