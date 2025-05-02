@@ -64,6 +64,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push(redirectPath);
   }, [router]);
 
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      const userId = localStorage.getItem('userId');
+      const accessToken = localStorage.getItem('accessToken');
+      
+      // Add validation for the user ID
+      if (!userId || userId.includes('...') || userId.length < 4) {
+        console.error('Invalid user ID found in localStorage:', userId);
+        // Clear invalid data and set unauthenticated state
+        localStorage.removeItem('userId');
+        localStorage.removeItem('accessToken');
+        setIsAuthenticated(false);
+        setIsAdmin(false);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Get user data from API with cache busting
+      const cacheBuster = new Date().getTime();
+      const response = await fetch(`/api/users/${userId}?_=${cacheBuster}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken || ''}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'x-user-id': userId // Add user ID as fallback auth mechanism
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setIsAuthenticated(true);
+        setIsAdmin(userData.role === 'admin');
+      } else {
+        // Handle expired tokens or authentication failures
+        console.error('Authentication failed:', response.status, response.statusText);
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('userId');
+        }
+        setIsAuthenticated(false);
+        setIsAdmin(false);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error in user authentication:', error);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Check authentication status
   useEffect(() => {
     // Skip effect during server-side rendering
@@ -105,32 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // Get user data from API with cache busting
-        const cacheBuster = new Date().getTime();
-        const response = await fetch(`/api/users/${userId}?_=${cacheBuster}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          setIsAuthenticated(true);
-          setIsAdmin(userData.role === 'admin');
-        } else {
-          // Handle expired tokens by clearing them
-          if (response.status === 401) {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('userId');
-          }
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-          setUser(null);
-        }
+        await fetchUserData();
       } catch (error) {
         console.error('Auth check error:', error);
         setIsAuthenticated(false);

@@ -28,7 +28,7 @@ export default function UserLotteryPage() {
     const fetchRegistrations = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/lottery/registration/', {
+        const response = await fetch('/api/registrations/lottery', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
             'x-user-id': user?.userId || ''

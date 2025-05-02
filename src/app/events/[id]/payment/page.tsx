@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
-import { BookingDetails, ProcessedPayment } from '@/types';
+import { BookingDetails, Payment } from '@/types';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 // 10-minute countdown timer component
@@ -212,7 +212,7 @@ export default function PaymentPage() {
         return;
       }
 
-      const payment: ProcessedPayment = await response.json();
+      const payment: Payment = await response.json();
       router.push(`/events/${eventId}/success?paymentId=${payment.paymentId}`);
     } catch (err) {
       console.error('Payment submission error:', err);

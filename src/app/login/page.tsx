@@ -93,24 +93,30 @@ const LoginForm = () => {
 
       // Type guard for the user object
       if (result.user && typeof result.user === 'object' && 'userId' in result.user) {
-        // Store only userId in localStorage
-        localStorage.setItem('userId', result.user.userId);
-        
-        // Store access token for API auth
-        if (result.accessToken) {
-          localStorage.setItem('accessToken', result.accessToken);
-        }
-        
-        // Clear any redirect flags
-        sessionStorage.removeItem('redirect_attempt_count');
-        sessionStorage.removeItem('redirected_to_login');
-        sessionStorage.removeItem('last_redirect_time');
-        
-        // Redirect to intended destination or home
-        if (redirectPath) {
-          router.push(redirectPath);
+        // Make sure user ID is valid before storing
+        const userId = result.user.userId;
+        if (userId && typeof userId === 'string' && !userId.includes('...')) {
+          // Store only userId in localStorage
+          localStorage.setItem('userId', userId);
+          
+          // Store access token for API auth
+          if (result.accessToken) {
+            localStorage.setItem('accessToken', result.accessToken);
+          }
+          
+          // Clear any redirect flags
+          sessionStorage.removeItem('redirect_attempt_count');
+          sessionStorage.removeItem('redirected_to_login');
+          sessionStorage.removeItem('last_redirect_time');
+          
+          // Redirect to intended destination or home
+          if (redirectPath) {
+            router.push(redirectPath);
+          } else {
+            router.push('/');
+          }
         } else {
-          router.push('/');
+          throw new Error('Invalid user ID received from server');
         }
       } else {
         throw new Error('Invalid user data received from server');

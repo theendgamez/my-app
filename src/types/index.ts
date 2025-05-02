@@ -15,6 +15,9 @@ export interface Users {
   tokenVersion?: number;
 }
 
+/**
+ * Authentication response structure
+ */
 export interface AuthResponse {
   success: boolean;
   message?: string;
@@ -22,6 +25,9 @@ export interface AuthResponse {
   error?: string;
 }
 
+/**
+ * JWT token payload structure
+ */
 export interface JWTPayload {
   userId: string;
   email: string;
@@ -30,6 +36,9 @@ export interface JWTPayload {
 }
 
 // Event related types
+/**
+ * Event zone configuration
+ */
 export interface Zone {
   name: string;
   price: string;
@@ -37,6 +46,9 @@ export interface Zone {
   max: string;
 }
 
+/**
+ * Event information structure
+ */
 export interface Events {
   eventId: string;
   eventName: string;
@@ -67,7 +79,7 @@ export interface Payment {
   payQuantity: number;
   totalAmount: number;
   createdAt: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'failed' | 'refunded';
   cardDetails: {
     lastFourDigits: string;
   };
@@ -102,7 +114,6 @@ export interface Booking {
   expiresAt: string;
   status: 'pending' | 'completed';
 }
-
 export interface BookingDetails {
   eventName: string;
   eventDate: string;
@@ -113,11 +124,7 @@ export interface BookingDetails {
   expiresAt: number;
 }
 
-export interface ProcessedPayment {
-  paymentId: string;
-}
 
-// 統一抽籤登記型別，供所有 API 使用
 export interface Registration {
   registrationToken: string;
   eventId: string;

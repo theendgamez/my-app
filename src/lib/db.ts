@@ -570,6 +570,27 @@ const db = {
         const data = await client.send(command);
         return data.Items?.map((item) => unmarshall(item) as Payment) || [];
       });
+    },
+    update : async (paymentId: string, updates: Partial<Payment>): Promise<Payment> => {
+      return executeDbCommand(async () => {
+        const currentPayment = await db.payments.findById(paymentId);
+        if (!currentPayment) throw new Error(`Payment with ID ${paymentId} not found`);
+        
+        const { updateExpressions, expressionAttributeValues, expressionAttributeNames } = 
+          createUpdateExpression(updates);
+
+        const command = new UpdateItemCommand({
+          TableName: 'Payments',
+          Key: marshall({ paymentId }),
+          UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? (unmarshall(result.Attributes) as Payment) : { ...currentPayment, ...updates };
+      });
     }
   },
 

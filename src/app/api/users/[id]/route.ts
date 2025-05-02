@@ -10,25 +10,33 @@ export async function GET(
   try {
     const userId = (await params).id;
     
+    // Log the requested user ID for debugging
+    console.log('API - User data requested for:', userId);
+    
     // Get userId from header as fallback auth mechanism
     const requestUserId = request.headers.get('x-user-id');
     
     // Add authentication/authorization checks...
     const currentUser = await getCurrentUser(request);
     
+    console.log('Auth check:', { 
+      currentUser: currentUser?.userId || 'none',
+      requestUserId: requestUserId || 'none', 
+      requestedId: userId 
+    });
+
     // Allow access if:
     // 1. User is authenticated and is requesting their own data
     // 2. User is authenticated as admin
     // 3. User ID in header matches requested ID (fallback auth)
-    if (!currentUser && (!requestUserId || requestUserId !== userId)) {
-      console.log('Unauthorized access: No user found', { requestedId: userId });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
-    
-    // If there's a currentUser but they're not requesting their own data and not an admin
-    if (currentUser && currentUser.userId !== userId && currentUser.role !== 'admin') {
-      console.log('Unauthorized access: Wrong user', { currentUser: currentUser?.userId, requestedId: userId });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (currentUser) {
+      // If current user exists but they're not requesting their own data and not an admin
+      if (currentUser.userId !== userId && currentUser.role !== 'admin') {
+        return NextResponse.json({ error: 'Unauthorized access' }, { status: 403 });
+      }
+    } else if (!requestUserId || requestUserId !== userId) {
+      // No authenticated user and header doesn't match
+      return NextResponse.json({ error: 'Authentication required' }, { status: 403 });
     }
     
     const user = await db.users.findById(userId);
