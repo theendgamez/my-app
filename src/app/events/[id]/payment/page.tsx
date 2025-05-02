@@ -11,7 +11,6 @@ import { BookingDetails, ProcessedPayment } from '@/types';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 // 10-minute countdown timer component
-//change timer in api/bookings/create-intent/route.ts 
 const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const router = useRouter();
@@ -22,25 +21,33 @@ const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
       const newTimeLeft = Math.max(0, Math.floor(difference / 1000));
       setTimeLeft(newTimeLeft);
       
-      // If time has expired, redirect to home page
-      if (newTimeLeft === 0) {
-        // Show alert and then redirect
-          alert('預留時間已結束，請重新選擇座位。');
-          router.push('/');
+      // Redirect if time expires
+      if (newTimeLeft <= 0) {
+        router.push('/events');
       }
     };
-
+    
+    // Initial calculation
     calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-    return () => clearInterval(timer);
+    
+    // Set up interval to update countdown
+    const timerId = setInterval(calculateTimeLeft, 1000);
+    
+    // Cleanup function
+    return () => clearInterval(timerId);
   }, [expiresAt, router]);
-
+  
+  // Format time for display
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-
+  
   return (
-    <div className={`text-sm font-medium ${timeLeft < 60 ? 'text-red-600' : 'text-gray-600'}`}>
-      預留時間: {minutes}:{seconds.toString().padStart(2, '0')}
+    <div className="text-center">
+      <p className="text-lg font-medium">支付倒計時</p>
+      <div className="text-2xl font-bold text-red-600">
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+      </div>
+      <p className="text-sm text-gray-500">超時未付款將自動取消預訂</p>
     </div>
   );
 };
@@ -55,44 +62,94 @@ export default function PaymentPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
-  
-  const bookingToken = searchParams.get('bookingToken');
+  const [paymentExpiresAt, setPaymentExpiresAt] = useState<number | null>(null);
 
   useEffect(() => {
-    // Check authentication first
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/events/${eventId}`)}`);
+    // Skip if still loading auth state
+    if (authLoading) return;
+
+    // Check for authentication
+    if (!isAuthenticated) {
+      // Redirect to login with return URL
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+    
+    // Get booking details from query parameter
+    const bookingToken = searchParams.get('bookingToken');
+    const registrationToken = searchParams.get('registrationToken');
+    
+    if (!bookingToken && !registrationToken) {
+      // No tokens provided, redirect to events page
+      setError('未提供預訂代碼，無法進行付款');
+      setTimeout(() => {
+        router.push('/events');
+      }, 3000);
       return;
     }
 
-    // Validate booking token
-    if (!bookingToken) {
-      setError('Missing booking information');
-      setLoading(false);
-      return;
-    }
-
-    const fetchBookingDetails = async () => {
+    // Fetch the booking details to validate
+    const fetchDetails = async () => {
       try {
-        const res = await fetchWithAuth(`/api/bookings/${bookingToken}/verify`);
-        if (!res.ok) {
-          throw new Error(await res.text() || 'Failed to verify booking');
+        setLoading(true);
+        let endpoint;
+        
+        if (bookingToken) {
+          endpoint = `/api/bookings/${bookingToken}`;
+        } else if (registrationToken) {
+          endpoint = `/api/lottery/registration/${registrationToken}`;
+        } else {
+          throw new Error('無法識別付款類型');
         }
 
-        const data = await res.json();
-        setBookingDetails(data);
+        const responseUnknown = await fetchWithAuth(endpoint);
+        const response = responseUnknown as BookingDetails & { status?: string; event?: { drawDate?: string } };
+        
+        // Check if token is valid and booking/registration is still active
+        if (response.status === 'expired' || response.status === 'cancelled') {
+          setError('此訂單已過期或已取消');
+          setTimeout(() => router.push('/events'), 3000);
+          return;
+        }
+
+        // For lottery registrations, check if the registration period is still open
+        if (registrationToken && response.event) {
+          // Check if the drawing date has passed
+          if (response.event.drawDate) {
+            const drawDate = new Date(response.event.drawDate);
+            if (drawDate < new Date()) {
+              setError('抽籤登記已結束，無法進行付款');
+              setTimeout(() => router.push('/events'), 3000);
+              return;
+            }
+          } else {
+            setError('抽籤登記日期無效，無法進行付款');
+            setTimeout(() => router.push('/events'), 3000);
+            return;
+          }
+        }
+        
+        // All validations passed, set the booking details
+        setBookingDetails(response);
+        
+        // Calculate payment expiry time
+        if (response.expiresAt) {
+          setPaymentExpiresAt(response.expiresAt);
+        } else {
+          // Default to 10 minutes if no expiration set
+          setPaymentExpiresAt(Date.now() + 10 * 60 * 1000);
+        }
       } catch (err) {
         console.error('Error fetching booking details:', err);
-        setError(err instanceof Error ? err.message : 'Unable to retrieve booking information');
+        setError(err instanceof Error ? err.message : '獲取訂單詳情時出錯');
       } finally {
         setLoading(false);
       }
     };
 
-    if (isAuthenticated && bookingToken) {
-      fetchBookingDetails();
-    }
-  }, [bookingToken, isAuthenticated, authLoading, router, eventId]);
+    fetchDetails();
+  }, [isAuthenticated, authLoading, router, searchParams, eventId]);
 
   const handlePayment = async (cardData: {
     cardNumber: string;
@@ -112,17 +169,18 @@ export default function PaymentPage() {
         throw new Error('您的預訂已過期，請重新選擇座位');
       }
 
-      const response = await fetchWithAuth('/api/payments', {
+      const responseUnknown = await fetchWithAuth('/api/payments', {
         method: 'POST',
         body: JSON.stringify({
           userId: user.userId, // Add userId to the request body
-          bookingToken,
+          bookingToken: searchParams.get('bookingToken'),
           cardDetails: {
             // Only send last 4 digits for security
             lastFourDigits: cardData.cardNumber.slice(-4),
           }
         }),
       });
+      const response = responseUnknown as Response;
 
       if (!response.ok) {
         let errorMessage = `Payment failed with status: ${response.status}`;
@@ -241,9 +299,9 @@ export default function PaymentPage() {
 
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
               {/* Timer is now inside the order details card */}
-              {bookingDetails.expiresAt && (
+              {paymentExpiresAt && (
                 <div className="mb-2">
-                  <CountdownTimer expiresAt={bookingDetails.expiresAt} />
+                  <CountdownTimer expiresAt={paymentExpiresAt} />
                 </div>
               )}
               <h2 className="font-semibold text-blue-800 mb-2">訂單詳情</h2>

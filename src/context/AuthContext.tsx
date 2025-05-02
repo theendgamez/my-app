@@ -1,247 +1,199 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
-interface User {
+// Constants to prevent auth check loops
+const AUTH_CHECK_FLAG = 'auth_check_in_progress';
+const MAX_AUTH_ATTEMPTS = 3;
+const REDIRECT_COOLDOWN = 'redirect_cooldown_time';
+const REDIRECT_COOLDOWN_MS = 3000; // 3 seconds cooldown between redirects
+
+interface UserType {
   userId: string;
-  userName: string;
-  email: string;
   role: string;
-  phoneNumber?: string;
+  [key: string]: unknown;
 }
 
 interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  register: (userData: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  verifyEmail: (token: string) => Promise<Record<string, unknown>>;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  error: string | null;
-  setError: (error: string | null) => void;
+  user: UserType | null;
+  loading: boolean;
+  login: (token: string, userData: UserType) => void;
+  logout: () => void;
+  redirectToLogin: (returnPath?: string) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  isAuthenticated: false,
+  isAdmin: false,
+  user: null,
+  loading: true,
+  login: () => {},
+  logout: () => {},
+  redirectToLogin: () => {},
+});
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
 
-  // Add a ref to track API calls and prevent excessive requests
-  const isFetchingRef = useRef(false);
-  const lastFetchTimeRef = useRef(0);
-  const API_COOLDOWN_MS = 2000; // 2 seconds between user data refreshes
+  // Function to redirect to login with protection against loops
+  const redirectToLogin = useCallback((returnPath?: string) => {
+    // Skip if not in browser environment
+    if (typeof window === 'undefined') return;
+    
+    // Check if we've redirected recently
+    const lastRedirectTime = parseInt(localStorage.getItem(REDIRECT_COOLDOWN) || '0', 10);
+    const now = Date.now();
+    
+    if (now - lastRedirectTime < REDIRECT_COOLDOWN_MS) {
+      console.log('Redirect prevented: Too soon after previous redirect');
+      return;
+    }
+    
+    // Store the timestamp of this redirect
+    localStorage.setItem(REDIRECT_COOLDOWN, now.toString());
+    
+    // Build the redirect URL
+    const redirectPath = returnPath ? `/login?redirect=${encodeURIComponent(returnPath)}` : '/login';
+    router.push(redirectPath);
+  }, [router]);
 
+  // Check authentication status
   useEffect(() => {
-    // Check if user is authenticated based on userId in localStorage
+    // Skip effect during server-side rendering
+    if (typeof window === 'undefined') return;
+    
     const checkAuth = async () => {
       try {
-        // Skip if we're already fetching or if we fetched recently
+        // Skip the check if we just redirected to prevent loops
+        const lastRedirectTime = parseInt(localStorage.getItem(REDIRECT_COOLDOWN) || '0', 10);
         const now = Date.now();
-        if (isFetchingRef.current || now - lastFetchTimeRef.current < API_COOLDOWN_MS) {
-          return;
-        }
-
-        // Get userId from localStorage
-        const userId = localStorage.getItem('userId');
-
-        if (!userId) {
+        if (now - lastRedirectTime < REDIRECT_COOLDOWN_MS) {
+          console.log('Auth check skipped: Too soon after redirect');
           setLoading(false);
           return;
         }
-
-        // Mark that we're fetching data
-        isFetchingRef.current = true;
-        lastFetchTimeRef.current = now;
-
-        // Fetch complete user data including role from API
-        try {
-          const accessToken = localStorage.getItem('accessToken');
-          const response = await fetch(`/api/users/${userId}`, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-              'x-user-id': userId
-            },
-            credentials: 'omit'
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            // Ensure userData conforms to User type
-            if (userData && typeof userData === 'object' && 'userId' in userData) {
-              setUser(userData as User);
-            } else {
-              console.error('Invalid user data structure received:', userData);
-              setUser(null);
-            }
-          } else {
-            // Handle authentication failure
-            localStorage.removeItem('userId');
-            localStorage.removeItem('accessToken');
-          }
-        } catch (err) {
-          console.error('Error fetching user data:', err);
-          setUser(null);
-        } finally {
-          // Reset fetching flag when done
-          isFetchingRef.current = false;
+        
+        // Check if we're already in an auth check to prevent loops
+        const authCheckCount = parseInt(localStorage.getItem(AUTH_CHECK_FLAG) || '0', 10);
+        
+        if (authCheckCount > MAX_AUTH_ATTEMPTS) {
+          console.error('Too many authentication check attempts, possible loop detected');
+          localStorage.removeItem(AUTH_CHECK_FLAG);
+          setLoading(false);
+          return;
         }
-      } catch (err) {
-        console.error('Auth check error:', err);
+        
+        // Increment the auth check counter
+        localStorage.setItem(AUTH_CHECK_FLAG, (authCheckCount + 1).toString());
+        
+        const accessToken = localStorage.getItem('accessToken');
+        const userId = localStorage.getItem('userId');
+        
+        if (!accessToken || !userId) {
+          setIsAuthenticated(false);
+          setIsAdmin(false);
+          setUser(null);
+          setLoading(false);
+          localStorage.removeItem(AUTH_CHECK_FLAG);
+          return;
+        }
+
+        // Get user data from API with cache busting
+        const cacheBuster = new Date().getTime();
+        const response = await fetch(`/api/users/${userId}?_=${cacheBuster}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          setIsAuthenticated(true);
+          setIsAdmin(userData.role === 'admin');
+        } else {
+          // Handle expired tokens by clearing them
+          if (response.status === 401) {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('userId');
+          }
+          setIsAuthenticated(false);
+          setIsAdmin(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
+        setIsAdmin(false);
+        setUser(null);
       } finally {
         setLoading(false);
+        localStorage.removeItem(AUTH_CHECK_FLAG);
       }
     };
 
     checkAuth();
-
-    // Set up interval to refresh auth state every 30 seconds
-    const interval = setInterval(checkAuth, 30000);
-
-    // Clear interval on unmount
-    return () => clearInterval(interval);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data.user);
-
-        // Store only userId in localStorage
-        localStorage.setItem('userId', data.user.userId);
-
-        // Store access token if provided
-        if (data.accessToken) {
-          localStorage.setItem('accessToken', data.accessToken);
-        }
-      } else {
-        setError(data.error || '登入失敗');
-        throw new Error(data.error || '登入失敗');
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || '登入時發生錯誤');
-        throw err;
-      } else {
-        setError('登入時發生錯誤');
-        throw new Error('登入時發生錯誤');
-      }
-    } finally {
-      setLoading(false);
-    }
+  const login = (token: string, userData: UserType) => {
+    if (typeof window === 'undefined') return;
+    
+    localStorage.setItem('accessToken', token);
+    localStorage.setItem('userId', userData.userId);
+    
+    // Reset any redirect timestamps to allow navigation after login
+    localStorage.removeItem(REDIRECT_COOLDOWN);
+    localStorage.removeItem(AUTH_CHECK_FLAG);
+    
+    setUser(userData);
+    setIsAuthenticated(true);
+    setIsAdmin(userData.role === 'admin');
   };
 
   const logout = async () => {
-    setLoading(true);
+    if (typeof window === 'undefined') return;
+    
     try {
-      setUser(null);
-      localStorage.removeItem('userId');
       localStorage.removeItem('accessToken');
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const register = async (userData: Record<string, unknown>) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || '註冊失敗');
-        throw new Error(data.error || '註冊失敗');
-      }
-      return data;
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || '註冊時發生錯誤');
-        throw err;
-      } else {
-        setError('註冊時發生錯誤');
-        throw new Error('註冊時發生錯誤');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyEmail = async (token: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data.user);
-        // Store only userId in localStorage
-        localStorage.setItem('userId', data.user.userId);
-        return data;
-      } else {
-        setError(data.error || '驗證失敗');
-        throw new Error(data.error || '驗證失敗');
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || '驗證時發生錯誤');
-        throw err;
-      }
-      setError('驗證時發生錯誤');
-      throw new Error('驗證時發生錯誤');
-    } finally {
-      setLoading(false);
+      localStorage.removeItem('userId');
+      
+      // Reset any auth flags
+      localStorage.removeItem(AUTH_CHECK_FLAG);
+      localStorage.removeItem(REDIRECT_COOLDOWN);
+      
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
   return (
     <AuthContext.Provider
       value={{
+        isAuthenticated,
+        isAdmin,
         user,
         loading,
         login,
         logout,
-        register,
-        verifyEmail,
-        isAuthenticated: !!user,
-        isAdmin: user?.role === 'admin',
-        error,
-        setError,
+        redirectToLogin,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-}
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };
+
+export const useAuth = () => useContext(AuthContext);

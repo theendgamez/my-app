@@ -94,8 +94,8 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white overflow-y-auto">
-      <div className="py-4">
+    <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col">
+      <div className="flex-1 py-4 overflow-y-auto">
         {sections.map((section, sectionIndex) => (
           <div key={section.title} className="mb-4">
             <button
@@ -141,8 +141,8 @@ const Sidebar: React.FC = () => {
         ))}
       </div>
       
-      {/* Admin info section */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700 bg-gray-800">
+      {/* Admin info section - no longer using absolute positioning */}
+      <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 mt-auto">
         <div className="flex items-center space-x-3">
           <div className="bg-blue-600 rounded-full p-2">
             <FiUser size={18} className="text-white" />

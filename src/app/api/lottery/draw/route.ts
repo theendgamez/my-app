@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get all paid registrations for this event
-    const registrations = await db.registration.findByEvent(eventId);
+    const registrations = await db.registration.findByEvent(eventId) as Registration[];
     if (registrations.length === 0) {
       return NextResponse.json({ error: '沒有有效的付費登記' }, { status: 400 });
     }
@@ -55,8 +55,27 @@ export async function POST(request: NextRequest) {
       // add other properties if needed
     };
 
-    // Shuffle the registrations randomly
-    const shuffledRegistrations = [...registrations].sort(() => Math.random() - 0.5) as Registration[];
+    // Track allocations per user to enforce maximum 2 tickets per person
+    const userAllocations: Record<string, number> = {};
+
+    /**
+     * Fisher-Yates (Knuth) Shuffle Algorithm
+     * This is a statistically fair algorithm for shuffling an array
+     * Reference: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+     */
+    const fairShuffle = (array: Registration[]): Registration[] => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        // Generate a random index between 0 and i (inclusive)
+        const j = Math.floor(Math.random() * (i + 1));
+        // Swap elements at i and j
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+    
+    // Apply fair shuffle algorithm to registrations
+    const shuffledRegistrations = fairShuffle(registrations) as Registration[];
     
     // Process each registration
     const results = [];
@@ -69,12 +88,21 @@ export async function POST(request: NextRequest) {
         status: 'drawn'
       });
       
-      const { zoneName, quantity } = reg;
+      const { zoneName, quantity, userId } = reg;
       
-      // Check if enough tickets are available in the zone
-      if (availableTicketsByZone[zoneName] >= quantity) {
+      // Initialize user allocation if not exist
+      if (!userAllocations[userId]) {
+        userAllocations[userId] = 0;
+      }
+      
+      // Check if this allocation would exceed maximum tickets per user (2)
+      const wouldExceedLimit = userAllocations[userId] + quantity > 2;
+      
+      // Check if enough tickets are available in the zone and user hasn't exceeded limit
+      if (availableTicketsByZone[zoneName] >= quantity && !wouldExceedLimit) {
         // Winner
         availableTicketsByZone[zoneName] -= quantity;
+        userAllocations[userId] += quantity;
         winners.push(reg.registrationToken);
         
         // Update registration status
@@ -91,7 +119,7 @@ export async function POST(request: NextRequest) {
           quantity
         });
       } else {
-        // Loser
+        // Loser (either no tickets left or would exceed 2 ticket limit)
         losers.push(reg.registrationToken);
         
         // Update registration status
@@ -126,10 +154,16 @@ export async function POST(request: NextRequest) {
         winners: winners.length,
         losers: losers.length
       },
-      results
+      results,
+      // Add timestamp to prevent caching issues that might contribute to loops
+      timestamp: Date.now()
     });
   } catch (error) {
     console.error('Lottery draw error:', error);
-    return NextResponse.json({ error: '執行抽籤時出錯' }, { status: 500 });
+    return NextResponse.json({ 
+      error: '執行抽籤時出錯', 
+      // Add error details if available to help with debugging
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }

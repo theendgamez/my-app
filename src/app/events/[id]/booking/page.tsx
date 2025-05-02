@@ -104,26 +104,43 @@ const BookingPage = () => {
         
         // Check if id is valid
         if (!id) {
-          throw new Error('Invalid event ID');
+          setError('無效的活動編號');
+          setLoading(false);
+          return;
         }
-        
+
         const data = await getEventDetails(id as string);
         setEvent(data);
-      } catch (error) {
-        console.error('Error fetching event:', error);
-        setError(error instanceof Error 
-          ? error.message 
-          : 'Unable to load event details. Please try again.');
+
+        // Prevent booking if event is in draw mode or has ended
+        if (data.isDrawMode === true) {
+          setError('此活動為抽籤制，請前往抽籤登記頁面');
+          router.push(`/events/${id}/lottery`);
+          return;
+        }
+
+        // Check if event date has passed
+        if (data.eventDate && new Date(data.eventDate) < new Date()) {
+          setError('此活動已結束，無法進行訂票');
+          return;
+        }
+
+        // Set the default zone if available
+        if (data.zones && data.zones.length > 0) {
+          setSelectedZone(data.zones[0].name);
+        }
+      } catch (err) {
+        console.error('Error fetching event details:', err);
+        setError(err instanceof Error ? err.message : '無法獲取活動詳情');
       } finally {
         setLoading(false);
       }
     };
 
-    // Try to fetch event details even if not fully authenticated in case of redirect loop
-    if (isAuthenticated || redirectAttempt) {
+    if (isAuthenticated) {
       fetchEventDetails();
     }
-  }, [id, isAuthenticated, authLoading, router]);
+  }, [id, router, isAuthenticated, authLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

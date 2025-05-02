@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
-import jwt from 'jsonwebtoken';
 import db from '@/lib/db';
 import { Users } from '@/types';
 
@@ -86,40 +85,29 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
   });
 };
 
-// Verify JWT token with improved error handling
+// Verify JWT token with improved error handling for Vercel Edge Runtime
 export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<JWTPayload | null> => {
   try {
-    // Check if we're in Edge Runtime environment
-    const isEdgeRuntime = typeof window === 'undefined' && !('NODE_ENV' in process.env);
-    
-    // Use jose for Edge Runtime and jwt for Node.js environment
-    if (!isEdgeRuntime) {
-      try {
-        return jwt.verify(token, secret) as JWTPayload;
-      } catch (err) {
-        // Check for specific error types
-        if (err instanceof jwt.TokenExpiredError) {
-          console.log('Token expired:', err.expiredAt);
-          // Return null for expired tokens, but could handle differently if needed
+    // Use jose for Vercel environment to ensure Edge Runtime compatibility
+    const secretBytes = new TextEncoder().encode(secret);
+    try {
+      const { payload } = await jwtVerify(token, secretBytes, {
+        algorithms: ['HS256'],
+      });
+      return payload as unknown as JWTPayload;
+    } catch (err: unknown) {
+      // Handle jose-specific errors
+      if (typeof err === 'object' && err !== null) {
+        if ('code' in err && (err as { code?: string }).code === 'ERR_JWT_EXPIRED') {
+          console.log('Token expired');
           return null;
         }
-        // Re-throw for other error types
-        throw err;
-      }
-    } else {
-      // Edge Runtime environment - use jose
-      const secretBytes = new TextEncoder().encode(secret);
-      try {
-        const { payload } = await jwtVerify(token, secretBytes);
-        return payload as unknown as JWTPayload;
-      } catch (err: unknown) {
-        // Handle jose-specific errors
-        if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'ERR_JWT_EXPIRED') {
-          console.log('Token expired (Edge runtime)');
+        if ('code' in err && (err as { code?: string }).code === 'ERR_JWS_INVALID') {
+          console.log('Invalid token signature');
           return null;
         }
-        throw err;
       }
+      throw err;
     }
   } catch (error) {
     // Only log detailed errors in development
@@ -130,17 +118,10 @@ export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<J
   }
 };
 
-// Sign JWT token - fixed type issues
+// Sign JWT token - updated for Edge Runtime compatibility
 export const signToken = async (payload: JWTPayload, expiresIn: string | number, secret = JWT_SECRET): Promise<string> => {
-  // Check if we're in Edge Runtime environment
-  const isEdgeRuntime = typeof window === 'undefined' && !('NODE_ENV' in process.env);
-  
-  if (!isEdgeRuntime) {
-    // Server environment - fix type issues with jwt.sign
-    const options = { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] };
-    return jwt.sign(payload as object, secret, options);
-  } else {
-    // Edge Runtime environment - use jose
+  try {
+    // Use jose for all environments to ensure consistency
     const secretBytes = new TextEncoder().encode(secret);
     const token = await new SignJWT(payload as unknown as Record<string, unknown>)
       .setProtectedHeader({ alg: 'HS256' })
@@ -148,6 +129,9 @@ export const signToken = async (payload: JWTPayload, expiresIn: string | number,
       .setExpirationTime(typeof expiresIn === 'string' ? expiresIn : `${expiresIn}s`)
       .sign(secretBytes);
     return token;
+  } catch (error) {
+    console.error('Error signing token:', error);
+    throw error;
   }
 };
 

@@ -1019,6 +1019,68 @@ const db = {
       });
     },
   },
+  lottery: {
+    /**
+     * Finds a lottery by ID
+     * @param lotteryId - Lottery identifier
+     * @returns Lottery or null if not found
+     */
+    create : async (data: unknown): Promise<unknown> => {
+      return executeDbCommand(async () => {
+        const command = new PutItemCommand({
+          TableName: 'Lottery',
+          Item: marshall(data)
+        });
+        await client.send(command);
+        return data;
+      });
+    },
+    findById: async (lotteryId: string): Promise<unknown | null> => {
+      return executeDbCommand(async () => {
+        const command = new GetItemCommand({
+          TableName: 'Lottery',
+          Key: marshall({ lotteryId })
+        });
+        
+        const result = await client.send(command);
+        return result.Item ? unmarshall(result.Item) : null;
+      });
+    },
+    /**
+     * Finds lotteries by event
+     * @param eventId - Event identifier
+     * @returns Array of lotteries
+     */
+    findByEvent: async (eventId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Lottery',
+          IndexName: 'eventId-index',
+          KeyConditionExpression: 'eventId = :eventId',
+          ExpressionAttributeValues: marshall({ ':eventId': eventId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    },
+    findByUserAndEvent(
+      userId: string,
+      eventId: string
+    ): Promise<unknown[]> {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Lottery',
+          IndexName: 'userId-eventId-index',
+          KeyConditionExpression: 'userId = :userId AND eventId = :eventId',
+          ExpressionAttributeValues: marshall({ ':userId': userId, ':eventId': eventId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    }
+  },
   
   /**
    * Scans a table for all items

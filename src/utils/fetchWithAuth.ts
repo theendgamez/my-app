@@ -1,50 +1,107 @@
 /**
- * Utility function to make authenticated API requests
- * Automatically adds authentication headers from localStorage
+ * Utility for making authenticated fetch requests in client components
  */
-export async function fetchWithAuth(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  // Get the userId from localStorage
-  const userId = localStorage.getItem('userId');
 
-  // Get access token from localStorage if available
-  const accessToken = localStorage.getItem('accessToken');
+type FetchOptions = RequestInit & {
+  useToken?: boolean;
+  fallbackToUserId?: boolean;
+  revalidate?: number | false;
+  tags?: string[];
+};
 
-  // Prepare headers with authentication
-  const headers: HeadersInit = {
-    ...options.headers,
+/**
+ * Enhanced fetch function that automatically adds auth headers
+ * and supports Next.js 15 caching features
+ */
+export async function fetchWithAuth<T>(
+  url: string, 
+  options: FetchOptions = {}
+): Promise<T> {
+  // Extract and remove custom options
+  const { 
+    useToken = true, 
+    fallbackToUserId = true,
+    revalidate,
+    tags,
+    ...fetchOptions 
+  } = options;
+  
+  // Default headers
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...(fetchOptions.headers as Record<string, string>),
   };
-
-  // Add Authorization header if access token exists
-  if (accessToken) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
-  }
-
-  // Always add user ID header as fallback authentication method
-  if (userId) {
-    (headers as Record<string, string>)['x-user-id'] = userId;
-  }
-
-  // Make the authenticated request
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'omit', // Don't include cookies for localStorage-based auth
-  });
-
-  // Handle auth errors automatically
-  if (response.status === 401 || response.status === 403) {
-    console.warn('Authentication error accessing:', url);
-    
-    // Clear tokens on auth error if configured to do so
-    if (options.method !== 'GET') {
-      // Only clear tokens for non-GET requests
-      localStorage.removeItem('accessToken');
+  
+  // Add auth headers if needed
+  if (typeof window !== 'undefined' && useToken) {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    } else if (fallbackToUserId) {
+      const userId = localStorage.getItem('userId');
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
     }
   }
+  
+  // Next.js 15 cache options
+  const nextFetchOptions: RequestInit & { next?: { revalidate?: number | false, tags?: string[] } } = {
+    ...fetchOptions,
+    headers,
+  };
+  
+  // Add Next.js 15 cache control options if provided
+  if (revalidate !== undefined || tags) {
+    nextFetchOptions.next = {
+      ...(revalidate !== undefined ? { revalidate } : {}),
+      ...(tags ? { tags } : {}),
+    };
+  }
+  
+  // Make the request
+  const response = await fetch(url, nextFetchOptions);
+  
+  // Handle response
+  if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      // Refresh token or redirect to login
+      const currentPath = window.location.pathname;
+      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+    }
+    
+    // Try to parse error message
+    let errorData: unknown = {};
+    try {
+      errorData = await response.json();
+    } catch {
+      // If parsing fails, use status text
+      throw new Error(response.statusText);
+    }
+    
+    if (typeof errorData === 'object' && errorData !== null) {
+      const message = (errorData as { message?: string; error?: string }).message
+        || (errorData as { message?: string; error?: string }).error
+        || 'Request failed';
+      throw new Error(message);
+    }
+    throw new Error('Request failed');
+  }
+  
+  // Return successful response data
+  return await response.json() as T;
+}
 
-  return response;
+/**
+ * Wrapper for revalidatePath to work with client components via API
+ */
+export async function revalidatePath(path: string): Promise<void> {
+  try {
+    await fetchWithAuth('/api/revalidate', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+  } catch (error) {
+    console.error('Failed to revalidate path:', error);
+  }
 }

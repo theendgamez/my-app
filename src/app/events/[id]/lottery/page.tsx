@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Events } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
-import { v4 as uuidv4 } from 'uuid'; // Replace crypto import with uuid
+
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
@@ -32,6 +32,8 @@ const LotteryPage = () => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showMoreLegal, setShowMoreLegal] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [eventClosed, setEventClosed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Add refs to track authentication state and prevent loops
   const redirectAttemptedRef = useRef(false);
@@ -49,7 +51,7 @@ const LotteryPage = () => {
 
   // 預設帶入用戶電話號碼
   useEffect(() => {
-    if (user && user.phoneNumber) {
+    if (user && typeof user.phoneNumber === 'string') {
       setPhoneNumber(user.phoneNumber);
     }
   }, [user]);
@@ -135,113 +137,66 @@ const LotteryPage = () => {
     }
   }, [isAuthenticated, authLoading, id, router, fetchEventDetails]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedZone) {
-      setError('請選擇區域');
+  const handleRegistration = async () => {
+    if (!isAuthenticated || !user || !selectedZone) {
+      setError('請先登錄並選擇區域');
       return;
     }
 
-    if (!agreedToTerms) {
-      setError('請同意並確認理解抽籤條款');
-      return;
-    }
+    setIsSubmitting(true);
+    setError(null);
 
-    // Generate a session ID for the lottery registration
-    const sessionId = uuidv4(); // Use uuidv4() instead of crypto.randomUUID()
-
-    // Create a lottery registration
-    fetch('/api/lottery/register', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(user ? { Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}` } : {}),
-      },
-      body: JSON.stringify({
+    try {
+      // Create registration data
+      const registrationData = {
         eventId: id,
-        userId: user?.userId,
-        zone: selectedZone,
-        quantity,
-        sessionId,
-        phoneNumber, // 新增
-      }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          if (res.status === 401) {
-            // For 401 unauthorized, try to refresh token first
-            try {
-              // Try to refresh the token
-              const refreshResponse = await fetch('/api/auth/refresh', {
-                method: 'GET',
-                credentials: 'include', // Include cookies for refresh token
-              });
+        userId: user.userId,
+        zoneName: selectedZone,
+        quantity: quantity,
+        status: 'registered'
+      };
 
-              if (refreshResponse.ok) {
-                const refreshData = await refreshResponse.json();
-
-                // If token was refreshed successfully, store new token and retry
-                if (refreshData.accessToken) {
-                  localStorage.setItem('accessToken', refreshData.accessToken);
-
-                  // Retry the original request with new token
-                  const retryResponse = await fetch('/api/lottery/register', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${refreshData.accessToken}`,
-                      'x-user-id': user?.userId || '',
-                    },
-                    body: JSON.stringify({
-                      eventId: id,
-                      userId: user?.userId,
-                      zone: selectedZone,
-                      quantity,
-                      sessionId,
-                      phoneNumber, // 新增
-                    }),
-                  });
-
-                  if (retryResponse.ok) {
-                    return retryResponse.json();
-                  }
-                }
-              }
-
-              // If token refresh failed or retry failed, redirect to login
-              router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-              // Return an object to prevent further processing instead of throwing
-              return { error: 'Please login to continue', redirected: true };
-            } catch (refreshError) {
-              console.error('Token refresh error:', refreshError);
-              router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-              return { error: 'Please login to continue', redirected: true };
-            }
-          }
-
-          const errorData = await res.json();
-          throw new Error(errorData.error || `API error: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        // Skip processing if we're being redirected to login
-        if (data.redirected) return;
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        // Navigate to lottery payment page with the registration token
-        router.push(`/events/${id}/lottery/payment?registrationToken=${data.registrationToken}`);
-      })
-      .catch((err) => {
-        console.error('Lottery registration error:', err);
-        setError(err.message || 'Unable to register for lottery. Please try again.');
+      const res = await fetch('/api/lottery/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify(registrationData)
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+
+        // Handle specific error cases
+        if (errorData.error === '抽籤登記已結束') {
+          setError('抽籤登記已結束，無法繼續報名');
+          setEventClosed(true);
+          return;
+        }
+
+        // Handle other errors
+        throw new Error(errorData.error || `API error: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // Redirect to confirmation page
+      router.push(`/events/${id}/lottery/confirmation?token=${data.registrationToken}`);
+    } catch (error) {
+      console.error('Registration error:', error);
+      setError(error instanceof Error ? error.message : '登記時發生錯誤');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  useEffect(() => {
+    if (event && (!event.isDrawMode || event.drawDate && new Date(event.drawDate) < new Date())) {
+      setEventClosed(true);
+      setError('抽籤登記已結束');
+    }
+  }, [event]);
 
   if (loading || authLoading) {
     return (
@@ -360,121 +315,148 @@ const LotteryPage = () => {
               </tbody>
             </table>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block mb-2 font-semibold">選擇區域</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                  {event.zones?.map((zone) => (
-                    <button
-                      key={zone.name}
-                      type="button"
-                      onClick={() => setSelectedZone(zone.name)}
-                      className={`
-                        p-4 rounded-lg border-2 text-left transition-all
-                        ${
-                          selectedZone === zone.name
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-200'
-                        }
-                      `}
-                    >
-                      <div className="font-semibold mb-1">{zone.name}區</div>
-                      <div className="text-sm text-gray-600">
-                        HKD {Number(zone.price).toLocaleString('en-HK')}
-                      </div>
-                    </button>
-                  ))}
+            {!eventClosed ? (
+              <form onSubmit={(e) => { e.preventDefault(); handleRegistration(); }} className="space-y-6">
+                <div>
+                  <label className="block mb-2 font-semibold">選擇區域</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    {event.zones?.map((zone) => (
+                      <button
+                        key={zone.name}
+                        type="button"
+                        onClick={() => setSelectedZone(zone.name)}
+                        className={`
+                          p-4 rounded-lg border-2 text-left transition-all
+                          ${
+                            selectedZone === zone.name
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-200'
+                          }
+                        `}
+                      >
+                        <div className="font-semibold mb-1">{zone.name}區</div>
+                        <div className="text-sm text-gray-600">
+                          HKD {Number(zone.price).toLocaleString('en-HK')}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="max-w-xs">
-                <label className="block mb-2 font-semibold">數量:</label>
-                <select
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  required
-                >
-                  {[1, 2, 3, 4].map((num) => (
-                    <option key={num} value={num}>
-                      {num} 張
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="max-w-xs">
-                <label className="block mb-2 font-semibold">聯絡電話（如需修改請至個人資料頁）:</label>
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={e => setPhoneNumber(e.target.value)}
-                  className="w-full p-2 border rounded"
-                  required
-                  disabled // 不允許直接修改，僅顯示
-                />
-              </div>
-
-              {selectedZone && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-semibold mb-3">平台手續費</h3>
-                  <table className="w-full">
-                    <tbody className="divide-y">
-                      <tr>
-                        <td className="py-2">平台手續費</td>
-                        <td className="py-2 text-right">
-                          HKD {PLATFORM_FEE} × {quantity}
-                        </td>
-                        <td className="py-2 text-right">
-                          HKD {platformFeeTotal.toLocaleString('en-HK')}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2 font-bold">總計</td>
-                        <td></td>
-                        <td className="py-2 text-right font-bold">
-                          HKD {platformFeeTotal.toLocaleString('en-HK')}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="mt-6 flex items-start">
-                <div className="flex items-center h-5">
-                  <input
-                    id="terms-agreement"
-                    name="terms-agreement"
-                    type="checkbox"
-                    checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                <div className="max-w-xs">
+                  <label className="block mb-2 font-semibold">數量:</label>
+                  <select
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-full p-2 border rounded"
                     required
+                  >
+                    {[1, 2, 3, 4].map((num) => (
+                      <option key={num} value={num}>
+                        {num} 張
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="max-w-xs">
+                  <label className="block mb-2 font-semibold">聯絡電話（如需修改請至個人資料頁）:</label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    required
+                    disabled // 不允許直接修改，僅顯示
                   />
                 </div>
-                <label htmlFor="terms-agreement" className="ml-3 text-sm">
-                  <span className="font-medium text-gray-700">我同意並確認理解：</span> 這是一個抽籤活動。我現在支付的僅是平台手續費，並不保證能購買到門票。如果我被選中，我將需要額外支付門票費用。
-                </label>
-              </div>
 
-              <div className="flex justify-between gap-4">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                >
-                  返回
-                </button>
-                <button
-                  type="submit"
-                  disabled={!selectedZone || loading || !agreedToTerms}
-                  className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                >
-                  確認登記並付款
-                </button>
+                {selectedZone && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold mb-3">平台手續費</h3>
+                    <table className="w-full">
+                      <tbody className="divide-y">
+                        <tr>
+                          <td className="py-2">平台手續費</td>
+                          <td className="py-2 text-right">
+                            HKD {PLATFORM_FEE} × {quantity}
+                          </td>
+                          <td className="py-2 text-right">
+                            HKD {platformFeeTotal.toLocaleString('en-HK')}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 font-bold">總計</td>
+                          <td></td>
+                          <td className="py-2 text-right font-bold">
+                            HKD {platformFeeTotal.toLocaleString('en-HK')}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="mt-6 flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="terms-agreement"
+                      name="terms-agreement"
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <label htmlFor="terms-agreement" className="ml-3 text-sm">
+                    <span className="font-medium text-gray-700">我同意並確認理解：</span> 這是一個抽籤活動。我現在支付的僅是平台手續費，並不保證能購買到門票。如果我被選中，我將需要額外支付門票費用。
+                  </label>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                  >
+                    返回
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!selectedZone || isSubmitting || eventClosed}
+                    className={`w-full py-2 px-4 rounded ${
+                      !selectedZone || isSubmitting || eventClosed
+                        ? 'bg-gray-300 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {isSubmitting ? '提交中...' : '提交抽籤登記'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 my-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">抽籤登記已結束，無法繼續報名。</p>
+                    <p className="mt-2">
+                      <button 
+                        onClick={() => router.push('/events')}
+                        className="text-sm text-yellow-700 underline hover:text-yellow-600"
+                      >
+                        返回活動列表
+                      </button>
+                    </p>
+                  </div>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       </div>

@@ -1,104 +1,55 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
+import { NextRequest } from 'next/server';
+import { createProtectedRouteHandler, createResponse } from '@/lib/auth';
 import db from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 
-const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
-
-interface LotteryRegistrationRequest {
-  eventId: string;
-  userId: string;
-  zone: string;
-  quantity: number;
-  sessionId: string;
-  phoneNumber?: string; // 新增
-}
-
-export async function POST(request: NextRequest) {
+export const POST = createProtectedRouteHandler(async (req: NextRequest, user) => {
   try {
-    // Check user authentication
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: '請先登入以繼續' }, { status: 401 });
-    }
-
-    const data: LotteryRegistrationRequest = await request.json();
-    const { eventId, zone, quantity, sessionId, phoneNumber } = data;
+    const { eventId, zoneName, quantity, status = 'registered' } = await req.json();
     
-    // Basic validation
-    if (!eventId || !zone || !quantity || !sessionId) {
-      return NextResponse.json({ error: '缺少必要參數' }, { status: 400 });
+    // Validate input
+    if (!eventId || !zoneName || !quantity) {
+      return createResponse({ error: '缺少必要參數' }, 400);
     }
 
-    if (quantity <= 0 || quantity > 4) {
-      return NextResponse.json({ error: '數量必須在1和4之間' }, { status: 400 });
-    }
-
-    // Fetch event to verify it exists and is a lottery event
+    // Get event to validate it's still open for registration
     const event = await db.events.findById(eventId);
+    
     if (!event) {
-      return NextResponse.json({ error: '找不到活動' }, { status: 404 });
+      return createResponse({ error: '找不到活動' }, 404);
     }
-
+    
     if (!event.isDrawMode) {
-      return NextResponse.json({ error: '此活動不支持抽籤模式' }, { status: 400 });
-    }
-
-    // Verify registration is still open
-    const now = new Date();
-    if (!event.registerDate || !event.endregisterDate) {
-      return NextResponse.json({ error: '活動登記日期資料不完整' }, { status: 400 });
-    }
-    const registerStart = new Date(event.registerDate);
-    const registerEnd = new Date(event.endregisterDate);
-    
-    if (now < registerStart) {
-      return NextResponse.json({ error: '抽籤登記尚未開始' }, { status: 400 });
+      return createResponse({ error: '此活動不支持抽籤' }, 400);
     }
     
-    if (now > registerEnd) {
-      return NextResponse.json({ error: '抽籤登記已結束' }, { status: 400 });
+    // Check if registration period has ended
+    if (event.drawDate && new Date(event.drawDate) < new Date()) {
+      return createResponse({ error: '抽籤登記已結束' }, 400);
     }
-
-    // Verify zone exists in event
-    const zoneDetails = event.zones?.find(z => z.name === zone);
-    if (!zoneDetails) {
-      return NextResponse.json({ error: '找不到所選區域' }, { status: 400 });
+    
+    // Check if user has already registered for this event
+    const existingRegistration = await db.lottery?.findByUserAndEvent(user.userId, eventId);
+    
+    if (existingRegistration) {
+      return createResponse({ error: '您已經登記了此活動的抽籤' }, 400);
     }
-
-    // Check if user already registered for this event
-    const existingRegistrations = await db.registration.findByEventAndUser(eventId, user.userId);
-    if (existingRegistrations.length > 0) {
-      return NextResponse.json({ error: '您已登記該活動的抽籤' }, { status: 400 });
-    }
-
-    // Create registration token
-    const registrationToken = uuidv4();
-    const totalAmount = PLATFORM_FEE * quantity;
-
-    // Create registration record
-    await db.registration.create({
-      registrationToken,
-      eventId,
+    
+    // Create registration
+    const registrationToken = await db.lottery.create({
       userId: user.userId,
-      zoneName: zone,
+      eventId,
+      zoneName, 
       quantity,
-      status: 'registered', // Initial status (registered, paid, drawn, won, lost)
-      platformFee: PLATFORM_FEE,
-      totalAmount,
-      paymentStatus: 'pending',
-      createdAt: new Date().toISOString(),
-      sessionId,
-      phoneNumber: phoneNumber || user.phoneNumber || '', // 儲存電話號碼
+      status,
+      createdAt: Date.now(),
     });
-
-    return NextResponse.json({
-      success: true,
-      message: '成功登記抽籤',
-      registrationToken: registrationToken
+    
+    return createResponse({ 
+      message: '抽籤登記成功',
+      registrationToken
     });
   } catch (error) {
-    console.error('Lottery registration error:', error);
-    return NextResponse.json({ error: '處理抽籤登記時出錯' }, { status: 500 });
+    console.error('Registration error:', error);
+    return createResponse({ error: '註冊時發生錯誤' }, 500);
   }
-}
+});
