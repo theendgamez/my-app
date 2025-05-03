@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params:  Promise<{ paymentId: string }> }
+  { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
     // Verify admin access
@@ -83,7 +83,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { paymentId: string } }
+  { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
     // Verify admin access
@@ -113,7 +113,7 @@ export async function PATCH(
       );
     }
 
-    const { paymentId } = params;
+    const { paymentId } = await params; // Add 'await' here to resolve the Promisearams;
     const { status } = await request.json();
     
     // Validate status

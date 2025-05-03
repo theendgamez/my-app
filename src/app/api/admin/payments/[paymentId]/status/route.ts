@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { paymentId: string } }
+  { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
     // Verify admin access
@@ -34,7 +34,7 @@ export async function PATCH(
       );
     }
 
-    const { paymentId } = params;
+    const { paymentId } = await params;
     const { status } = await request.json();
     
     // Validate status
