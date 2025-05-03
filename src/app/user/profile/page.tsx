@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter, useParams } from 'next/navigation';
-import { Users } from '@/types/index';
+
+import { useAuth } from '@/context/AuthContext';
 
 interface FormData {
   userName: string;
@@ -15,69 +16,41 @@ interface FormData {
 
 export default function ProfilePage() {
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>();
-  const [user, setUser] = useState<Users | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
   const params = useParams();
   
-  // Get userId from URL params or from localStorage
+  // Use Auth Context
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  
+  // Get userId from URL params or from context
   const urlUserId = params.id as string | undefined;
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      setLoading(true);
+    // Check authentication first
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    
+    // If authenticated and we have the user data, set form values
+    if (!authLoading && isAuthenticated && user) {
+      // Use URL userId if provided, otherwise use context user
+      const targetUserId = urlUserId || user.userId;
       
-      // Get userId from localStorage
-      const storedUserId = localStorage.getItem('userId');
-      
-      if (!storedUserId) {
-        // No userId in localStorage, redirect to login
-        router.push('/login');
-        return;
+      // If trying to view another user's profile, need to check permissions
+      if (targetUserId !== user.userId) {
+        // Add permission check here if needed
       }
       
-      // Use URL userId if provided, otherwise use stored userId
-      const targetUserId = urlUserId || storedUserId;
-      
-      try {
-        // Fetch user data from API
-        const accessToken = localStorage.getItem('accessToken');
-        const response = await fetch(`/api/users/${targetUserId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-            'x-user-id': storedUserId
-          },
-          credentials: 'omit'
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data');
-        }
-        
-        const userData = await response.json();
-        
-        // Type guard to ensure we have valid user data
-        if (userData && typeof userData === 'object' && 'userId' in userData) {
-          setUser(userData as Users);
-          setValue('userName', userData.userName || '');
-          setValue('email', userData.email || '');
-          setValue('phoneNumber', userData.phoneNumber || '');
-        } else {
-          throw new Error('Invalid user data received');
-        }
-      } catch (err) {
-        console.error('Failed to fetch user:', err);
-        setError('無法載入用戶資料');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [router, setValue, urlUserId]);
+      // Set form values from context user
+      setValue('userName', typeof user.userName === 'string' ? user.userName : '');
+      setValue('email', typeof user.email === 'string' ? user.email : '');
+      setValue('phoneNumber', typeof user.phoneNumber === 'string' ? user.phoneNumber : '');
+    }
+  }, [isAuthenticated, authLoading, user, setValue, urlUserId, router]);
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setError('');
@@ -89,8 +62,11 @@ export default function ProfilePage() {
     }
 
     try {
+      setLoading(true);
+      const accessToken = localStorage.getItem('accessToken');
+      
       const response = await fetch(`/api/users/${user.userId}`, {
-        method: "PATCH", // Use PATCH instead of POST
+        method: "PATCH",
         body: JSON.stringify({
           userName: data.userName,
           email: data.email,
@@ -98,14 +74,14 @@ export default function ProfilePage() {
         }),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          'Authorization': `Bearer ${accessToken || ''}`,
+          'x-user-id': user.userId
         }
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        setUser(prev => prev ? {...prev, ...result.user} : result.user);
         setSuccess('個人資料更新成功');
       } else {
         setError(result.error || '更新失敗，請重試');
@@ -113,6 +89,8 @@ export default function ProfilePage() {
     } catch (err) {
       console.error('更新個人資料時出錯:', err);
       setError('發生錯誤，請稍後再試');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,11 +102,11 @@ export default function ProfilePage() {
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         {success && <p className="text-green-500 text-sm mb-4">{success}</p>}
         
-        {loading ? (
+        {authLoading ? (
           <div className="flex justify-center items-center h-48">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
           </div>
-        ) : user ? ( 
+        ) : isAuthenticated && user ? ( 
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-md">
             <div className="mb-4">
               <label htmlFor="userName" className="block text-gray-700 mb-2">
@@ -168,9 +146,10 @@ export default function ProfilePage() {
             </div>
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              disabled={loading}
+              className={`bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ${loading ? 'opacity-50' : ''}`}
             >
-              更新個人資料
+              {loading ? '更新中...' : '更新個人資料'}
             </button>
           </form>
         ) : (

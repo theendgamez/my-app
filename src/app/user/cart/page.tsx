@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 import { Alert } from '@/components/ui/Alert';
+import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Booking, Events } from '@/types';
 
@@ -17,110 +18,93 @@ interface BookingWithEvent extends Booking {
 
 export default function CartPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<BookingWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Check for user authentication from localStorage directly
-  useEffect(() => {
-    // Skip this effect during server-side rendering
-    if (typeof window === 'undefined') return;
+  // Memoize fetchBookings with useCallback
+  const fetchBookings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Check for userId in localStorage
-    const storedUserId = localStorage.getItem('userId');
-    if (!storedUserId) {
-      // Redirect to login with a return path
-      const redirectUrl = `/login?redirect=${encodeURIComponent("/user/cart")}&t=${Date.now()}`;
-      router.push(redirectUrl);
+      // Get access token if available
+      const accessToken = localStorage.getItem('accessToken');
+
+      // Fetch bookings using user ID with proper authorization
+      const response = await fetch(`/api/bookings/user/${user?.userId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+          'x-user-id': user?.userId || ''
+        },
+        credentials: 'omit'
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
+          return;
+        }
+        throw new Error('Failed to fetch bookings');
+      }
+
+      const data = await response.json();
+
+      // Fetch event details for each booking
+      const bookingsWithEvents = await Promise.all(
+        data.map(async (booking: BookingWithEvent) => {
+          try {
+            const eventResponse = await fetch(`/api/events/${booking.eventId}`, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+                'x-user-id': user?.userId || ''
+              },
+              credentials: 'omit'
+            });
+
+            if (eventResponse.ok) {
+              const event = await eventResponse.json();
+              const zone = event.zones?.find((z: { name: string; price: string | number }) => z.name === booking.zone);
+              return {
+                ...booking,
+                event,
+                price: zone ? Number(zone.price) : 0,
+                totalAmount: zone ? (Number(zone.price) * booking.quantity) + (18 * booking.quantity) : 0
+              };
+            }
+            return booking;
+          } catch (error) {
+            console.error('Error fetching event:', error);
+            return booking;
+          }
+        })
+      );
+      const pendingBookings = bookingsWithEvents.filter((booking) => booking.status === 'pending');
+      setBookings(pendingBookings);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      setError(error instanceof Error ? error.message : '載入訂單時發生錯誤');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, router]);
+
+  useEffect(() => {
+    // Check authentication first
+    if (!authLoading && !isAuthenticated) {
+      router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
       return;
     }
 
-    setUserId(storedUserId);
-  }, [router]);
-
-  // Fetch user's bookings once we have user data
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Get access token if available
-        const accessToken = localStorage.getItem('accessToken');
-
-        // Fetch bookings using user ID with proper authorization
-        const response = await fetch(`/api/bookings/user/${userId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            // Add authorization header if token exists
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-            // Fallback header with user ID
-            'x-user-id': userId
-          },
-          // Don't include cookies for localStorage-only auth
-          credentials: 'omit'
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
-            return;
-          }
-          throw new Error('Failed to fetch bookings');
-        }
-
-        const data = await response.json();
-
-        // Fetch event details for each booking
-        const bookingsWithEvents = await Promise.all(
-          data.map(async (booking: BookingWithEvent) => {
-            try {
-              // Get access token if available
-              const accessToken = localStorage.getItem('accessToken');
-
-              const eventResponse = await fetch(`/api/events/${booking.eventId}`, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-                  'x-user-id': userId
-                },
-                // Don't include cookies for localStorage-only auth
-                credentials: 'omit'
-              });
-
-              if (eventResponse.ok) {
-                const event = await eventResponse.json();
-                const zone = event.zones?.find((z: { name: string; price: string | number }) => z.name === booking.zone);
-                return {
-                  ...booking,
-                  event,
-                  price: zone ? Number(zone.price) : 0,
-                  totalAmount: zone ? (Number(zone.price) * booking.quantity) + (18 * booking.quantity) : 0
-                };
-              }
-              return booking;
-            } catch (error) {
-              console.error('Error fetching event:', error);
-              return booking;
-            }
-          })
-        );
-        const pendingBookings = bookingsWithEvents.filter((booking) => booking.status === 'pending');
-        setBookings(pendingBookings);
-      } catch (error) {
-        console.error('Error fetching bookings:', error);
-        setError(error instanceof Error ? error.message : '載入訂單時發生錯誤');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBookings();
-  }, [userId, router]);
+    // Only fetch bookings if user is authenticated
+    if (!authLoading && isAuthenticated && user) {
+      fetchBookings();
+    }
+  }, [isAuthenticated, authLoading, user, router, fetchBookings]);
 
   const handleNavigate = (e: React.MouseEvent<HTMLButtonElement>, path: string) => {
     e.preventDefault(); // Prevent any default behavior
@@ -132,7 +116,7 @@ export default function CartPage() {
   };
 
   const cancelBooking = async (bookingToken: string) => {
-    if (actionInProgress || !userId) return;
+    if (actionInProgress || !user) return;
 
     if (!confirm('確定要取消此訂單嗎？此操作無法撤銷。')) {
       return;
@@ -148,10 +132,9 @@ export default function CartPage() {
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-          'x-user-id': userId
+          'x-user-id': user.userId
         },
-        body: JSON.stringify({ userId }),
-        // Don't include cookies for localStorage-only auth
+        body: JSON.stringify({ userId: user.userId }),
         credentials: 'omit'
       });
 
@@ -173,6 +156,17 @@ export default function CartPage() {
       setActionInProgress(null);
     }
   };
+
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner size="large" />
+        </div>
+      </>
+    );
+  }
 
   if (loading) {
     return (

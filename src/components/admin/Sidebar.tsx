@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { 
   FiHome, 
   FiPlus, 
@@ -15,7 +16,8 @@ import {
   FiDollarSign,
   FiChevronDown,
   FiChevronRight,
-  FiUser
+  FiUser,
+  FiAlertCircle
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
 
@@ -34,6 +36,8 @@ type MenuItem = {
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
   const [sections, setSections] = useState<MenuSection[]>([
     {
       title: '儀表板',
@@ -84,6 +88,11 @@ const Sidebar: React.FC = () => {
     },
   ]);
 
+  // Track component mounting for client-side rendering
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Toggle section collapse state
   const toggleSection = (index: number) => {
     setSections(prevSections => 
@@ -92,9 +101,36 @@ const Sidebar: React.FC = () => {
       )
     );
   };
+  
+  // Don't render on server or if user is not authenticated and loading is complete
+  if (!isMounted) {
+    return null; // Avoids hydration issues
+  }
+  
+  // In case of auth issues, provide minimum visibility feedback
+  if (!isAuthenticated && !authLoading) {
+    return (
+      <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10">
+        <div className="p-4 text-center">
+          <FiAlertCircle size={24} className="mx-auto text-yellow-500 mb-2" />
+          <p className="text-sm">認證失敗，請重新登入</p>
+          <Link href="/login" className="mt-4 bg-blue-600 text-white px-4 py-2 rounded block text-center">
+            前往登入
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col">
+    <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10 overflow-hidden">
+      {/* Show loading state if authentication is still loading */}
+      {authLoading && (
+        <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      )}
+      
       <div className="flex-1 py-4 overflow-y-auto">
         {sections.map((section, sectionIndex) => (
           <div key={section.title} className="mb-4">
@@ -141,14 +177,16 @@ const Sidebar: React.FC = () => {
         ))}
       </div>
       
-      {/* Admin info section - no longer using absolute positioning */}
+      {/* Admin info section */}
       <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 mt-auto">
         <div className="flex items-center space-x-3">
           <div className="bg-blue-600 rounded-full p-2">
             <FiUser size={18} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-medium text-white">系統管理員</p>
+            <p className="text-sm font-medium text-white">
+              {isAdmin ? '系統管理員' : '訪問受限'}
+            </p>
             <p className="text-xs text-gray-400">管理面板</p>
           </div>
         </div>
