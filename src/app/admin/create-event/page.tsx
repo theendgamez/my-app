@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/navbar/Navbar';
-import Sidebar from "@/components/ui/Sidebar";
+import Sidebar from "@/components/admin/Sidebar";
 import { useAuth } from '@/context/AuthContext';
 import type { Zone } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';

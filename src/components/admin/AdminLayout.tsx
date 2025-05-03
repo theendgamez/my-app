@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/navbar/Navbar';
-import Sidebar from '@/components/ui/Sidebar';
+import Sidebar from '@/components/admin/Sidebar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface AdminLayoutProps {

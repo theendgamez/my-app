@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Users } from '@/types';
+
 import { 
   FiSearch, 
   FiMenu, 
@@ -18,53 +18,18 @@ import {
 
 const Navbar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [user, setUser] = useState<Users | null>(null);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { logout } = useAuth();
+  
+  const { user, isAuthenticated, loading, logout } = useAuth();
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      const userId = localStorage.getItem('userId');
-      if (!userId) return;
-      
-      try {
-        const accessToken = localStorage.getItem('accessToken');
-        const response = await fetch(`/api/users/${userId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-            'x-user-id': userId
-          },
-          credentials: 'omit'
-        });
-        
-        if (response.ok) {
-          try {
-            const text = await response.text();
-            const userData = text ? JSON.parse(text) : null;
-            if (userData && typeof userData === 'object' && 'userId' in userData) {
-              setUser(userData as Users);
-            } else {
-              setUser(null);
-            }
-          } catch (parseError) {
-            console.error('Failed to parse user data:', parseError);
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-        setUser(null);
-      }
-    };
-    
-    fetchUserData();
-  }, []);
+    if (!isAuthenticated) {
+      setIsUserMenuOpen(false);
+    }
+  }, [isAuthenticated]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +42,6 @@ const Navbar: React.FC = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      setUser(null);
       setIsNavOpen(false);
       setIsUserMenuOpen(false);
       router.push('/login');
@@ -86,7 +50,6 @@ const Navbar: React.FC = () => {
     }
   };
 
-  // Improved click-outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -94,7 +57,6 @@ const Navbar: React.FC = () => {
       }
     };
 
-    // Only add the event listener if the menu is open
     if (isUserMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
@@ -108,14 +70,12 @@ const Navbar: React.FC = () => {
     <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo and brand */}
           <div className="flex-shrink-0 flex items-center">
             <Link href="/" className="flex items-center">
               <span className="text-white font-bold text-xl">票務系統</span>
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex md:items-center md:space-x-4">
             <Link href="/events" className="text-gray-100 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
               活動
@@ -137,9 +97,8 @@ const Navbar: React.FC = () => {
             </form>
           </div>
 
-          {/* User section */}
           <div className="hidden md:flex md:items-center md:space-x-4">
-            {user ? (
+            {isAuthenticated && user ? (
               <div className="relative flex items-center space-x-4">
                 <Link href="/user/cart" className="text-white hover:text-gray-200 transition-colors">
                   <div className="relative">
@@ -147,17 +106,15 @@ const Navbar: React.FC = () => {
                   </div>
                 </Link>
                 
-                {/* User dropdown */}
                 <div className="relative" ref={userMenuRef}>
                   <button 
                     className="flex items-center space-x-1 text-gray-100 hover:text-white"
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   >
-                    <span>{user.userName || '用戶'}</span>
+                    <span>{typeof user.userName === 'string' && user.userName.trim() !== '' ? user.userName : '用戶'}</span>
                     <FiChevronDown className={`h-4 w-4 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
                   
-                  {/* Dropdown menu */}
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
                       <Link 
@@ -195,6 +152,10 @@ const Navbar: React.FC = () => {
                   )}
                 </div>
               </div>
+            ) : loading ? (
+              <div className="flex items-center space-x-2">
+                <div className="h-3 w-12 bg-blue-400/30 rounded animate-pulse"></div>
+              </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/login" className="text-gray-100 hover:bg-blue-700 rounded px-3 py-2 transition-colors">
@@ -207,7 +168,6 @@ const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
           <div className="flex md:hidden">
             <button 
               onClick={() => setIsNavOpen(!isNavOpen)}
@@ -223,11 +183,9 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isNavOpen && (
         <div className="md:hidden bg-blue-700">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {/* Mobile search */}
             <form onSubmit={handleSearch} className="flex p-2 mb-2">
               <input
                 type="text"
@@ -252,7 +210,7 @@ const Navbar: React.FC = () => {
               活動
             </Link>
             
-            {user ? (
+            {isAuthenticated && user ? (
               <>
                 <Link 
                   href="/user/cart"

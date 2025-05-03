@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import { Events as EventType } from '@/types';
-import Sidebar from '@/components/ui/Sidebar';
+import Sidebar from '@/components/admin/Sidebar';
 import PromoCarousel from '@/components/ui/PromoCarousel';
 import Events from '@/components/eventCompo/EventComponents';
 
