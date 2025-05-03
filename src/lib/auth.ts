@@ -50,7 +50,7 @@ export const generateTokens = async (user: Users) => {
   return { accessToken, refreshToken };
 };
 
-// Set auth cookies
+// Set auth cookies with improved userRole handling
 export const setAuthCookies = async (response: NextResponse, accessToken: string, refreshToken: string) => {
   response.cookies.set('accessToken', accessToken, {
     httpOnly: true,
@@ -68,7 +68,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     path: '/'
   });
 
-  // Non-HTTP-only cookie for UI purposes
+  // Non-HTTP-only cookie for UI purposes - making sure role is extracted
   let role = 'user';
   try {
     const { payload } = await jwtVerify(accessToken, new TextEncoder().encode(JWT_SECRET));
@@ -76,11 +76,13 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
   } catch {
     // fallback to 'user'
   }
+  
+  // Set the userRole cookie with longer expiry for better persistence
   response.cookies.set('userRole', role, {
-    httpOnly: false,
+    httpOnly: false, // Must be false so client JS can read it
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 15 * 60,
+    maxAge: 7 * 24 * 60 * 60, // Match refresh token expiry
     path: '/'
   });
 };
@@ -135,14 +137,15 @@ export const signToken = async (payload: JWTPayload, expiresIn: string | number,
   }
 };
 
-// Get current user from request with more robust fallback
+// Get current user from request with more robust role handling
 export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
   try {
     // Add debug info for Vercel deployment
     console.log('Auth headers:', {
       cookie: req.headers.get('cookie')?.substring(0, 20) + '...',
       authorization: req.headers.get('authorization')?.substring(0, 20) + '...',
-      userId: req.headers.get('x-user-id')
+      userId: req.headers.get('x-user-id'),
+      userRole: req.cookies.get('userRole')?.value
     });
     
     // Try cookies first
@@ -154,8 +157,10 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
       ? authHeader.substring(7) 
       : null;
 
-    // New: Add userId header as fallback auth method
+    // Add userId header as fallback auth method
     const userIdHeader = req.headers.get('x-user-id');
+    // Get role cookie as an additional data point
+    const roleCookie = req.cookies.get('userRole')?.value;
     
     let user: Users | null = null;
     
@@ -170,6 +175,10 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
           
           // Verify token version to ensure token hasn't been invalidated
           if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
+            // If we have a role cookie but user doesn't have a role, use the cookie
+            if (!user.role && roleCookie) {
+              user.role = roleCookie;
+            }
             return user;
           }
         }
@@ -184,6 +193,10 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
       console.log('Falling back to userId header auth:', userIdHeader);
       user = await db.users.findById(userIdHeader);
       if (user) {
+        // If we have a role cookie but user doesn't have a role, use the cookie
+        if (!user.role && roleCookie) {
+          user.role = roleCookie;
+        }
         return user;
       }
     }

@@ -38,6 +38,7 @@ const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
+  const [localAdmin, setLocalAdmin] = useState(false);
   const [sections, setSections] = useState<MenuSection[]>([
     {
       title: '儀表板',
@@ -88,10 +89,22 @@ const Sidebar: React.FC = () => {
     },
   ]);
 
-  // Track component mounting for client-side rendering
+  // Track component mounting and check localStorage for admin status
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    // Also check localStorage for admin status as fallback for Vercel
+    if (typeof window !== 'undefined') {
+      const userRole = localStorage.getItem('userRole');
+      setLocalAdmin(userRole === 'admin');
+      
+      // For debugging - log admin status
+      console.log('Sidebar admin status:', { 
+        contextAdmin: isAdmin, 
+        localStorageRole: userRole,
+        localAdmin: userRole === 'admin' 
+      });
+    }
+  }, [isAdmin]);
 
   // Toggle section collapse state
   const toggleSection = (index: number) => {
@@ -102,19 +115,22 @@ const Sidebar: React.FC = () => {
     );
   };
   
-  // Don't render on server or if user is not authenticated and loading is complete
+  // Don't render on server or if not mounted yet
   if (!isMounted) {
     return null; // Avoids hydration issues
   }
   
+  // Use either context admin state or localStorage admin state
+  const effectiveIsAdmin = isAdmin || localAdmin;
+  
   // In case of auth issues, provide minimum visibility feedback
-  if (!isAuthenticated && !authLoading) {
+  if (!isAuthenticated && !authLoading && !localAdmin) {
     return (
       <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10">
         <div className="p-4 text-center">
           <FiAlertCircle size={24} className="mx-auto text-yellow-500 mb-2" />
           <p className="text-sm">認證失敗，請重新登入</p>
-          <Link href="/login" className="mt-4 bg-blue-600 text-white px-4 py-2 rounded block text-center">
+          <Link href="/login?source=admin" className="mt-4 bg-blue-600 text-white px-4 py-2 rounded block text-center">
             前往登入
           </Link>
         </div>
@@ -122,10 +138,15 @@ const Sidebar: React.FC = () => {
     );
   }
 
+  // If not admin, don't render the sidebar
+  if (!effectiveIsAdmin && !authLoading) {
+    return null;
+  }
+
   return (
     <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10 overflow-hidden">
       {/* Show loading state if authentication is still loading */}
-      {authLoading && (
+      {authLoading && !localAdmin && (
         <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-20">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
         </div>
@@ -185,7 +206,7 @@ const Sidebar: React.FC = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-white">
-              {isAdmin ? '系統管理員' : '訪問受限'}
+              {effectiveIsAdmin ? '系統管理員' : '訪問受限'}
             </p>
             <p className="text-xs text-gray-400">管理面板</p>
           </div>

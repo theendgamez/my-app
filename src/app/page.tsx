@@ -19,12 +19,18 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    // Get userId from localStorage
-    const userId = localStorage.getItem('userId');
-    
-    if (userId) {
-      // Fetch user data from API
-      const fetchUserData = async () => {
+    // Check for admin status in multiple ways
+    const checkAdminStatus = async () => {
+      // First, check localStorage directly for userRole
+      const userRole = localStorage.getItem('userRole');
+      if (userRole === 'admin') {
+        setIsAdmin(true);
+        return;
+      }
+
+      // If no role in localStorage, try to get it from API
+      const userId = localStorage.getItem('userId');
+      if (userId) {
         try {
           const accessToken = localStorage.getItem('accessToken');
           const response = await fetch(`/api/users/${userId}`, {
@@ -33,15 +39,20 @@ export default function Home() {
               ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
               'x-user-id': userId
             },
-            credentials: 'omit'
+            credentials: 'include' // Changed to include for consistent behavior
           });
           
           if (response.ok) {
             try {
-              // Check if the response has content before parsing
               const text = await response.text();
-              const userData = text ? JSON.parse(text) : {};
-              setIsAdmin(userData.role === 'admin');
+              if (text) {
+                const userData = JSON.parse(text);
+                // Update localStorage with role if we get it from API
+                if (userData.role) {
+                  localStorage.setItem('userRole', userData.role);
+                }
+                setIsAdmin(userData.role === 'admin');
+              }
             } catch (parseError) {
               console.error('Failed to parse user data:', parseError);
             }
@@ -49,10 +60,10 @@ export default function Home() {
         } catch (error) {
           console.error('Failed to fetch user data:', error);
         }
-      };
-      
-      fetchUserData();
-    }
+      }
+    };
+    
+    checkAdminStatus();
 
     // Fetch events
     const fetchEvents = async () => {

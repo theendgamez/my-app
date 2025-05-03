@@ -23,19 +23,32 @@ export default function AdminLayout({
   const { isAdmin, isAuthenticated, loading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [localAdmin, setLocalAdmin] = useState(false);
 
-  // Ensure component is mounted (client-side only)
+  // Ensure component is mounted (client-side only) and check localStorage
   useEffect(() => {
     setIsMounted(true);
+    
+    // Check localStorage for admin status as a fallback
+    if (typeof window !== 'undefined') {
+      const userRole = localStorage.getItem('userRole');
+      setLocalAdmin(userRole === 'admin');
+    }
   }, []);
 
   // Admin access protection with improved Vercel compatibility
   useEffect(() => {
     // Skip if not mounted or still loading auth state or already redirected
-    if (!isMounted || loading || hasRedirected) return;
+    if (!isMounted || hasRedirected) return;
+    
+    // Use either context admin state or localStorage admin state
+    const effectiveIsAdmin = isAdmin || localAdmin;
     
     // Check for authorization
     if (requiresAdmin) {
+      // If still loading, wait for auth to complete
+      if (loading) return;
+      
       // If not authenticated, redirect to login
       if (!isAuthenticated) {
         setHasRedirected(true);
@@ -45,19 +58,19 @@ export default function AdminLayout({
       }
       
       // If authenticated but not admin, redirect to home
-      if (isAuthenticated && !isAdmin) {
+      if (isAuthenticated && !effectiveIsAdmin) {
         setHasRedirected(true);
         router.push('/');
         return;
       }
     }
-  }, [isMounted, loading, isAuthenticated, isAdmin, router, pathname, requiresAdmin, hasRedirected]);
+  }, [isMounted, loading, isAuthenticated, isAdmin, localAdmin, router, pathname, requiresAdmin, hasRedirected]);
 
   // Don't render anything during SSR to avoid hydration issues
   if (!isMounted) return null;
 
   // Show loading spinner while checking authentication
-  if (loading) {
+  if (loading && !localAdmin) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <LoadingSpinner size="large" />
@@ -65,8 +78,11 @@ export default function AdminLayout({
     );
   }
 
+  // Use either context admin state or localStorage admin state
+  const effectiveIsAdmin = isAdmin || localAdmin;
+
   // Don't render admin content if user is not an admin (after authentication check)
-  if (!loading && requiresAdmin && (!isAuthenticated || !isAdmin)) {
+  if (!loading && requiresAdmin && (!isAuthenticated || !effectiveIsAdmin)) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">

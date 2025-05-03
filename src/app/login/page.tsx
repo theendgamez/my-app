@@ -106,6 +106,8 @@ const LoginForm = () => {
         if (userId && typeof userId === 'string') {
           // Store userId, role and accessToken in localStorage
           localStorage.setItem('userId', userId);
+          
+          // IMPORTANT: Store the user role for admin sidebar visibility
           if (result.user.role) {
             localStorage.setItem('userRole', result.user.role);
           }
@@ -114,7 +116,7 @@ const LoginForm = () => {
             localStorage.setItem('accessToken', result.accessToken);
           }
           
-          // Clear any redirect flags
+          // Clear any redirect flags to prevent loops
           localStorage.removeItem('redirect_attempt_count');
           localStorage.removeItem('redirected_to_login');
           localStorage.removeItem('last_redirect_time');
