@@ -104,23 +104,36 @@ const LoginForm = () => {
         // Make sure user ID is valid before storing
         const userId = result.user.userId;
         if (userId && typeof userId === 'string') {
-          // Store userId and accessToken in localStorage
+          // Store userId, role and accessToken in localStorage
           localStorage.setItem('userId', userId);
+          if (result.user.role) {
+            localStorage.setItem('userRole', result.user.role);
+          }
           
           if (result.accessToken) {
             localStorage.setItem('accessToken', result.accessToken);
           }
           
           // Clear any redirect flags
-          sessionStorage.removeItem('redirect_attempt_count');
-          sessionStorage.removeItem('redirected_to_login');
-          sessionStorage.removeItem('last_redirect_time');
+          localStorage.removeItem('redirect_attempt_count');
+          localStorage.removeItem('redirected_to_login');
+          localStorage.removeItem('last_redirect_time');
+          localStorage.removeItem('redirect_attempted');
+          
+          // Check if there was a source=admin parameter
+          const isFromAdmin = searchParams.get('source') === 'admin';
           
           // Redirect to intended destination or home
           if (redirectPath) {
-            router.push(redirectPath);
+            // Use replace instead of push for Vercel compatibility
+            router.replace(redirectPath);
           } else {
-            router.push('/');
+            // If coming from admin area and user is admin, go to admin dashboard
+            if (isFromAdmin && result.user.role === 'admin') {
+              router.replace('/admin/dashboard');
+            } else {
+              router.replace('/');
+            }
           }
         } else {
           throw new Error('Invalid user ID received from server');

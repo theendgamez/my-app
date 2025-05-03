@@ -23,12 +23,12 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize fetchTickets with useCallback
+  // Updated fetchTickets function with better auth handling
   const fetchTickets = useCallback(async () => {
     try {
       setLoading(true);
-      // Get access token if available
-      const accessToken = localStorage.getItem('accessToken');
+      // Safe localStorage access
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
       // Fetch tickets using user ID
       const res = await fetch(`/api/users/${user?.userId}/tickets`, {
@@ -39,13 +39,94 @@ export default function OrderPage() {
           // Fallback header with user ID
           'x-user-id': user?.userId || ''
         },
-        credentials: 'omit'
+        credentials: 'include'  // Keep this as include to be consistent
       });
       
       if (!res.ok) {
         if (res.status === 401) {
-          router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
-          return;
+          // Try to refresh token first
+          try {
+            const refreshRes = await fetch('/api/auth/refresh', {
+              method: 'GET',
+              credentials: 'include'
+            });
+            
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              if (refreshData.accessToken && typeof window !== 'undefined') {
+                // Store new token and retry the request - safely
+                localStorage.setItem('accessToken', refreshData.accessToken);
+                
+                // Retry with new token
+                const retryRes = await fetch(`/api/users/${user?.userId}/tickets`, {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${refreshData.accessToken}`,
+                    'x-user-id': user?.userId || ''
+                  },
+                  credentials: 'include'
+                });
+                
+                if (retryRes.ok) {
+                  const retryData = await retryRes.json();
+                  // Continue with processing data as before
+                  const groupedByPayment: Record<string, Ticket[]> = {};
+                  retryData.forEach((ticket: Ticket) => {
+                    const paymentId = ticket.paymentId || 'unknown';
+                    if (!groupedByPayment[paymentId]) {
+                      groupedByPayment[paymentId] = [];
+                    }
+                    groupedByPayment[paymentId].push(ticket);
+                  });
+                  
+                  const groups = Object.entries(groupedByPayment).map(([paymentId, ticketList]) => {
+                    const firstTicket = ticketList[0];
+                    return {
+                      paymentId,
+                      eventName: firstTicket.eventName,
+                      eventDate: firstTicket.eventDate,
+                      purchaseDate: firstTicket.purchaseDate,
+                      tickets: ticketList
+                    };
+                  });
+                  
+                  groups.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+                  
+                  setTicketGroups(groups);
+                  return;
+                }
+              }
+            }
+            
+            // If we get here, token refresh failed or retry failed
+            // Safe sessionStorage access with browser check
+            const redirectAttemptKey = 'orderRedirectAttempt';
+            if (typeof window !== 'undefined') {
+              const redirectAttempt = sessionStorage.getItem(redirectAttemptKey);
+              
+              if (!redirectAttempt) {
+                // Set flag to prevent loops
+                sessionStorage.setItem(redirectAttemptKey, Date.now().toString());
+                router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
+                return;
+              } else {
+                // Check if the redirect attempt is recent (less than 5 seconds ago)
+                const attemptTime = parseInt(redirectAttempt);
+                if (Date.now() - attemptTime > 5000) {
+                  // If it's been more than 5 seconds, try again
+                  sessionStorage.setItem(redirectAttemptKey, Date.now().toString());
+                  router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
+                  return;
+                } else {
+                  // Otherwise show an error to avoid redirect loops
+                  throw new Error('登入已過期，請手動重新登入');
+                }
+              }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh error:', refreshError);
+            throw new Error('身份驗證失敗，請重新登入');
+          }
         }
         throw new Error('Failed to fetch tickets');
       }
@@ -86,6 +167,7 @@ export default function OrderPage() {
     }
   }, [user, router]);
 
+  // Add cleanup for redirect attempt in useEffect
   useEffect(() => {
     // Check authentication first
     if (!authLoading && !isAuthenticated) {
@@ -97,6 +179,13 @@ export default function OrderPage() {
     if (!authLoading && isAuthenticated && user) {
       fetchTickets();
     }
+    
+    // Cleanup function - safely access sessionStorage
+    return () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('orderRedirectAttempt');
+      }
+    };
   }, [isAuthenticated, authLoading, user, router, fetchTickets]);
 
   // Format date function

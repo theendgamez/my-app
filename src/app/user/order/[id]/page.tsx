@@ -33,8 +33,8 @@ export default function OrderDetailPage() {
   const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
-      // Get access token if available
-      const accessToken = localStorage.getItem('accessToken');
+      // Safe localStorage access
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
       // Fetch order details using payment ID
       const res = await fetch(`/api/payments/${paymentId}`, {
@@ -45,7 +45,7 @@ export default function OrderDetailPage() {
           // Fallback header with user ID
           'x-user-id': user?.userId || ''
         },
-        credentials: 'omit'
+        credentials: 'include' // Changed to 'include' for consistency
       });
       
       if (!res.ok) {
@@ -60,7 +60,6 @@ export default function OrderDetailPage() {
       }
       
       const data = await res.json();
-      console.log('API response data:', data); // Debug the API response
       
       // Process and validate the data before setting state
       const processedData = {
@@ -80,12 +79,12 @@ export default function OrderDetailPage() {
               'Content-Type': 'application/json',
               ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
               'x-user-id': user?.userId || ''
-            }
+            },
+            credentials: 'include' // Changed to 'include' for consistency
           });
           if (ticketsRes.ok) {
             const ticketsData = await ticketsRes.json();
             processedData.tickets = Array.isArray(ticketsData) ? ticketsData : [];
-            console.log('Fetched tickets separately:', processedData.tickets);
           }
         } catch (ticketError) {
           console.error('Error fetching tickets separately:', ticketError);
@@ -122,7 +121,6 @@ export default function OrderDetailPage() {
       // Validate the dateString is actually a valid date
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        console.log(`Invalid date format: ${dateString}`);
         return '日期格式有誤';
       }
       
@@ -134,7 +132,7 @@ export default function OrderDetailPage() {
         minute: '2-digit'
       });
     } catch (error) {
-      console.error('Date formatting error:', error, dateString);
+      console.error('Date formatting error:', error);
       return '日期處理錯誤';
     }
   };

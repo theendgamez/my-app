@@ -30,8 +30,8 @@ export default function CartPage() {
       setLoading(true);
       setError(null);
 
-      // Get access token if available
-      const accessToken = localStorage.getItem('accessToken');
+      // Safe localStorage access
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
       // Fetch bookings using user ID with proper authorization
       const response = await fetch(`/api/bookings/user/${user?.userId}`, {
@@ -40,7 +40,7 @@ export default function CartPage() {
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           'x-user-id': user?.userId || ''
         },
-        credentials: 'omit'
+        credentials: 'include' // Changed to 'include' for consistency
       });
 
       if (!response.ok) {
@@ -63,7 +63,7 @@ export default function CartPage() {
                 ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
                 'x-user-id': user?.userId || ''
               },
-              credentials: 'omit'
+              credentials: 'include' // Changed to 'include' for consistency
             });
 
             if (eventResponse.ok) {
@@ -124,8 +124,8 @@ export default function CartPage() {
 
     try {
       setActionInProgress(bookingToken);
-      // Get access token if available
-      const accessToken = localStorage.getItem('accessToken');
+      // Safe localStorage access
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
       const response = await fetch(`/api/bookings/${bookingToken}/cancel`, {
         method: 'POST',
@@ -134,8 +134,7 @@ export default function CartPage() {
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           'x-user-id': user.userId
         },
-        body: JSON.stringify({ userId: user.userId }),
-        credentials: 'omit'
+        credentials: 'include' // Changed to 'include' for consistency
       });
 
       if (!response.ok) {

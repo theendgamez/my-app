@@ -54,7 +54,7 @@ export const handleAdminAccess = ({
     return;
   }
 
-  // If not authenticated, redirect to login
+  // If not authenticated, redirect to login with proper return URL
   if (!isAuthenticated && !hasAttemptedPath) {
     // Record this redirect attempt
     localStorage.setItem(
@@ -63,7 +63,8 @@ export const handleAdminAccess = ({
     );
     localStorage.setItem(REDIRECT_COOLDOWN, now.toString());
     
-    const redirectPath = `/login?redirect=${encodeURIComponent(currentPath)}`;
+    // Include the source parameter to help post-login navigation
+    const redirectPath = `/login?redirect=${encodeURIComponent(currentPath)}&source=admin`;
     router.push(redirectPath);
     return;
   }
@@ -82,7 +83,9 @@ export function safeRedirect(
   destination: string, 
   options: { 
     isAuthenticated?: boolean, 
+    isAdmin?: boolean,
     protectedRoute?: boolean,
+    adminRoute?: boolean,
     loginPath?: string 
   } = {}
 ) {
@@ -91,9 +94,25 @@ export function safeRedirect(
   
   const {
     isAuthenticated = false,
+    isAdmin = false,
     protectedRoute = false,
+    adminRoute = false,
     loginPath = '/login'
   } = options;
+  
+  // If this is an admin route and user is not an admin
+  if (adminRoute && !isAdmin) {
+    // Check if user is authenticated but not admin
+    if (isAuthenticated) {
+      router.push('/');
+      return true;
+    }
+    
+    // User is not authenticated, redirect to login
+    const encodedRedirect = encodeURIComponent(destination);
+    router.push(`${loginPath}?redirect=${encodedRedirect}&source=admin`);
+    return true;
+  }
   
   // If this is a protected route and user is not authenticated
   if (protectedRoute && !isAuthenticated) {

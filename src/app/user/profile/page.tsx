@@ -63,7 +63,8 @@ export default function ProfilePage() {
 
     try {
       setLoading(true);
-      const accessToken = localStorage.getItem('accessToken');
+      // Safe localStorage access
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
       const response = await fetch(`/api/users/${user.userId}`, {
         method: "PATCH",
@@ -74,9 +75,10 @@ export default function ProfilePage() {
         }),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || ''}`,
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           'x-user-id': user.userId
-        }
+        },
+        credentials: 'include' // Changed to include cookies consistently
       });
 
       const result = await response.json();
