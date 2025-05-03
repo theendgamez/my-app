@@ -4,7 +4,6 @@
 
 type FetchOptions = RequestInit & {
   useToken?: boolean;
-  fallbackToUserId?: boolean;
   revalidate?: number | false;
   tags?: string[];
 };
@@ -20,11 +19,10 @@ export async function fetchWithAuth<T>(
   // Extract and remove custom options
   const { 
     useToken = true, 
-    fallbackToUserId = true,
     revalidate,
     tags,
     ...fetchOptions 
-  } = options;
+  }: FetchOptions = options;
   
   // Default headers
   const headers: Record<string, string> = {
@@ -35,13 +33,16 @@ export async function fetchWithAuth<T>(
   // Add auth headers if needed
   if (typeof window !== 'undefined' && useToken) {
     const accessToken = localStorage.getItem('accessToken');
+    const userId = localStorage.getItem('userId');
+    
+    // Always send userId as fallback for Vercel deployment
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    
+    // Add token if available
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
-    } else if (fallbackToUserId) {
-      const userId = localStorage.getItem('userId');
-      if (userId) {
-        headers['x-user-id'] = userId;
-      }
     }
   }
   
@@ -65,9 +66,11 @@ export async function fetchWithAuth<T>(
   // Handle response
   if (!response.ok) {
     if (response.status === 401 && typeof window !== 'undefined') {
+      console.error('Authentication failed:', await response.text());
       // Refresh token or redirect to login
       const currentPath = window.location.pathname;
-      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&auth_error=true`;
+      throw new Error('Authentication failed. Redirecting to login...');
     }
     
     // Try to parse error message

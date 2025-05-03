@@ -138,6 +138,13 @@ export const signToken = async (payload: JWTPayload, expiresIn: string | number,
 // Get current user from request with more robust fallback
 export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
   try {
+    // Add debug info for Vercel deployment
+    console.log('Auth headers:', {
+      cookie: req.headers.get('cookie')?.substring(0, 20) + '...',
+      authorization: req.headers.get('authorization')?.substring(0, 20) + '...',
+      userId: req.headers.get('x-user-id')
+    });
+    
     // Try cookies first
     const accessToken = req.cookies.get('accessToken')?.value;
     
@@ -155,21 +162,26 @@ export const getCurrentUser = async (req: NextRequest): Promise<Users | null> =>
     // Try token authentication first
     if (accessToken || headerToken) {
       const token = accessToken || headerToken;
-      const decoded = token ? await verifyToken(token) : null;
-      
-      if (decoded?.userId) {
-        user = await db.users.findById(decoded.userId);
+      try {
+        const decoded = token ? await verifyToken(token) : null;
         
-        // Verify token version to ensure token hasn't been invalidated
-        if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
-          return user;
+        if (decoded?.userId) {
+          user = await db.users.findById(decoded.userId);
+          
+          // Verify token version to ensure token hasn't been invalidated
+          if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
+            return user;
+          }
         }
+      } catch (err) {
+        console.error('Token verification error:', err);
       }
     }
     
     // Fall back to userIdHeader if token auth failed
     if (!user && userIdHeader) {
       // Use userId header as backup authentication
+      console.log('Falling back to userId header auth:', userIdHeader);
       user = await db.users.findById(userIdHeader);
       if (user) {
         return user;

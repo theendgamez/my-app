@@ -29,9 +29,17 @@ const LoginForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect');
+  const authError = searchParams.get('auth_error');
   const [loginError, setLoginError] = useState('');
   const [isProcessingRedirect, setIsProcessingRedirect] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    // Show message if redirected due to auth error
+    if (authError) {
+      setLoginError('您的登入已過期或無效，請重新登入');
+    }
+  }, [authError]);
 
   // Check if user is already logged in (using userId only)
   useEffect(() => {
@@ -95,11 +103,10 @@ const LoginForm = () => {
       if (result.user && typeof result.user === 'object' && 'userId' in result.user) {
         // Make sure user ID is valid before storing
         const userId = result.user.userId;
-        if (userId && typeof userId === 'string' && !userId.includes('...')) {
-          // Store only userId in localStorage
+        if (userId && typeof userId === 'string') {
+          // Store userId and accessToken in localStorage
           localStorage.setItem('userId', userId);
           
-          // Store access token for API auth
           if (result.accessToken) {
             localStorage.setItem('accessToken', result.accessToken);
           }
