@@ -203,7 +203,7 @@ export default function AdminLotteryPage() {
                           </Link>
                           {event.status === 'drawing' && (
                             <Link
-                              href={`/admin/lottery/draw/${event.eventId}`}
+                              href={`/admin/lottery/draw?eventId=${event.eventId}`}
                               className="text-purple-600 hover:text-purple-900"
                             >
                               執行抽籤

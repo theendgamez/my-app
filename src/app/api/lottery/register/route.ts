@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createProtectedRouteHandler, createResponse } from '@/lib/auth';
 import db from '@/lib/db';
+import { v4 as uuidv4 } from 'uuid';
 
 export const POST = createProtectedRouteHandler(async (req: NextRequest, user) => {
   try {
@@ -8,14 +9,14 @@ export const POST = createProtectedRouteHandler(async (req: NextRequest, user) =
     
     // Validate input
     if (!eventId || !zoneName || !quantity) {
-      return createResponse({ error: '缺少必要參數' }, 400);
+      return createResponse({ error: '缺少必要參數', details: { eventId, zoneName, quantity } }, 400);
     }
 
     // Get event to validate it's still open for registration
     const event = await db.events.findById(eventId);
     
     if (!event) {
-      return createResponse({ error: '找不到活動' }, 404);
+      return createResponse({ error: '找不到活動', eventId }, 404);
     }
     
     if (!event.isDrawMode) {
@@ -23,33 +24,66 @@ export const POST = createProtectedRouteHandler(async (req: NextRequest, user) =
     }
     
     // Check if registration period has ended
-    if (event.drawDate && new Date(event.drawDate) < new Date()) {
+    if (event.endregisterDate && new Date(event.endregisterDate) < new Date()) {
       return createResponse({ error: '抽籤登記已結束' }, 400);
+    }
+
+    if (event.drawDate && new Date(event.drawDate) < new Date()) {
+      return createResponse({ error: '抽籤已經結束' }, 400);
+    }
+
+    // Check if registration period has not started yet
+    if (event.registerDate && new Date(event.registerDate) > new Date()) {
+      return createResponse({ error: '抽籤登記尚未開始' }, 400);
     }
     
     // Check if user has already registered for this event
-    const existingRegistration = await db.lottery?.findByUserAndEvent(user.userId, eventId);
-    
-    if (existingRegistration) {
-      return createResponse({ error: '您已經登記了此活動的抽籤' }, 400);
+    try {
+      const existingRegistrations = await db.lottery.findByUserAndEvent(user.userId, eventId);
+      
+      if (existingRegistrations && existingRegistrations.length > 0) {
+        return createResponse({ error: '您已經登記了此活動的抽籤', registrationToken: (existingRegistrations as { registrationToken: string }[])[0].registrationToken }, 400);
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error checking existing registrations:', error.message);
+      } else {
+        console.error('Error checking existing registrations:', error);
+      }
+      // Continue with registration even if check fails
     }
     
-    // Create registration
-    const registrationToken = await db.lottery.create({
+    // Create registration with a secure token
+    const registrationToken = uuidv4();
+    const platformFee = 18; // Assuming constant platform fee per ticket
+    const totalAmount = platformFee * quantity;
+    const now = new Date().toISOString();
+
+    const registrationData = {
+      registrationToken,
       userId: user.userId,
       eventId,
       zoneName, 
       quantity,
       status,
-      createdAt: Date.now(),
-    });
+      platformFee,
+      totalAmount,
+      paymentStatus: 'pending',
+      createdAt: now,
+      drawDate: event.drawDate
+    };
+    
+    await db.registration.create(registrationData);
     
     return createResponse({ 
       message: '抽籤登記成功',
       registrationToken
-    });
+    }, 201);
   } catch (error) {
     console.error('Registration error:', error);
-    return createResponse({ error: '註冊時發生錯誤' }, 500);
+    return createResponse({ 
+      error: '註冊時發生錯誤', 
+      details: error instanceof Error ? error.message : String(error) 
+    }, 500);
   }
 });

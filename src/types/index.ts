@@ -96,6 +96,8 @@ export interface Ticket {
   eventLocation: string;
   zone: string;
   userId: string;
+  userRealName: string;
+  qrCode: string;
   paymentId: string;
   status: 'available' | 'reserved' | 'sold';
   seatNumber: string;
@@ -129,6 +131,8 @@ export interface Registration {
   registrationToken: string;
   eventId: string;
   userId: string;
+  userRealName?: string;
+  email?: string;
   phoneNumber?: string;
   eventName?: string;
   zoneName: string;

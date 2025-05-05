@@ -7,6 +7,7 @@ import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
 
 interface OrderDetails {
   paymentId: string;
@@ -252,14 +253,13 @@ export default function OrderDetailPage() {
                             </div>
                           </div>
                           
-                          {/* QR code placeholder - would be implemented with actual QR code */}
+                          {/* QR code display */}
                           <div className="mt-4 border-t pt-4 flex justify-center">
-                            <div className="bg-gray-100 p-4 rounded-lg">
-                              <p className="text-xs text-center text-gray-500 mb-2">入場憑證</p>
-                              <div className="h-32 w-32 bg-gray-300 flex items-center justify-center">
-                                <span className="text-xs text-gray-600">票券 QR 碼</span>
-                              </div>
-                            </div>
+                            <QRCodeDisplay 
+                              qrCode={ticket.qrCode} 
+                              ticketId={ticket.ticketId} 
+                              size={120}
+                            />
                           </div>
                         </div>
                       ))}

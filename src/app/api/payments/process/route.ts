@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
       return errorResponse('無效的預訂資料', 'INVALID_BOOKING', 404);
     }
     if (new Date(booking.expiresAt) < new Date()) {
-      // Optionally: await db.bookings.delete(bookingToken);
       return errorResponse('預訂已過期，請重新選擇座位', 'BOOKING_EXPIRED', 400);
     }
     if (booking.userId !== user.userId) {
@@ -55,17 +54,25 @@ export async function POST(request: NextRequest) {
     if (!event) {
       return errorResponse('找不到活動資料', 'EVENT_NOT_FOUND', 404);
     }
-    const zone = event.zones?.find((z) => z.name === booking.zone);
-    if (!zone) {
-      return errorResponse('無效的座位區域', 'INVALID_ZONE', 400);
-    }
-    if ((zone.zoneQuantity || 0) < booking.quantity) {
-      return errorResponse('所選區域的票券不足', 'INSUFFICIENT_TICKETS', 400);
-    }
+    // Use imported Zone type for type consistency
+    
+        // Find the zone and ensure price is a number
+        const foundZone = event.zones?.find((z) => z.name === booking.zone);
+        if (!foundZone) {
+          return errorResponse('無效的座位區域', 'INVALID_ZONE', 400);
+        }
+        const zone = {
+          ...foundZone,
+          price: Number(foundZone.price),
+          zoneQuantity: foundZone.zoneQuantity !== undefined ? Number(foundZone.zoneQuantity) : undefined,
+        };
+        if ((zone.zoneQuantity || 0) < booking.quantity) {
+          return errorResponse('所選區域的票券不足', 'INSUFFICIENT_TICKETS', 400);
+        }
 
     // Calculate payment
     const paymentId = uuidv4();
-    const ticketPrice = Number(zone.price);
+    const ticketPrice = zone.price;
     const platformFee = 18;
     const subtotal = ticketPrice * booking.quantity;
     const platformFeeTotal = platformFee * booking.quantity;
@@ -79,49 +86,61 @@ export async function POST(request: NextRequest) {
       zone: booking.zone,
       payQuantity: booking.quantity,
       totalAmount,
-      amount: totalAmount, // Add amount field
-      paymentMethod: cardDetails?.method || 'card', // Add paymentMethod field, adjust as needed
-      relatedTo: "ticket_purchase" as const, // Set to a valid enum value
+      amount: totalAmount,
+      paymentMethod: cardDetails?.method || 'card',
+      relatedTo: "ticket_purchase" as const,
       createdAt: new Date().toISOString(),
       status: 'completed' as const,
       cardDetails,
     };
 
-    // Transaction: payment, booking, event, tickets
-    await db.transaction(async (trx) => {
-      await trx.payments.create(payment);
+    try {
+      // Create payment record
+      await db.payments.create(payment);
+
       // Define the update payload type explicitly
       const bookingUpdate: { status: 'completed'; paymentId: string } = {
         status: 'completed',
-        paymentId,
+        paymentId: payment.paymentId
       };
-      await trx.bookings.update(booking.bookingToken, bookingUpdate);
-      await trx.events.updateZoneRemaining(
+
+      // Update booking status
+      await db.bookings.createIntent({
+        ...booking,
+        ...bookingUpdate
+      });
+
+      // Update event zone inventory
+      await db.events.updateZoneRemaining(
         booking.eventId,
         booking.zone,
         (zone.zoneQuantity || 0) - booking.quantity
       );
-      const ticketPromises = [];
+
+      // Generate tickets
       for (let i = 0; i < booking.quantity; i++) {
-        ticketPromises.push(
-          trx.tickets.create({
-            ticketId: uuidv4(),
-            eventId: booking.eventId,
-            eventName: event.eventName,
-            eventDate: event.eventDate,
-            eventLocation: event.location,
-            userId: user.userId,
-            zone: booking.zone,
-            seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
-            price: ticketPrice,
-            purchaseDate: new Date().toISOString(),
-            status: 'sold',
-            paymentId,
-          })
-        );
+        const ticketId = uuidv4();
+        await db.tickets.create({
+          ticketId,
+          eventId: booking.eventId,
+          eventName: event.eventName,
+          eventDate: event.eventDate,
+          eventLocation: event.location,
+          userId: user.userId,
+          userRealName: "",
+          qrCode: ticketId,
+          zone: booking.zone,
+          seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
+          price: ticketPrice,
+          purchaseDate: new Date().toISOString(),
+          status: 'sold',
+          paymentId,
+        });
       }
-      await Promise.all(ticketPromises);
-    });
+    } catch (error) {
+      console.error('Payment processing failed:', error);
+      throw error;
+    }
 
     return NextResponse.json({
       paymentId,

@@ -36,7 +36,7 @@ export default function LotteryPaymentPage() {
       setLoading(false);
       return;
     }
-
+    
     // Fetch lottery registration details
     const fetchRegistration = async () => {
       try {
@@ -53,6 +53,34 @@ export default function LotteryPaymentPage() {
         }
 
         const data = await response.json();
+        
+        // Check if user has already won the lottery
+        if (data.status === 'won') {
+          setError('您已中籤，請前往購買門票而不是支付登記費');
+          setTimeout(() => {
+            router.push(`/events/${id}/lottery/result?registrationToken=${registrationToken}`);
+          }, 2000);
+          return;
+        }
+        
+        // Check if payment is already completed
+        if (data.paymentStatus === 'paid') {
+          setError('您已經支付過此登記的手續費');
+          setTimeout(() => {
+            router.push(`/events/${id}/lottery/confirmation?registrationToken=${registrationToken}`);
+          }, 2000);
+          return;
+        }
+
+        // Check if lottery has ended
+        if (data.status === 'lost') {
+          setError('抽籤已結束，您未中籤，無需付款');
+          setTimeout(() => {
+            router.push(`/user/lottery`);
+          }, 2000);
+          return;
+        }
+        
         setRegistration(data);
       } catch (err) {
         console.error('Error fetching registration:', err);
@@ -154,9 +182,9 @@ export default function LotteryPaymentPage() {
               
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="mb-2">
-                  <span className="font-semibold">提醒：</span> 您正在支付抽籤登記的平台手續費。這不是活動門票的付款，亦不保證能購買到門票。
+                  <span className="font-semibold">提醒：</span> 您正在支付抽籤登記的費用。如果您在抽籤中被選中，此費用將作為票券的全額付款，無需再次付款。
                 </p>
-                <p>本次支付僅授予您參與抽籤的資格。如果您在抽籤中被選中，您將需要另外支付門票費用。</p>
+                <p>如果您未中籤，此費用將不予退還，作為平台手續費。</p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -205,14 +233,13 @@ export default function LotteryPaymentPage() {
                 </div>
               </div>
               
-              <div className="border-t pt-6">
+              <div className="border-t pt-6"></div>
                 <h3 className="font-semibold mb-4">付款方式</h3>
                 <CreditCardForm onSubmit={handlePayment} isProcessing={isProcessing} />
-              </div>
             </div>
           )}
         </div>
-      </div>
+        </div>
     </>
   );
 }

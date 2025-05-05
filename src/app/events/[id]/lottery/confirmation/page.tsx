@@ -13,12 +13,13 @@ export default function LotteryConfirmationPage() {
   const router = useRouter();
   const { id } = useParams();
   const searchParams = useSearchParams();
-  const registrationToken = searchParams.get('registrationToken');
+  // Get registrationToken from either 'registrationToken' or fallback to 'token' parameter
+  const registrationToken = searchParams.get('registrationToken') || searchParams.get('token');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [details, setDetails] = useState<Registration | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError,] = useState<string | null>(null);
 
   useEffect(() => {
     // Check authentication first
@@ -109,7 +110,7 @@ export default function LotteryConfirmationPage() {
           <Alert type="error" title="錯誤" message={error} />
           <div className="mt-4 flex justify-center">
             <button
-              onClick={() => router.push('/user/tickets')}
+              onClick={() => router.push('/user/order')}
               className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
             >
               查看我的票券
@@ -195,13 +196,13 @@ export default function LotteryConfirmationPage() {
                 2. 抽籤結果將通過電子郵件通知您，也可在「我的票券」頁面查看。
               </p>
               <p className="text-sm">
-                3. 如您中籤，請在指定時間內完成門票付款，否則將視為放棄資格。
+                3. 如您中籤，您已支付的費用將作為票券費用，無需再次付款即可獲得門票。
               </p>
             </div>
 
             <div className="flex justify-between gap-4">
               <Link 
-                href="/user/tickets" 
+                href="/user/order" 
                 className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-center"
               >
                 查看我的票券

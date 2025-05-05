@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ClientLayout } from "./ClientLayout";
 import "./globals.css";
+import LotteryNotification from '@/components/notifications/LotteryNotification';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -34,6 +35,7 @@ export default function RootLayout({
             {children}
           </div>
         </ClientLayout>
+        <LotteryNotification />
       </body>
     </html>
   );

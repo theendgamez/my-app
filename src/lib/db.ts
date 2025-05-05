@@ -66,7 +66,7 @@ async function executeDbCommand<T>(operation: () => Promise<T>): Promise<T> {
 /**
  * Transaction implementation for atomic operations
  */
-class Transaction {
+export class Transaction {
   private writeItems: TransactWriteItem[] = [];
   private client: DynamoDBClient;
 
@@ -133,7 +133,7 @@ class Transaction {
       if (!currentEvent) throw new Error(`Event with ID ${eventId} not found`);
       
       const zones = currentEvent.zones || [];
-      const zoneIndex = zones.findIndex(zone => zone.name === zoneName);
+      const zoneIndex: number = zones.findIndex((zone: { name: string }) => zone.name === zoneName);
       
       if (zoneIndex === -1) throw new Error(`Zone ${zoneName} not found in event ${eventId}`);
 
@@ -193,9 +193,85 @@ class Transaction {
 }
 
 /**
- * Database handler with operations for all entity types
+ * Type definition for the database handler
  */
-const db = {
+interface DbHandler {
+  events: {
+    findMany(): Promise<Events[]>;
+    create(data: Events): Promise<Events>;
+    findById(eventId: string): Promise<Events | null>;
+    update(eventId: string, updates: Partial<Events>): Promise<Events>;
+    delete(eventId: string): Promise<void>;
+    updateZoneProperty(
+      eventId: string,
+      zoneName: string,
+      propertyName: string,
+      newValue: string | number
+    ): Promise<{ zoneName: string; [key: string]: string | number }>;
+    updateZoneMax(eventId: string, zoneName: string, newMax: number): Promise<{ zoneName: string; [key: string]: string | number }>;
+    updateZoneRemaining(eventId: string, zoneName: string, newRemaining: number): Promise<{ zoneName: string; [key: string]: string | number }>;
+  };
+  users: {
+    findMany(): Promise<Users[]>;
+    findByVerificationCode(verificationCode: string): Promise<Users | null>;
+    findByEmail(email: string): Promise<Users | null>;
+    findById(userId: string): Promise<Users | null>;
+    create(data: Users): Promise<Users>;
+    update(userId: string, updates: Partial<Users>): Promise<Users>;
+    delete(userId: string): Promise<void>;
+    getAdmin(): Promise<Users | null>;
+  };
+  payments: {
+    create(paymentData: Payment): Promise<Payment>;
+    findById(paymentId: string): Promise<Payment | null>;
+    findByUser(userId: string): Promise<Payment[]>;
+    findMany(): Promise<Payment[]>;
+    update(paymentId: string, updates: Partial<Payment>): Promise<Payment>;
+  };
+  tickets: {
+    create(ticketData: Ticket): Promise<Ticket>;
+    findMany(): Promise<Ticket[]>;
+    findByUser(userId: string): Promise<Ticket[]>;
+    findByEvent(eventId: string, zone: string): Promise<Ticket[]>;
+    findAvailableByEvent(eventId: string, zone: string, quantity: number): Promise<Ticket[]>;
+    findById(ticketId: string): Promise<Ticket | null>;
+    findByPayment(paymentId: string): Promise<Ticket[]>;
+    update(ticketId: string, updates: Partial<Ticket>): Promise<Ticket>;
+  };
+  bookings: {
+    create(bookingData: Booking): Promise<Booking>;
+    createIntent(bookingData: Booking): Promise<Booking>;
+    findIntentByToken(bookingToken: string): Promise<Booking | null>;
+    scanAllBookings(): Promise<Booking[]>;
+    findByUser(userId: string): Promise<Booking[]>;
+    delete(bookingToken: string): Promise<void>;
+  };
+  registration: {
+    findByToken(registrationToken: string): Promise<unknown | null>;
+    create(data: unknown): Promise<unknown>;
+    update(registrationToken: string, updates: Partial<unknown>): Promise<unknown>;
+    delete(registrationToken: string): Promise<void>;
+    findByUser(userId: string): Promise<unknown[]>;
+    findByEvent(eventId: string): Promise<unknown[]>;
+    findByEventAndUser(eventId: string, userId: string): Promise<unknown[]>;
+    findByEventAndStatus(eventId: string, status: string): Promise<unknown[]>;
+    findByUserRecentDrawn(userId: string): Promise<unknown[]>;
+    findMany(): Promise<unknown[]>;
+  };
+  lottery: {
+    create(data: unknown): Promise<unknown>;
+    findById(lotteryId: string): Promise<unknown | null>;
+    findByEvent(eventId: string): Promise<unknown[]>;
+    findByUserAndEvent(userId: string, eventId: string): Promise<unknown[]>;
+  };
+  scanTable(tableName: string): Promise<unknown[]>;
+  transaction<T>(callback: (trx: DbHandler) => Promise<T>): Promise<T>;
+}
+
+/**
+ * Database handler with operations for all entity types
+ */ 
+export const db: DbHandler = {
   /**
    * Event-related database operations
    */
@@ -307,7 +383,7 @@ const db = {
         if (!currentEvent) throw new Error(`Event with ID ${eventId} not found`);
         
         const zones = currentEvent.zones || [];
-        const zoneIndex = zones.findIndex(zone => zone.name === zoneName);
+        const zoneIndex: number = zones.findIndex((zone: { name: string }) => zone.name === zoneName);
         
         if (zoneIndex === -1) throw new Error(`Zone ${zoneName} not found in event ${eventId}`);
 
@@ -1025,6 +1101,19 @@ const db = {
         return result.Items?.map(item => unmarshall(item)) || [];
       });
     },
+    findByUserRecentDrawn: async (userId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Registration',
+          IndexName: 'userId-recentDrawn-index',
+          KeyConditionExpression: 'userId = :userId AND recentDrawn = :recentDrawn',
+          ExpressionAttributeValues: marshall({ ':userId': userId, ':recentDrawn': true })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+    },
     /**
      * Retrieves all registrations
      * @returns Array of registrations
@@ -1090,15 +1179,37 @@ const db = {
       eventId: string
     ): Promise<unknown[]> {
       return executeDbCommand(async () => {
-        const command = new QueryCommand({
-          TableName: 'Lottery',
-          IndexName: 'userId-eventId-index',
-          KeyConditionExpression: 'userId = :userId AND eventId = :eventId',
-          ExpressionAttributeValues: marshall({ ':userId': userId, ':eventId': eventId })
-        });
-        
-        const result = await client.send(command);
-        return result.Items?.map(item => unmarshall(item)) || [];
+        try {
+          // Try using userId index with filter instead of non-existent compound index
+          const command = new QueryCommand({
+            TableName: 'Lottery',
+            IndexName: 'userId-index', // Use just the userId index if it exists
+            KeyConditionExpression: 'userId = :userId',
+            FilterExpression: 'eventId = :eventId',
+            ExpressionAttributeValues: marshall({ 
+              ':userId': userId, 
+              ':eventId': eventId 
+            })
+          });
+          
+          const result = await client.send(command);
+          return result.Items?.map(item => unmarshall(item)) || [];
+        } catch (error) {
+          console.warn('Failed to query by userId-index, falling back to scan:', error);
+          
+          // Fallback to a scan operation with filters
+          const command = new ScanCommand({
+            TableName: 'Lottery',
+            FilterExpression: 'userId = :userId AND eventId = :eventId',
+            ExpressionAttributeValues: marshall({ 
+              ':userId': userId, 
+              ':eventId': eventId 
+            })
+          });
+          
+          const result = await client.send(command);
+          return result.Items?.map(item => unmarshall(item)) || [];
+        }
       });
     }
   },
@@ -1122,21 +1233,18 @@ const db = {
   },
 
   /**
-   * Executes operations within a transaction
-   * @param callback - Function containing operations to execute
+   * Execute operations within a transaction
+   * @param callback Function that executes database operations within a transaction
    */
-  transaction: async (callback: (transaction: Transaction) => Promise<void>): Promise<void> => {
-    const transaction = new Transaction(client);
+  transaction: async <T>(callback: (trx: DbHandler) => Promise<T>): Promise<T> => {
     try {
-      await callback(transaction);
-      await transaction.commit();
+      const result = await callback(db);
+      return result;
     } catch (error) {
-      console.error('Transaction execution failed:', error);
+      console.error('Transaction failed:', error);
       throw error;
     }
   }
 };
-
-
 
 export default db;

@@ -154,7 +154,7 @@ export default function UserLotteryPage() {
                               href={`/events/${reg.eventId}/lottery/result?registrationToken=${reg.registrationToken}`}
                               className="text-blue-600 hover:text-blue-900"
                             >
-                              查看結果
+                              查看門票
                             </Link>
                           ) : (
                             <Link 
@@ -169,6 +169,14 @@ export default function UserLotteryPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="p-4">
+                <button
+                  onClick={() => router.push('/user/order')}
+                  className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                >
+                  查看我的票券
+                </button>
               </div>
             </div>
           )}

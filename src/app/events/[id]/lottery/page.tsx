@@ -182,7 +182,7 @@ const LotteryPage = () => {
       const data = await res.json();
 
       // Redirect to confirmation page
-      router.push(`/events/${id}/lottery/confirmation?token=${data.registrationToken}`);
+      router.push(`/events/${id}/lottery/confirmation?registrationToken=${data.registrationToken}`);
     } catch (error) {
       console.error('Registration error:', error);
       setError(error instanceof Error ? error.message : '登記時發生錯誤');

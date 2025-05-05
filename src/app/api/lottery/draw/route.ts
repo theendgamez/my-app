@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
+import QRCode from 'qrcode';
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,8 +52,12 @@ export async function POST(request: NextRequest) {
     type Registration = {
       registrationToken: string;
       userId: string;
+      userRealName: string;
       zoneName: string;
       quantity: number;
+      paymentId: string;
+      email?: string;
+      phoneNumber?: string;
       // add other properties if needed
     };
 
@@ -111,6 +117,37 @@ export async function POST(request: NextRequest) {
           drawnAt: new Date().toISOString()
         });
         
+        // Automatically create tickets for winners since they've already paid
+        const ticketIds = [];
+        for (let i = 0; i < quantity; i++) {
+          const ticketId = uuidv4();
+          ticketIds.push(ticketId);
+          
+          // Create a ticket for the winner
+          await db.tickets.create({
+            ticketId: ticketId,
+            userId: reg.userId,
+            userRealName: reg.userRealName,
+            eventId: eventId,
+            zone: zoneName,
+            paymentId: reg.paymentId,
+            status: 'available',
+            purchaseDate: new Date().toISOString(),
+            // Required missing properties
+            eventName: event.eventName,
+            eventDate: event.eventDate,
+            eventLocation: event.location || "TBD",
+            seatNumber: generateSeatNumber(zoneName), // You would need to implement this function
+            price: Number(event.zones.find(z => z.name === zoneName)?.price) || 0,
+            qrCode: await generateQrCode(ticketId) // Updated to use the QRCode library
+          });
+        }
+        
+        // Save ticket IDs to the registration
+        await db.registration.update(reg.registrationToken, {
+          ticketIds: ticketIds
+        });
+        
         results.push({
           registrationToken: reg.registrationToken,
           userId: reg.userId,
@@ -167,3 +204,28 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// Simple seat number generator: returns a random seat number in the format "<ZoneName>-<3-digit number>"
+// In production, you should ensure seat numbers are unique and not over-allocated per zone.
+function generateSeatNumber(zoneName: string): string {
+  const randomNum = Math.floor(100 + Math.random() * 900); // 3-digit number
+  return `${zoneName}-${randomNum}`;
+}
+
+// Generate QR code as a data URL
+async function generateQrCode(ticketId: string): Promise<string> {
+  try {
+    // Generate QR code using the library
+    const qrCodeDataUrl = await QRCode.toDataURL(ticketId, {
+      width: 200,
+      margin: 2,
+      errorCorrectionLevel: 'H'
+    });
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error("Error generating QR code:", error);
+    // Fallback to external service if library fails
+    return `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(ticketId)}&size=150x150`;
+  }
+}
+
