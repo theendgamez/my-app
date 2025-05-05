@@ -10,7 +10,7 @@ import {
   TransactWriteItem,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users, Payment, Ticket, Booking } from '@/types';
+import { Events, Users, Payment, Ticket, Booking, Friendship } from '@/types';
 
 /**
  * Initialize DynamoDB client with environment credentials
@@ -237,6 +237,7 @@ interface DbHandler {
     findById(ticketId: string): Promise<Ticket | null>;
     findByPayment(paymentId: string): Promise<Ticket[]>;
     update(ticketId: string, updates: Partial<Ticket>): Promise<Ticket>;
+    transfer(ticketId: string, newUserId: string, newUserRealName: string): Promise<Ticket>;
   };
   bookings: {
     create(bookingData: Booking): Promise<Booking>;
@@ -263,6 +264,16 @@ interface DbHandler {
     findById(lotteryId: string): Promise<unknown | null>;
     findByEvent(eventId: string): Promise<unknown[]>;
     findByUserAndEvent(userId: string, eventId: string): Promise<unknown[]>;
+  };
+  friends: {
+    create(friendshipData: Friendship): Promise<Friendship>;
+    findById(friendshipId: string): Promise<Friendship | null>;
+    findByUser(userId: string): Promise<Friendship[]>;
+    findPendingByUser(userId: string): Promise<Friendship[]>;
+    findByUsers(userId1: string, userId2: string): Promise<Friendship | null>;
+    accept(friendshipId: string): Promise<Friendship>;
+    reject(friendshipId: string): Promise<void>;
+    remove(friendshipId: string): Promise<void>;
   };
   scanTable(tableName: string): Promise<unknown[]>;
   transaction<T>(callback: (trx: DbHandler) => Promise<T>): Promise<T>;
@@ -420,7 +431,8 @@ export const db: DbHandler = {
      * @param newRemaining - New remaining value
      */
     updateZoneRemaining: async (eventId: string, zoneName: string, newRemaining: number) => {
-      return db.events.updateZoneProperty(eventId, zoneName, 'remaining', newRemaining);
+      // BUGFIX: Change 'remaining' to 'zoneQuantity' to match the actual property name in the database
+      return db.events.updateZoneProperty(eventId, zoneName, 'zoneQuantity', newRemaining);
     }
   },
 
@@ -840,6 +852,39 @@ export const db: DbHandler = {
         const result = await client.send(command);
         return result.Attributes ? (unmarshall(result.Attributes) as Ticket) : { ...currentTicket, ...updates };
       });
+    },
+
+    /**
+     * Transfer ticket to another user
+     * @param ticketId - Ticket identifier
+     * @param newUserId - New user identifier
+     * @param newUserRealName - New user's real name
+     * @returns Updated ticket
+     */
+    transfer: async (ticketId: string, newUserId: string, newUserRealName: string): Promise<Ticket> => {
+      return executeDbCommand(async () => {
+        const currentTicket = await db.tickets.findById(ticketId);
+        if (!currentTicket) throw new Error(`Ticket with ID ${ticketId} not found`);
+        
+        const command = new UpdateItemCommand({
+          TableName: 'Tickets',
+          Key: marshall({ ticketId }),
+          UpdateExpression: 'SET userId = :newUserId, userRealName = :newUserRealName, transferredAt = :transferredAt',
+          ExpressionAttributeValues: marshall({
+            ':newUserId': newUserId,
+            ':newUserRealName': newUserRealName,
+            ':transferredAt': new Date().toISOString()
+          }),
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? unmarshall(result.Attributes) as Ticket : {
+          ...currentTicket,
+          userId: newUserId,
+          userRealName: newUserRealName
+        } as Ticket;
+      });
     }
   },
 
@@ -1213,7 +1258,220 @@ export const db: DbHandler = {
       });
     }
   },
-  
+
+  /**
+   * Friendship-related database operations
+   */
+  friends: {
+    /**
+     * Creates a new friendship request
+     * @param friendshipData - Friendship data
+     * @returns Created friendship
+     */
+    create: async (friendshipData: Friendship): Promise<Friendship> => {
+      return executeDbCommand(async () => {
+        // Ensure friendshipId exists - it's required as the primary key
+        if (!friendshipData.friendshipId) {
+          throw new Error("friendshipId is required for creating friendship records");
+        }
+        
+        console.log("Pre-marshall data:", friendshipData);
+        
+        // Create completely manual DynamoDB attribute map
+        const item: { [key: string]: { S: string } } = {
+          friendshipId: { S: friendshipData.friendshipId },
+          requesterId: { S: friendshipData.requesterId },
+          requesterName: { S: friendshipData.requesterName || "" },
+          recipientId: { S: friendshipData.recipientId },
+          recipientName: { S: friendshipData.recipientName || "" },
+          status: { S: friendshipData.status },
+          createdAt: { S: friendshipData.createdAt },
+          userRelationship: { S: friendshipData.userRelationship || `user#${friendshipData.requesterId}` }
+        };
+        
+        if (friendshipData.acceptedAt) {
+          item["acceptedAt"] = { S: friendshipData.acceptedAt };
+        }
+        
+        const command = new PutItemCommand({
+          TableName: 'Friendships',
+          Item: item
+        });
+        
+        
+        await client.send(command);
+        return friendshipData;
+      });
+    },
+    findById: async (friendshipId: string): Promise<Friendship | null> => {
+      return executeDbCommand(async () => {
+        const command = new GetItemCommand({
+          TableName: 'Friendships',
+          Key: marshall({ friendshipId })
+        });
+        
+        const result = await client.send(command);
+        return result.Item ? (unmarshall(result.Item) as Friendship) : null;
+      });
+    },
+
+    /**
+     * Finds all friendships for a user
+     * @param userId - User identifier
+     * @returns Array of friendships
+     */
+    findByUser: async (userId: string): Promise<Friendship[]> => {
+      return executeDbCommand(async () => {
+        // Use scan operation with filters instead of the non-existent index
+        const command = new ScanCommand({
+          TableName: 'Friendships',
+          FilterExpression: '(requesterId = :userId OR recipientId = :userId) AND #statusAttr = :status',
+          ExpressionAttributeValues: marshall({ 
+            ':userId': userId,
+            ':status': 'accepted' 
+          }),
+          ExpressionAttributeNames: {
+            '#statusAttr': 'status'
+          }
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as Friendship) || [];
+      });
+    },
+
+    /**
+     * Finds pending friendship requests for a user
+     * @param userId - User identifier
+     * @returns Array of pending friendships
+     */
+    findPendingByUser: async (userId: string): Promise<Friendship[]> => {
+      return executeDbCommand(async () => {
+        // Use scan operation with filters instead of the non-existent index
+        const command = new ScanCommand({
+          TableName: 'Friendships',
+          FilterExpression: 'recipientId = :userId AND #statusAttr = :status',
+          ExpressionAttributeValues: marshall({ 
+            ':userId': userId,
+            ':status': 'pending' 
+          }),
+          ExpressionAttributeNames: {
+            '#statusAttr': 'status'
+          }
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as Friendship) || [];
+      });
+    },
+
+    /**
+     * Finds friendship between two users
+     * @param userId1 - First user identifier
+     * @param userId2 - Second user identifier
+     * @returns Friendship or null if not found
+     */
+    findByUsers: async (userId1: string, userId2: string): Promise<Friendship | null> => {
+      return executeDbCommand(async () => {
+        // First attempt: user1 -> user2
+        const command1 = new QueryCommand({
+          TableName: 'Friendships',
+          IndexName: 'requesterId-recipientId-index',
+          KeyConditionExpression: 'requesterId = :userId1 AND recipientId = :userId2',
+          ExpressionAttributeValues: marshall({ 
+            ':userId1': userId1,
+            ':userId2': userId2 
+          })
+        });
+        
+        let result = await client.send(command1);
+        if (result.Items && result.Items.length > 0) {
+          return unmarshall(result.Items[0]) as Friendship;
+        }
+        
+        // Second attempt: user2 -> user1
+        const command2 = new QueryCommand({
+          TableName: 'Friendships',
+          IndexName: 'requesterId-recipientId-index',
+          KeyConditionExpression: 'requesterId = :userId2 AND recipientId = :userId1',
+          ExpressionAttributeValues: marshall({ 
+            ':userId1': userId1,
+            ':userId2': userId2 
+          })
+        });
+        
+        result = await client.send(command2);
+        if (result.Items && result.Items.length > 0) {
+          return unmarshall(result.Items[0]) as Friendship;
+        }
+        
+        return null;
+      });
+    },
+
+    /**
+     * Accept a friendship request
+     * @param friendshipId - Friendship identifier
+     * @returns Updated friendship
+     */
+    accept: async (friendshipId: string): Promise<Friendship> => {
+      return executeDbCommand(async () => {
+        const now = new Date().toISOString();
+        const command = new UpdateItemCommand({
+          TableName: 'Friendships',
+          Key: marshall({ friendshipId }),
+          UpdateExpression: 'SET #status = :status, acceptedAt = :acceptedAt, userRelationship = :userRelation',
+          ExpressionAttributeNames: {
+            '#status': 'status'
+          },
+          ExpressionAttributeValues: marshall({ 
+            ':status': 'accepted',
+            ':acceptedAt': now,
+            ':userRelation': 'user#all' // Indexed for querying all users' friendships
+          }),
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? unmarshall(result.Attributes) as Friendship : { 
+          friendshipId,
+          status: 'accepted',
+          acceptedAt: now
+        } as Friendship;
+      });
+    },
+
+    /**
+     * Reject a friendship request
+     * @param friendshipId - Friendship identifier
+     */
+    reject: async (friendshipId: string): Promise<void> => {
+      return executeDbCommand(async () => {
+        const command = new DeleteItemCommand({
+          TableName: 'Friendships',
+          Key: marshall({ friendshipId })
+        });
+        
+        await client.send(command);
+      });
+    },
+
+    /**
+     * Remove a friendship
+     * @param friendshipId - Friendship identifier
+     */
+    remove: async (friendshipId: string): Promise<void> => {
+      return executeDbCommand(async () => {
+        const command = new DeleteItemCommand({
+          TableName: 'Friendships',
+          Key: marshall({ friendshipId })
+        });
+        
+        await client.send(command);
+      });
+    }
+  },
+
   /**
    * Scans a table for all items
    * @param tableName - Table name

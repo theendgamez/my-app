@@ -142,152 +142,55 @@ const BookingPage = () => {
     }
   }, [id, router, isAuthenticated, authLoading]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent multiple submissions
-    if (isProcessing) return;
+    if (isProcessing || !selectedZone) return;
     
-    // Additional validations
-    if (!selectedZone) {
-      setError('請選擇區域');
-      return;
-    }
-    
-    // Check that zone has available tickets
-    const zoneDetails = event?.zones?.find(z => z.name === selectedZone);
-    if (!zoneDetails || (zoneDetails.zoneQuantity && zoneDetails.zoneQuantity < quantity)) {
-      setError(`所選區域的票券不足，目前僅剩 ${zoneDetails?.zoneQuantity || 0} 張`);
-      return;
-    }
-
-    // Validate user is logged in
-    if (!user || !user.userId) {
-      setError('請先登入以繼續購票');
-      return;
-    }
-
-    // Generate a session ID and create a booking intent
-    const sessionId = crypto.randomUUID();
-    
-    setIsProcessing(true);
-    
-    // Create request payload and validate all fields are present
-    const payload = {
-      eventId: id,
-      userId: user.userId,
-      zone: selectedZone,
-      quantity,
-      sessionId
-    };
-    
-    // Log the payload for debugging
-    console.log('Sending booking request payload:', payload);
-    
-    // Create a secure booking token
-    fetch(`/api/bookings/create-intent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-        'x-user-id': user.userId // Add user ID as backup authentication method
-      },
-      credentials: 'omit', // Don't send cookies
-      body: JSON.stringify(payload)
-    })
-    .then(async res => {      
+    try {
+      setIsProcessing(true);
+      setError(null);
+      
+      // Store event info in sessionStorage
+      sessionStorage.setItem('bookingEventInfo', JSON.stringify({
+        eventId: id,
+        eventName: event?.eventName,
+        eventLocation: event?.location,
+        eventDate: event?.eventDate
+      }));
+      
+      // Create booking
+      const sessionId = crypto.randomUUID();
+      const payload = {
+        eventId: id,
+        userId: user?.userId,
+        zone: selectedZone,
+        quantity,
+        sessionId
+      };
+      
+      const res = await fetch(`/api/bookings/create-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+          'x-user-id': user?.userId || ''
+        },
+        credentials: 'omit',
+        body: JSON.stringify(payload)
+      });
+      
       if (!res.ok) {
-        // Check if token has expired (401 Unauthorized)
-        if (res.status === 401) {
-          console.error('Authentication failed - token may have expired');
-          
-          try {
-            // Try to refresh the token
-            const refreshResponse = await fetch('/api/auth/refresh', {
-              method: 'GET',
-              credentials: 'include' // Include cookies for refresh token
-            });
-            
-            if (refreshResponse.ok) {
-              const refreshData = await refreshResponse.json();
-              
-              // If token was refreshed successfully, store new token and retry
-              if (refreshData.accessToken) {
-                localStorage.setItem('accessToken', refreshData.accessToken);
-                
-                // Retry the original request with new token
-                const retryResponse = await fetch(`/api/bookings/create-intent`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${refreshData.accessToken}`,
-                    'x-user-id': user.userId
-                  },
-                  body: JSON.stringify(payload)
-                });
-                
-                if (retryResponse.ok) {
-                  return retryResponse.json();
-                }
-              }
-            }
-            
-            // If refresh failed or retry failed, redirect to login
-            const currentPath = `/events/${id}/booking`;
-            router.push(`/login?redirect=${encodeURIComponent(currentPath)}&session=expired`);
-            return { error: 'Your session has expired. Please log in again.' };
-          } catch (refreshError) {
-            console.error('Token refresh error:', refreshError);
-            const currentPath = `/events/${id}/booking`;
-            router.push(`/login?redirect=${encodeURIComponent(currentPath)}&session=expired`);
-            return { error: 'Please login to continue' };
-          }
-        }
-        
-        // Handle other API errors
-        const errorData = await res.json();
-        console.error('Booking API error:', errorData);
-        throw new Error(errorData.error || `API error: ${res.status}`);
-      }
-      return res.json();
-    })
-    .then(data => {
-      if (data.error) {
-        throw new Error(data.error);
+        throw new Error('Booking creation failed');
       }
       
-      // Save event data to sessionStorage before navigating
-      try {
-        sessionStorage.removeItem('redirectCount');
-        sessionStorage.removeItem('redirectAttempt');
-        
-        const eventStateToSave = {
-          eventName: event?.eventName,
-          eventDate: event?.eventDate,
-          selectedZone,
-          quantity,
-          price: {
-            ticketPrice: selectedZoneDetails?.price || 0,
-            platformFee: PLATFORM_FEE,
-            total: totalPrice
-          }
-        };
-        
-        sessionStorage.setItem(`booking_${id}`, JSON.stringify(eventStateToSave));
-      } catch (err) {
-        console.warn('Could not save booking state to session storage', err);
-      }
-      
-      // Navigate to payment page with the secure booking token
+      const data = await res.json();
       router.push(`/events/${id}/payment?bookingToken=${data.bookingToken}`);
-    })
-    .catch(err => {
-      console.error('Booking intent error:', err);
-      setError(err.message || 'Unable to create booking. Please try again.');
-    })
-    .finally(() => {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Booking creation failed');
+    } finally {
       setIsProcessing(false);
-    });
+    }
   };
 
   // Handle back navigation properly

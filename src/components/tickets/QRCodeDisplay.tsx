@@ -1,16 +1,45 @@
 import React from 'react';
 import Image from 'next/image';
+import QRCode from 'qrcode';
 
 interface QRCodeDisplayProps {
-  qrCode?: string;  // Make qrCode optional
+  qrCode?: string;
   ticketId: string;
   size?: number;
 }
 
 export default function QRCodeDisplay({ qrCode, ticketId, size = 150 }: QRCodeDisplayProps) {
-  // Handle undefined/null qrCode
-  if (!qrCode) {
-    // Return placeholder when no QR code is available
+  const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
+  
+  // Generate QR code on component mount
+  React.useEffect(() => {
+    async function generateQR() {
+      try {
+        // If qrCode starts with data:image or http, it's already an image
+        if (qrCode?.startsWith('data:image/') || qrCode?.startsWith('http')) {
+          setQrDataUrl(qrCode);
+          return;
+        }
+        
+        // Otherwise, generate a QR code from the string value
+        if (qrCode) {
+          const dataUrl = await QRCode.toDataURL(qrCode);
+          setQrDataUrl(dataUrl);
+        } else if (ticketId) {
+          // Fallback to ticketId if no qrCode is provided
+          const dataUrl = await QRCode.toDataURL(ticketId);
+          setQrDataUrl(dataUrl);
+        }
+      } catch (err) {
+        console.error('Error generating QR code:', err);
+      }
+    }
+    
+    generateQR();
+  }, [qrCode, ticketId]);
+  
+  // Show placeholder while loading or if generation fails
+  if (!qrDataUrl) {
     return (
       <div className="flex flex-col items-center">
         <div className="bg-gray-100 p-3 rounded-lg shadow-sm border flex items-center justify-center" style={{ width: size, height: size }}>
@@ -24,33 +53,17 @@ export default function QRCodeDisplay({ qrCode, ticketId, size = 150 }: QRCodeDi
       </div>
     );
   }
-
-  // Check if qrCode is a data URL or an external URL
-  const isDataUrl = qrCode.startsWith('data:image');
   
   return (
     <div className="flex flex-col items-center">
       <div className="bg-white p-3 rounded-lg shadow-sm border">
-        {isDataUrl ? (
-          // Use Image component for data URLs
-          <Image 
-            src={qrCode} 
-            alt={`Ticket QR code ${ticketId}`} 
-            width={size} 
-            height={size}
-            className="mx-auto"
-          />
-        ) : (
-          // Use regular img for external URLs
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={qrCode}
-            alt={`Ticket QR code ${ticketId}`}
-            width={size}
-            height={size}
-            className="mx-auto"
-          />
-        )}
+        <Image 
+          src={qrDataUrl}
+          alt={`Ticket QR Code: ${ticketId}`}
+          width={size}
+          height={size}
+          className="rounded"
+        />
       </div>
       <p className="text-xs text-gray-500 mt-2 text-center">
         {ticketId.substring(0, 8)}...

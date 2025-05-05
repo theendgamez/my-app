@@ -21,21 +21,21 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
-    // Basic validation
+    // Validate input
     if (!email || !password) {
-      return createResponse({ error: '電子郵件和密碼為必填項' }, 400);
+      return createResponse({ error: '請提供電子郵件和密碼' }, 400);
     }
 
     // Find user by email
     const user = await db.users.findByEmail(email);
     if (!user) {
-      return createResponse({ error: '電子郵件或密碼錯誤' }, 401);
+      return createResponse({ error: '用戶不存在或密碼錯誤' }, 401);
     }
 
     // Verify password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return createResponse({ error: '電子郵件或密碼錯誤' }, 401);
+      return createResponse({ error: '用戶不存在或密碼錯誤' }, 401);
     }
 
     // Check if email is verified
@@ -69,8 +69,7 @@ export async function POST(request: NextRequest) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     
     return response;
-  } catch (error) {
-    console.error('Login error:', error);
-    return createResponse({ error: '內部伺服器錯誤' }, 500);
+  } catch {
+    return createResponse({ error: '登入時出錯' }, 500);
   }
 }

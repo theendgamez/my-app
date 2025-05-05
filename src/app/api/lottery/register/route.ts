@@ -22,7 +22,7 @@ export const POST = createProtectedRouteHandler(async (req: NextRequest, user) =
     if (!event.isDrawMode) {
       return createResponse({ error: '此活動不支持抽籤' }, 400);
     }
-    
+
     // Check if registration period has ended
     if (event.endregisterDate && new Date(event.endregisterDate) < new Date()) {
       return createResponse({ error: '抽籤登記已結束' }, 400);
@@ -35,6 +35,25 @@ export const POST = createProtectedRouteHandler(async (req: NextRequest, user) =
     // Check if registration period has not started yet
     if (event.registerDate && new Date(event.registerDate) > new Date()) {
       return createResponse({ error: '抽籤登記尚未開始' }, 400);
+    }
+    
+    // Check if user has been registered for at least 7 days
+    const userDetails = await db.users.findById(user.userId);
+    if (!userDetails || !userDetails.createdAt) {
+      return createResponse({ error: '無法驗證用戶資料' }, 500);
+    }
+    
+    const userCreatedAt = new Date(userDetails.createdAt);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    if (userCreatedAt > sevenDaysAgo) {
+      return createResponse({ 
+        error: '只有註冊超過7天的用戶才能參加抽籤', 
+        registeredAt: userCreatedAt,
+        eligible: false,
+        eligibleDate: new Date(userCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }, 403);
     }
     
     // Check if user has already registered for this event

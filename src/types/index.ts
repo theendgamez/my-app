@@ -103,6 +103,8 @@ export interface Ticket {
   seatNumber: string;
   price: number;
   purchaseDate: string;
+  transferredAt?: string;  // 添加轉贈時間
+  transferredFrom?: string; // 添加轉贈來源
 }
 
 // Booking related types
@@ -126,7 +128,6 @@ export interface BookingDetails {
   expiresAt: number;
 }
 
-
 export interface Registration {
   registrationToken: string;
   eventId: string;
@@ -147,4 +148,17 @@ export interface Registration {
   drawDate?: string;
   isDrawn?: boolean;
   sessionId?: string;
+}
+
+// Friendship related types
+export interface Friendship {
+  friendshipId: string;
+  requesterId: string;
+  requesterName?: string;
+  recipientId: string;
+  recipientName?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  acceptedAt?: string;
+  userRelationship?: string; // 用於索引查詢
 }

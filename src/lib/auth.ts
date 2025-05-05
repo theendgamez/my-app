@@ -101,21 +101,15 @@ export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<J
       // Handle jose-specific errors
       if (typeof err === 'object' && err !== null) {
         if ('code' in err && (err as { code?: string }).code === 'ERR_JWT_EXPIRED') {
-          console.log('Token expired');
           return null;
         }
         if ('code' in err && (err as { code?: string }).code === 'ERR_JWS_INVALID') {
-          console.log('Invalid token signature');
           return null;
         }
       }
       throw err;
     }
-  } catch (error) {
-    // Only log detailed errors in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Token verification failed:', error);
-    }
+  } catch {
     return null;
   }
 };
@@ -132,78 +126,48 @@ export const signToken = async (payload: JWTPayload, expiresIn: string | number,
       .sign(secretBytes);
     return token;
   } catch (error) {
-    console.error('Error signing token:', error);
     throw error;
   }
 };
 
 // Get current user from request with more robust role handling
 export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
+  const headers = req.headers;
+  
+  // Get token from Authorization header
+  const authHeader = headers.get('authorization');
+  const token = authHeader?.split(' ')[1];
+  
+  // Get userId from header (added for Vercel deployment)
+  const userIdHeader = headers.get('x-user-id');
+  
   try {
-    // Add debug info for Vercel deployment
-    console.log('Auth headers:', {
-      cookie: req.headers.get('cookie')?.substring(0, 20) + '...',
-      authorization: req.headers.get('authorization')?.substring(0, 20) + '...',
-      userId: req.headers.get('x-user-id'),
-      userRole: req.cookies.get('userRole')?.value
-    });
-    
-    // Try cookies first
-    const accessToken = req.cookies.get('accessToken')?.value;
-    
-    // If cookie auth fails, try header auth
-    const authHeader = req.headers.get('authorization');
-    const headerToken = authHeader?.startsWith('Bearer ') 
-      ? authHeader.substring(7) 
-      : null;
-
-    // Add userId header as fallback auth method
-    const userIdHeader = req.headers.get('x-user-id');
-    // Get role cookie as an additional data point
-    const roleCookie = req.cookies.get('userRole')?.value;
-    
-    let user: Users | null = null;
-    
-    // Try token authentication first
-    if (accessToken || headerToken) {
-      const token = accessToken || headerToken;
+    // Try using the token first
+    if (token) {
       try {
-        const decoded = token ? await verifyToken(token) : null;
-        
+        // Verify token
+        const decoded = await verifyToken(token);
         if (decoded?.userId) {
-          user = await db.users.findById(decoded.userId);
+          const user = await db.users.findById(decoded.userId);
           
           // Verify token version to ensure token hasn't been invalidated
           if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
-            // If we have a role cookie but user doesn't have a role, use the cookie
-            if (!user.role && roleCookie) {
-              user.role = roleCookie;
-            }
             return user;
           }
         }
-      } catch (err) {
-        console.error('Token verification error:', err);
+      } catch {
+        // Token is invalid or expired
+        // Continue to try other methods
       }
     }
     
-    // Fall back to userIdHeader if token auth failed
-    if (!user && userIdHeader) {
-      // Use userId header as backup authentication
-      console.log('Falling back to userId header auth:', userIdHeader);
-      user = await db.users.findById(userIdHeader);
-      if (user) {
-        // If we have a role cookie but user doesn't have a role, use the cookie
-        if (!user.role && roleCookie) {
-          user.role = roleCookie;
-        }
-        return user;
-      }
+    // Fall back to userId header if token doesn't work
+    if (userIdHeader) {
+      return await db.users.findById(userIdHeader);
     }
     
     return null;
-  } catch (error) {
-    console.error('Auth error:', error);
+  } catch  {
     return null;
   }
 };
@@ -255,8 +219,7 @@ export const handleTokenRefresh = async (req: NextRequest): Promise<NextResponse
     setAuthCookies(response, tokens.accessToken, tokens.refreshToken);
     
     return response;
-  } catch (error) {
-    console.error('Token refresh error:', error);
+  } catch  {
     return null;
   }
 };

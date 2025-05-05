@@ -54,6 +54,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
     }
 
+    // Update zone quantity
+    const zoneFromEvent = event.zones?.find(zone => zone.name === registration.zoneName);
+    if (zoneFromEvent && zoneFromEvent.zoneQuantity !== undefined) {
+      // BUGFIX: Get the current event to have the most up-to-date zone quantity
+      const currentEvent = await db.events.findById(registration.eventId);
+      if (!currentEvent) {
+        return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
+      }
+      
+      // Find the current zone details with up-to-date quantity
+      const currentZoneDetails = currentEvent.zones?.find(z => z.name === registration.zoneName);
+      if (currentZoneDetails && currentZoneDetails.zoneQuantity !== undefined) {
+        // Calculate the new remaining quantity
+        const currentQuantity = Number(currentZoneDetails.zoneQuantity);
+        const newQuantity = Math.max(0, currentQuantity - quantity);
+        
+        // Update with the new calculated quantity
+        await db.events.updateZoneRemaining(
+          registration.eventId,
+          registration.zoneName,
+          newQuantity
+        );
+        
+        console.log(`Zone quantity updated: ${registration.zoneName} in event ${registration.eventId}: ${currentQuantity} -> ${newQuantity}`);
+      }
+    }
+
     // In a real application, you would integrate with a payment processor here
     // For demo purposes, we'll just simulate payment processing
     

@@ -5,60 +5,43 @@ import { getCurrentUser } from '@/lib/auth';
 // GET user by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // Fix: Remove Promise wrapper
+  { params }: { params:  Promise<{ id: string }> }
 ) {
   try {
-    const userId = (await params).id; // No need for await
-    
-    // Log the requested user ID for debugging
-    console.log('API - User data requested for:', userId);
-    
-    // Get userId from header as fallback auth mechanism
-    const requestUserId = request.headers.get('x-user-id');
-    
-    // Add authentication/authorization checks...
+    // Get current user from token
     const currentUser = await getCurrentUser(request);
-    
-    console.log('Auth check:', { 
-      currentUser: currentUser?.userId || 'none',
-      requestUserId: requestUserId || 'none', 
-      requestedId: userId 
-    });
+    const requestedId = (await params).id;
 
-    // Allow access if:
-    // 1. User is authenticated and is requesting their own data
-    // 2. User is authenticated as admin
-    // 3. User ID in header matches requested ID (fallback auth)
-    if (currentUser) {
-      // If current user exists but they're not requesting their own data and not an admin
-      if (currentUser.userId !== userId && currentUser.role !== 'admin') {
-        return NextResponse.json({ error: 'Unauthorized access' }, { status: 403 });
-      }
-    } else if (!requestUserId || requestUserId !== userId) {
-      // No authenticated user and header doesn't match
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    // Check if user is requesting their own data or is admin
+    const hasAccess = currentUser && (
+      currentUser.userId === requestedId || 
+      currentUser.role === 'admin'
+    );
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
     }
-    
-    const user = await db.users.findById(userId);
+
+    // Fetch user data
+    const user = await db.users.findById(requestedId);
+
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
     }
-    
-    // Return limited user info for security
-    return NextResponse.json({
-      userId: user.userId,
-      userName: user.userName,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
-      isEmailVerified: user.isEmailVerified,
-      isPhoneVerified: user.isPhoneVerified,
-      createdAt: user.createdAt
-    });
-    
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+
+    // Return user data
+    return NextResponse.json(user);
+  } catch  {
+    return NextResponse.json(
+      { error: "Failed to retrieve user data" },
+      { status: 500 }
+    );
   }
 }
 

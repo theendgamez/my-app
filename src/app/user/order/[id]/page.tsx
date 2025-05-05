@@ -30,7 +30,6 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize fetchOrderDetails with useCallback
   const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
@@ -41,12 +40,10 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/payments/${paymentId}`, {
         headers: {
           'Content-Type': 'application/json',
-          // Add authorization header if token exists
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-          // Fallback header with user ID
           'x-user-id': user?.userId || ''
         },
-        credentials: 'include' // Changed to 'include' for consistency
+        credentials: 'include'
       });
       
       if (!res.ok) {
@@ -65,14 +62,40 @@ export default function OrderDetailPage() {
       // Process and validate the data before setting state
       const processedData = {
         ...data,
-        // Verify date formats or provide defaults
         purchaseDate: data.purchaseDate || new Date().toISOString(),
-        eventDate: data.eventDate || data.event?.eventDate || null,
-        // Ensure tickets array exists with proper fallback
+        eventDate: data.eventDate || 
+                  (data.event && data.event.eventDate) || 
+                  (data.tickets && data.tickets[0] && data.tickets[0].eventDate) || 
+                  null,
         tickets: Array.isArray(data.tickets) ? data.tickets : []
       };
       
-      // If we need to fetch tickets separately when they're not included
+      // If event date is missing, try to fetch event details directly
+      if (!processedData.eventDate && data.eventId) {
+        try {
+          const eventRes = await fetch(`/api/events/${data.eventId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+              'x-user-id': user?.userId || ''
+            },
+            credentials: 'include'
+          });
+          
+          if (eventRes.ok) {
+            const eventData = await eventRes.json();
+            if (eventData.eventDate) {
+              processedData.eventDate = eventData.eventDate;
+              processedData.eventLocation = eventData.location || processedData.eventLocation;
+              console.log("Retrieved event date from separate API call:", eventData.eventDate);
+            }
+          }
+        } catch (eventError) {
+          console.error('Error fetching event details separately:', eventError);
+        }
+      }
+      
+      // If we still don't have tickets, fetch them separately
       if (!processedData.tickets.length && data.paymentId) {
         try {
           const ticketsRes = await fetch(`/api/payments/${data.paymentId}/tickets`, {
@@ -81,7 +104,7 @@ export default function OrderDetailPage() {
               ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
               'x-user-id': user?.userId || ''
             },
-            credentials: 'include' // Changed to 'include' for consistency
+            credentials: 'include'
           });
           if (ticketsRes.ok) {
             const ticketsData = await ticketsRes.json();
@@ -142,6 +165,24 @@ export default function OrderDetailPage() {
   const formatCurrency = (amount?: number) => {
     if (amount === undefined) return 'HKD 0';
     return `HKD ${amount.toLocaleString('en-HK')}`;
+  };
+
+  // Helper function to generate a QR code if none exists
+  const ensureQRCode = (ticket: Ticket) => {
+    if (!ticket.qrCode) {
+      // Fallback to ticket ID if no QR code exists
+      return ticket.ticketId;
+    }
+    
+    // If the QR code isn't already a data URL, convert it
+    // This ensures it displays as an actual QR code image
+    if (!ticket.qrCode.startsWith('data:image/') && !ticket.qrCode.startsWith('http')) {
+      // For real implementation, you might want to generate a proper QR code here
+      // For now, we'll just use the ticket ID
+      return ticket.ticketId;
+    }
+    
+    return ticket.qrCode;
   };
 
   return (
@@ -256,10 +297,20 @@ export default function OrderDetailPage() {
                           {/* QR code display */}
                           <div className="mt-4 border-t pt-4 flex justify-center">
                             <QRCodeDisplay 
-                              qrCode={ticket.qrCode} 
+                              qrCode={ensureQRCode(ticket)} 
                               ticketId={ticket.ticketId} 
                               size={120}
                             />
+                          </div>
+
+                          {/* Ticket transfer option */}
+                          <div className="p-4 bg-gray-50 flex justify-end">
+                            <Link
+                              href={`/user/tickets/transfer?ticketId=${ticket.ticketId}`}
+                              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors text-sm"
+                            >
+                              轉贈給好友
+                            </Link>
                           </div>
                         </div>
                       ))}

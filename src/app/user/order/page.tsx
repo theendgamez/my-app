@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/navbar/Navbar';
 import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -188,18 +189,27 @@ export default function OrderPage() {
     };
   }, [isAuthenticated, authLoading, user, router, fetchTickets]);
 
-  // Format date function
-  const formatDate = (dateString: string) => {
+  // Format date function - improved to handle undefined and invalid dates
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '未知日期';
+    
     try {
-      return new Date(dateString).toLocaleString('zh-HK', {
+      // Validate the dateString is actually a valid date
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return '日期格式有誤';
+      }
+      
+      return date.toLocaleString('zh-HK', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch  {
-      return dateString;
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return '日期處理錯誤';
     }
   };
 
@@ -239,36 +249,42 @@ export default function OrderPage() {
             ) : (
               <div className="space-y-6">
                 {ticketGroups.map((group) => (
-                  <div key={group.paymentId} className="bg-white rounded-lg shadow-md overflow-hidden">
-                    {/* Payment header */}
-                    <div className="bg-blue-50 p-4 border-b border-blue-100">
-                      <h2 className="text-lg font-semibold text-blue-800">{group.eventName}</h2>
-                      <div className="flex justify-between text-sm">
-                        <span>購買時間: {formatDate(group.purchaseDate)}</span>
-                        <span>
-                          訂單編號: {group.paymentId.substring(0, 8)}...
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Order summary - simplified without ticket details */}
-                    <div className="p-4">
-                      <div className="flex flex-wrap justify-between items-center">
+                  <div key={group.paymentId} className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                         <div>
-                          <p className="text-sm text-gray-700">
-                            <span className="font-medium">活動日期:</span> {formatDate(group.eventDate)}
+                          <h2 className="text-xl font-semibold">{group.eventName}</h2>
+                          <p className="text-sm text-gray-700 mt-1">
+                            <span className="font-medium">訂單編號：</span> 
+                            {group.paymentId}
                           </p>
                           <p className="text-sm text-gray-700 mt-1">
-                            <span className="font-medium">票券數量:</span> {group.tickets.length} 張
+                            <span className="font-medium">購買時間：</span> 
+                            {formatDate(group.purchaseDate)}
+                          </p>
+                          <p className="text-sm text-gray-700 mt-1">
+                            <span className="font-medium">活動時間：</span> 
+                            {formatDate(group.eventDate)}
+                          </p>
+                          <p className="text-sm text-gray-700 mt-1">
+                            <span className="font-medium">票券數量：</span> {group.tickets.length} 張
                           </p>
                         </div>
                         
-                        <button 
-                          onClick={() => router.push(`/user/order/${group.paymentId}`)}
-                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors mt-2 sm:mt-0"
-                        >
-                          查看票券詳情
-                        </button>
+                        <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
+                          <Link
+                            href="/user/tickets/transfer"
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors text-center"
+                          >
+                            轉贈票券
+                          </Link>
+                          <button 
+                            onClick={() => router.push(`/user/order/${group.paymentId}`)}
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                          >
+                            查看票券詳情
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

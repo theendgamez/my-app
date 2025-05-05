@@ -96,13 +96,6 @@ const Sidebar: React.FC = () => {
     if (typeof window !== 'undefined') {
       const userRole = localStorage.getItem('userRole');
       setLocalAdmin(userRole === 'admin');
-      
-      // For debugging - log admin status
-      console.log('Sidebar admin status:', { 
-        contextAdmin: isAdmin, 
-        localStorageRole: userRole,
-        localAdmin: userRole === 'admin' 
-      });
     }
   }, [isAdmin]);
 

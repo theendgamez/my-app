@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
-import { BookingDetails, Payment } from '@/types';
+import { BookingDetails} from '@/types';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 // 10-minute countdown timer component
@@ -161,7 +161,7 @@ export default function PaymentPage() {
     
     setProcessing(true);
     setError(null);
-
+    
     try {
       // Validate that the booking hasn't expired
       if (bookingDetails.expiresAt < Date.now()) {
@@ -169,10 +169,15 @@ export default function PaymentPage() {
         throw new Error('您的預訂已過期，請重新選擇座位');
       }
 
-      const responseUnknown = await fetchWithAuth('/api/payments', {
+      // Use fetch directly instead of fetchWithAuth helper to have more control over error handling
+      const response = await fetch('/api/payments', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+          'x-user-id': user.userId
+        },
         body: JSON.stringify({
-          userId: user.userId, // Add userId to the request body
           bookingToken: searchParams.get('bookingToken'),
           cardDetails: {
             // Only send last 4 digits for security
@@ -180,42 +185,35 @@ export default function PaymentPage() {
           }
         }),
       });
-      const response = responseUnknown as Response;
 
+      // Handle HTTP errors
       if (!response.ok) {
+        const errorText = await response.text();
         let errorMessage = `Payment failed with status: ${response.status}`;
-        let errorData: { message: string; error?: string; code?: string } = { message: errorMessage };
         
         try {
-          // Safely try to parse the error response as JSON
-          const jsonData = await response.json();
-          errorData = jsonData || errorData;
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error('Error parsing error response:', parseError);
-          // Use the status text if JSON parsing fails
-          errorMessage = `Payment failed: ${response.statusText || 'Unknown error'}`;
+          // Try to parse as JSON, but don't fail if it's not valid JSON
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // If parsing fails, use the raw text if available
+          if (errorText) {
+            errorMessage = errorText;
+          }
         }
         
-        console.error('Payment processing error:', errorData);
-        
-        // Handle authentication errors specifically
-        if (errorData.code === 'UNAUTHORIZED') {
-          setError('Your session has expired. Please log in again.');
-          router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-          return;
-        }
-        
-        // Set a user-friendly error message
-        setError(errorMessage);
-        setProcessing(false);
-        return;
+        throw new Error(errorMessage);
       }
-
-      const payment: Payment = await response.json();
-      router.push(`/events/${eventId}/success?paymentId=${payment.paymentId}`);
+      
+      // Parse the successful response
+      const data = await response.json();
+      
+      // If successful, redirect to success page
+      router.push(`/events/${eventId}/success?paymentId=${data.paymentId}`);
     } catch (err) {
-      console.error('Payment submission error:', err);
+      console.error('Payment processing error:', err);
       setError(err instanceof Error ? err.message : '付款處理過程中發生錯誤');
       setProcessing(false);
     }

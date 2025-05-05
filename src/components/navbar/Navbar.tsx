@@ -134,6 +134,14 @@ const Navbar: React.FC = () => {
                         我的票券
                       </Link>
                       <Link 
+                        href="/user/friends" 
+                        className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FiTag className="mr-2" />
+                        好友管理
+                      </Link>
+                      <Link 
                         href="/user/lottery" 
                         className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
                         onClick={() => setIsUserMenuOpen(false)}
@@ -235,6 +243,14 @@ const Navbar: React.FC = () => {
                 >
                   <FiTag className="mr-2 h-5 w-5" />
                   我的票券
+                </Link>
+                <Link 
+                  href="/user/friends"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <FiTag className="mr-2 h-5 w-5" />
+                  好友管理
                 </Link>
                 <Link 
                   href="/user/lottery"
