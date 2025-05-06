@@ -134,7 +134,7 @@ export default function LotteryResultPage() {
                       <div className="flex-1 space-y-2">
                         <h3 className="font-semibold text-lg">{ticket.eventName}</h3>
                         <p className="text-gray-600">
-                          {new Date(ticket.eventDate).toLocaleString()}
+                          {ticket.eventDate ? new Date(ticket.eventDate).toLocaleString() : 'Date unavailable'}
                         </p>
                         <p className="text-gray-600">
                           {ticket.eventLocation}

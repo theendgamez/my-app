@@ -7,14 +7,17 @@ import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
-import QRCodeDisplay from '@/components/tickets/QRCodeDisplay'; // 使用普通QR組件
+import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
+import { Ticket } from '@/types';
+// Define proper ticket type
 
 export default function AdminTicketDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { isAdmin, loading: authLoading } = useAuth();
+  // We are using loading from auth, but can remove isAdmin since we're not using it
+  const { loading: authLoading } = useAuth();
   
-  const [ticket, setTicket] = useState<any>(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -144,7 +147,6 @@ export default function AdminTicketDetailPage() {
               </div>
             </div>
             
-            {/* Ticket details - similar to verify page but with more comprehensive info */}
             {/* ...existing ticket details code... */}
           </div>
         ) : (

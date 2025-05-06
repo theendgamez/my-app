@@ -152,8 +152,15 @@ export async function POST(request: NextRequest) {
             eventDate: event.eventDate,
             eventLocation: event.location || "TBD",
             seatNumber: generateSeatNumber(zoneName),
-            price: Number(event.zones.find(z => z.name === zoneName)?.price) || 0,
-            qrCode: await generateQrCode(ticketId)
+            price: String(Number(event.zones.find(z => z.name === zoneName)?.price) || 0),
+            qrCode: await generateQrCode(ticketId),
+            lastRefreshed: '',
+            nextRefresh: '',
+            lastVerified: null,
+            verificationCount: 0,
+            transferredAt: null,
+            transferredFrom: null,
+            adminNotes: ''
           });
         }
         

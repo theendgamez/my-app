@@ -7,13 +7,28 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 
+// Define a proper type for the verification result
+interface VerificationResult {
+  verified: boolean;
+  message: string;
+  status?: 'used' | 'cancelled' | 'available' | string;
+  ticket?: {
+    eventName: string;
+    eventDate: string;
+    zone: string;
+    seatNumber: string;
+    userRealName: string;
+    // Add other ticket properties as needed
+  };
+}
+
 export default function VerifyTicketPage() {
   const router = useRouter();
   const { isAuthenticated, isAdmin } = useAuth();
   const [ticketId, setTicketId] = useState('');
   const [qrData, setQrData] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<VerificationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = async (e: React.FormEvent) => {
@@ -81,7 +96,7 @@ export default function VerifyTicketPage() {
 
       const data = await response.json();
       setResult(data);
-    } catch (err) {
+    } catch  {
       setError('使用票券時出錯');
     } finally {
       setLoading(false);

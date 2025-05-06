@@ -131,10 +131,17 @@ export async function POST(request: NextRequest) {
           qrCode: ticketId,
           zone: booking.zone,
           seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
-          price: ticketPrice,
+          price: ticketPrice.toString(),
           purchaseDate: new Date().toISOString(),
           status: 'sold',
           paymentId,
+          lastRefreshed: '',
+          nextRefresh: '',
+          lastVerified: null,
+          verificationCount: 0,
+          transferredAt: null,
+          transferredFrom: null,
+          adminNotes: ''
         });
       }
     } catch (error) {

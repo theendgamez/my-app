@@ -212,7 +212,7 @@ export default function TransferTicketContent() {
                   <option value="">請選擇票券</option>
                   {tickets.map((ticket) => (
                     <option key={ticket.ticketId} value={ticket.ticketId}>
-                      {ticket.eventName} - {ticket.zone}區 - {new Date(ticket.eventDate).toLocaleDateString()}
+                      {ticket.eventName} - {ticket.zone}區 - {ticket.eventDate ? new Date(ticket.eventDate).toLocaleDateString() : '未知日期'}
                     </option>
                   ))}
                 </select>

@@ -174,8 +174,15 @@ export async function POST(request: NextRequest) {
         eventDate: event.eventDate,
         eventLocation: event.location ?? '',
         seatNumber: '',
-        price: totalAmount / quantity,
-        qrCode: ticketId
+        price: String(totalAmount / quantity),
+        qrCode: ticketId,
+        lastRefreshed: '',
+        nextRefresh: '',
+        lastVerified: null,
+        verificationCount: 0,
+        transferredAt: null,
+        transferredFrom: null,
+        adminNotes: ''
       };
       
       tickets.push(ticket);

@@ -5,7 +5,7 @@ import { DynamicTicketData, Ticket } from '@/types';
 export interface Block {
   index: number;
   timestamp: number;
-  data: any;
+  data: string | TicketTransaction[];
   previousHash: string;
   hash: string;
   nonce: number;
@@ -51,7 +51,7 @@ export class TicketBlockchain {
     return this.chain[this.chain.length - 1];
   }
 
-  private calculateHash(index: number, timestamp: number, data: any, previousHash: string, nonce: number): string {
+  private calculateHash(index: number, timestamp: number, data: string | TicketTransaction[], previousHash: string, nonce: number): string {
     return crypto
       .createHash('sha256')
       .update(index + timestamp + JSON.stringify(data) + previousHash + nonce)

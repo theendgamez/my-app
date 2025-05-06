@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar/Navbar';
 import Link from 'next/link';
@@ -36,7 +36,7 @@ export default function UserOrderPage() {
     return acc;
   }, {} as Record<string, Ticket[]>);
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     if (!user?.userId) {
       console.error("Cannot fetch tickets: userId is undefined");
       setError("認證問題: 缺少用戶ID");
@@ -91,7 +91,7 @@ export default function UserOrderPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.userId, router]);
 
   useEffect(() => {
     // Check authentication first
@@ -108,7 +108,7 @@ export default function UserOrderPage() {
       setError("無法載入用戶資訊");
       setLoading(false);
     }
-  }, [isAuthenticated, user?.userId, authLoading]);
+  }, [isAuthenticated, user?.userId, authLoading, fetchTickets, router]);
 
   // Format date function
   const formatDate = (dateString?: string) => {
@@ -123,7 +123,7 @@ export default function UserOrderPage() {
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch (error) {
+    } catch {
       return '日期格式有誤';
     }
   };

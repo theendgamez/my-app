@@ -140,10 +140,17 @@ export async function POST(request: NextRequest) {
           qrCode: ticketId,
           zone: booking.zone,
           seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
-          price: ticketPrice,
+          price: String(ticketPrice),
           purchaseDate: now,
           status: 'sold',
           paymentId,
+          lastRefreshed: '',
+          nextRefresh: '',
+          lastVerified: null,
+          verificationCount: 0,
+          transferredAt: null,
+          transferredFrom: null,
+          adminNotes: ''
         });
       }
 

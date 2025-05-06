@@ -1,68 +1,32 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
+import { Ticket } from '@/types';
 
 export default function AdminTicketVerifyPage() {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Using these variables in the UI behavior based on query params
   const token = searchParams.get('token');
   const source = searchParams.get('source');
   const shouldRedirect = searchParams.get('redirect') === 'true';
   
-  const { isAdmin, loading: authLoading } = useAuth();
-  const [ticket, setTicket] = useState<any>(null);
+  // We need the loading state from auth, can ignore isAdmin since AdminPage handles that
+  const { loading: authLoading } = useAuth();
+  const [ticket, setTicket] = useState<Ticket| null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
 
-  // 獲取票券資料
-  useEffect(() => {
-    const fetchTicket = async () => {
-      if (!id) return;
-      
-      try {
-        setLoading(true);
-        const accessToken = localStorage.getItem('accessToken') || '';
-        const userId = localStorage.getItem('userId') || '';
-        
-        const response = await fetch(`/api/tickets/${id}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'x-user-id': userId,
-            // 標記這是來自票券檢查員的請求
-            'x-ticket-checker': 'true'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`無法獲取票券資料: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        setTicket(data);
-      } catch (err) {
-        console.error('Error fetching ticket:', err);
-        setError(err instanceof Error ? err.message : '無法獲取票券資料');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    if (!authLoading) {
-      fetchTicket();
-    }
-  }, [id, authLoading]);
-  
-  // 標記票券為已使用
-  const markAsUsed = async () => {
+  // Wrap markAsUsed with useCallback to maintain stable function reference
+  const markAsUsed = useCallback(async () => {
     if (!id || verifying) return;
     
     try {
@@ -109,8 +73,64 @@ export default function AdminTicketVerifyPage() {
     } finally {
       setVerifying(false);
     }
-  };
+  }, [id, verifying, setVerifying, setError, setSuccess, setTicket]);
 
+  // 獲取票券資料
+  useEffect(() => {
+    const fetchTicket = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        const accessToken = localStorage.getItem('accessToken') || '';
+        const userId = localStorage.getItem('userId') || '';
+        
+        // Add optional token and source from query parameters to the request
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'x-user-id': userId,
+          'x-ticket-checker': 'true'
+        };
+        
+        // If we have a verification token, add it to the headers
+        if (token) {
+          headers['x-verification-token'] = token;
+        }
+        
+        // If we have a source parameter, handle it accordingly
+        const sourceParam = source ? `&source=${source}` : '';
+        
+        const response = await fetch(`/api/tickets/${id}?verifying=true${sourceParam}`, {
+          headers
+        });
+        
+        if (!response.ok) {
+          throw new Error(`無法獲取票券資料: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setTicket(data);
+        
+        // Implement auto-redirect if requested via query parameter
+        if (shouldRedirect && data.status === 'sold') {
+          // Auto-mark as used if redirect parameter is true
+          markAsUsed();
+        }
+        
+      } catch (err) {
+        console.error('Error fetching ticket:', err);
+        setError(err instanceof Error ? err.message : '無法獲取票券資料');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (!authLoading) {
+      fetchTicket();
+    }
+  }, [id, authLoading, token, source, shouldRedirect, markAsUsed]);
+  
   // 取消票券
   const cancelTicket = async () => {
     if (!id || verifying) return;
@@ -272,14 +292,6 @@ export default function AdminTicketVerifyPage() {
                   <p className="text-sm text-gray-500">購買日期</p>
                   <p className="font-medium">{ticket.formattedPurchaseDate}</p>
                 </div>
-                
-                {ticket.transferredFrom && (
-                  <div>
-                    <p className="text-sm text-gray-500">轉讓自</p>
-                    <p className="font-medium">{ticket.transferredFrom}</p>
-                    <p className="text-xs text-gray-500">{ticket.transferredAt && new Date(ticket.transferredAt).toLocaleString()}</p>
-                  </div>
-                )}
                 
                 {ticket.verificationInfo && (
                   <div>

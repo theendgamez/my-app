@@ -100,31 +100,35 @@ export interface Ticket {
   ticketId: string;
   eventId: string;
   eventName: string;
-  eventDate: string;
-  eventLocation: string;
   zone: string;
-  userId: string;
-  userRealName: string;
-  qrCode: string;
-  paymentId: string;
   status: 'available' | 'reserved' | 'sold' | 'used' | 'cancelled';
-  seatNumber: string;
-  price: number;
-  purchaseDate: string;
-  transferredAt?: string;  // 添加轉贈時間
-  transferredFrom?: string; // 添加轉贈來源
+  userId: string;
+  userRealName?: string;
+  paymentId?: string;
+  purchaseDate?: string;
+  eventDate?: string;
+  eventLocation?: string;
+  seatNumber?: string;
+  qrCode?: string;
+  lastRefreshed: string;
+  nextRefresh: string;
+  formattedPurchaseDate?: string;
+  formattedEventDate?: string;
+  verificationInfo?: {
+    verificationStatus: string;
+    lastVerified: string | null;
+    verificationCount: number;
+    isTransferred: boolean;
+    originalOwner: string | null;
+    adminNotes: string | null;
+  };
+  lastVerified: string | null;
+  verificationCount: number;
+  transferredFrom: string | null;
+  adminNotes: string | null;
+  transferredAt: string | null;
   dynamicData?: DynamicTicketData;
-  lastRefreshed?: string;
-  refreshInterval?: number; // 刷新間隔（秒）
-  blockchainRef?: string;   // 區塊鏈引用ID
-  nextRefresh?: string; // 下一次刷新時間
-  lastVerified?: string; // 最後驗證時間
-  verificationStatus?: 'valid' | 'used' | 'invalid'; // 驗證狀態
-  verificationInfo?: string; // 驗證信息
-  adminNotes?: string; // 管理員備註
-  verificationCount?: number; // 驗證次數
-  isTransferred?: boolean; // 是否已轉贈
-  originalOwner?: string; // 原持有者ID
+  price: string;
 }
 
 // Booking related types
@@ -171,6 +175,7 @@ export interface Registration {
   priorityScore?: number;  // 優先權分數
   riskScore?: number;      // 風險評分
   lastPurchaseDate?: string; // 上次購票日期
+  
 }
 
 // Friendship related types
