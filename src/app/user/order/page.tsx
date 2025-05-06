@@ -1,205 +1,121 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Navbar from '@/components/navbar/Navbar';
-import { Ticket } from '@/types';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-// Interface for grouped tickets
-interface TicketGroup {
-  paymentId: string;
+interface Ticket {
+  ticketId: string;
+  eventId: string;
   eventName: string;
-  eventDate: string;
-  purchaseDate: string;
-  tickets: Ticket[];
+  zone: string;
+  seatNumber?: string;
+  status: 'available' | 'reserved' | 'sold' | 'used' | 'cancelled';
+  paymentId?: string;
+  purchaseDate?: string;
+  eventDate?: string;
 }
 
-export default function OrderPage() {
-  const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const [ticketGroups, setTicketGroups] = useState<TicketGroup[]>([]);
+export default function UserOrderPage() {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  // Updated fetchTickets function with better auth handling
-  const fetchTickets = useCallback(async () => {
-    try {
-      setLoading(true);
-      // Safe localStorage access
-      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      
-      // Fetch tickets using user ID
-      const res = await fetch(`/api/users/${user?.userId}/tickets`, {
-        headers: {
-          'Content-Type': 'application/json',
-          // Add authorization header if token exists
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-          // Fallback header with user ID
-          'x-user-id': user?.userId || ''
-        },
-        credentials: 'include'  // Keep this as include to be consistent
-      });
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          // Try to refresh token first
-          try {
-            const refreshRes = await fetch('/api/auth/refresh', {
-              method: 'GET',
-              credentials: 'include'
-            });
-            
-            if (refreshRes.ok) {
-              const refreshData = await refreshRes.json();
-              if (refreshData.accessToken && typeof window !== 'undefined') {
-                // Store new token and retry the request - safely
-                localStorage.setItem('accessToken', refreshData.accessToken);
-                
-                // Retry with new token
-                const retryRes = await fetch(`/api/users/${user?.userId}/tickets`, {
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${refreshData.accessToken}`,
-                    'x-user-id': user?.userId || ''
-                  },
-                  credentials: 'include'
-                });
-                
-                if (retryRes.ok) {
-                  const retryData = await retryRes.json();
-                  // Continue with processing data as before
-                  const groupedByPayment: Record<string, Ticket[]> = {};
-                  retryData.forEach((ticket: Ticket) => {
-                    const paymentId = ticket.paymentId || 'unknown';
-                    if (!groupedByPayment[paymentId]) {
-                      groupedByPayment[paymentId] = [];
-                    }
-                    groupedByPayment[paymentId].push(ticket);
-                  });
-                  
-                  const groups = Object.entries(groupedByPayment).map(([paymentId, ticketList]) => {
-                    const firstTicket = ticketList[0];
-                    return {
-                      paymentId,
-                      eventName: firstTicket.eventName,
-                      eventDate: firstTicket.eventDate,
-                      purchaseDate: firstTicket.purchaseDate,
-                      tickets: ticketList
-                    };
-                  });
-                  
-                  groups.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-                  
-                  setTicketGroups(groups);
-                  return;
-                }
-              }
-            }
-            
-            // If we get here, token refresh failed or retry failed
-            // Safe sessionStorage access with browser check
-            const redirectAttemptKey = 'orderRedirectAttempt';
-            if (typeof window !== 'undefined') {
-              const redirectAttempt = sessionStorage.getItem(redirectAttemptKey);
-              
-              if (!redirectAttempt) {
-                // Set flag to prevent loops
-                sessionStorage.setItem(redirectAttemptKey, Date.now().toString());
-                router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
-                return;
-              } else {
-                // Check if the redirect attempt is recent (less than 5 seconds ago)
-                const attemptTime = parseInt(redirectAttempt);
-                if (Date.now() - attemptTime > 5000) {
-                  // If it's been more than 5 seconds, try again
-                  sessionStorage.setItem(redirectAttemptKey, Date.now().toString());
-                  router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
-                  return;
-                } else {
-                  // Otherwise show an error to avoid redirect loops
-                  throw new Error('登入已過期，請手動重新登入');
-                }
-              }
-            }
-          } catch (refreshError) {
-            console.error('Token refresh error:', refreshError);
-            throw new Error('身份驗證失敗，請重新登入');
-          }
-        }
-        throw new Error('Failed to fetch tickets');
-      }
-      
-      const data = await res.json();
-      
-      // Group tickets by payment ID
-      const groupedByPayment: Record<string, Ticket[]> = {};
-      data.forEach((ticket: Ticket) => {
-        const paymentId = ticket.paymentId || 'unknown';
-        if (!groupedByPayment[paymentId]) {
-          groupedByPayment[paymentId] = [];
-        }
-        groupedByPayment[paymentId].push(ticket);
-      });
-      
-      // Convert to array format for easier rendering
-      const groups = Object.entries(groupedByPayment).map(([paymentId, ticketList]) => {
-        // Get common data from first ticket in group
-        const firstTicket = ticketList[0];
-        return {
-          paymentId,
-          eventName: firstTicket.eventName,
-          eventDate: firstTicket.eventDate,
-          purchaseDate: firstTicket.purchaseDate,
-          tickets: ticketList
-        };
-      });
-      
-      // Sort by purchase date, newest first
-      groups.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-      
-      setTicketGroups(groups);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  // Group tickets by event
+  const ticketsByEvent = tickets.reduce((acc, ticket) => {
+    const eventId = ticket.eventId;
+    if (!acc[eventId]) {
+      acc[eventId] = [];
     }
-  }, [user, router]);
+    acc[eventId].push(ticket);
+    return acc;
+  }, {} as Record<string, Ticket[]>);
 
-  // Add cleanup for redirect attempt in useEffect
-  useEffect(() => {
-    // Check authentication first
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent('/user/order')}`);
+  const fetchTickets = async () => {
+    if (!user?.userId) {
+      console.error("Cannot fetch tickets: userId is undefined");
+      setError("認證問題: 缺少用戶ID");
+      setLoading(false);
       return;
     }
 
-    // Only fetch tickets if user is authenticated
-    if (!authLoading && isAuthenticated && user) {
-      fetchTickets();
-    }
-    
-    // Cleanup function - safely access sessionStorage
-    return () => {
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('orderRedirectAttempt');
-      }
-    };
-  }, [isAuthenticated, authLoading, user, router, fetchTickets]);
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Format date function - improved to handle undefined and invalid dates
+      const accessToken = localStorage.getItem('accessToken');
+      const userId = user.userId;
+      
+      console.log(`Fetching tickets for user: ${userId}`);
+      
+      // Be explicit about constructing the headers to ensure userId is included
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
+
+      const response = await fetch(`/api/users/${userId}/tickets`, {
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log("Authentication failed, redirecting to login");
+          router.push(`/login?redirect=${encodeURIComponent("/user/order")}&auth_error=true`);
+          return;
+        }
+        
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch tickets: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`Received ${data.length} tickets`);
+      setTickets(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching tickets:', err);
+      setError(err instanceof Error ? err.message : '載入票券資料失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check authentication first
+    if (!authLoading && !isAuthenticated) {
+      console.log("User not authenticated, redirecting to login");
+      router.push(`/login?redirect=${encodeURIComponent("/user/order")}`);
+      return;
+    }
+
+    // Only fetch tickets if user is authenticated and has userId
+    if (isAuthenticated && user?.userId) {
+      fetchTickets();
+    } else if (!authLoading && isAuthenticated && !user?.userId) {
+      setError("無法載入用戶資訊");
+      setLoading(false);
+    }
+  }, [isAuthenticated, user?.userId, authLoading]);
+
+  // Format date function
   const formatDate = (dateString?: string) => {
     if (!dateString) return '未知日期';
     
     try {
-      // Validate the dateString is actually a valid date
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return '日期格式有誤';
-      }
-      
       return date.toLocaleString('zh-HK', {
         year: 'numeric',
         month: '2-digit',
@@ -208,8 +124,20 @@ export default function OrderPage() {
         minute: '2-digit'
       });
     } catch (error) {
-      console.error('Date formatting error:', error);
-      return '日期處理錯誤';
+      return '日期格式有誤';
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'sold':
+        return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">已售出</span>;
+      case 'used':
+        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">已使用</span>;
+      case 'cancelled':
+        return <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">已取消</span>;
+      default:
+        return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">已預訂</span>;
     }
   };
 
@@ -217,80 +145,92 @@ export default function OrderPage() {
     <>
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
-        {authLoading ? (
-          <div className="flex justify-center items-center py-10">
+        <h1 className="text-2xl font-bold mb-6">我的票券</h1>
+
+        {authLoading || loading ? (
+          <div className="flex justify-center py-8">
             <LoadingSpinner size="large" />
           </div>
+        ) : error ? (
+          <div className="p-4 border border-red-200 bg-red-50 text-red-600 rounded-lg">
+            <p>{error}</p>
+            <button 
+              onClick={fetchTickets} 
+              className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+              disabled={!user?.userId}
+            >
+              重試
+            </button>
+          </div>
+        ) : Object.keys(ticketsByEvent).length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-lg text-gray-600 mb-4">您還沒有任何票券</p>
+            <Link href="/events" className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">
+              立即瀏覽活動
+            </Link>
+          </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6">我的票券</h1>
-            
-            {loading ? (
-              <div className="flex justify-center items-center py-10">
-                <LoadingSpinner size="large" />
+          <div className="space-y-8">
+            {Object.entries(ticketsByEvent).map(([eventId, eventTickets]) => (
+              <div key={eventId} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-blue-50 p-4 border-b border-blue-100">
+                  <h2 className="text-xl font-semibold">{eventTickets[0].eventName}</h2>
+                  <p className="text-sm text-gray-600">
+                    活動時間: {formatDate(eventTickets[0].eventDate)}
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          票券編號
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          區域 / 座位
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          購買時間
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          狀態
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {eventTickets.map((ticket) => (
+                        <tr key={ticket.ticketId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {ticket.ticketId.substring(0, 8)}...
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ticket.zone} {ticket.seatNumber ? `/ ${ticket.seatNumber}` : ''}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(ticket.purchaseDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(ticket.status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <Link 
+                              href={`/user/order/${ticket.paymentId}`}
+                              className="text-blue-600 hover:text-blue-800 mr-4"
+                            >
+                              查看詳情
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ) : error ? (
-              <div className="p-4 border border-red-200 bg-red-50 text-red-600 rounded-lg mb-6">
-                <p>{error}</p>
-              </div>
-            ) : ticketGroups.length === 0 ? (
-              <div className="bg-white p-6 rounded-lg shadow-md text-center py-12">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-lg text-gray-600 mb-4">您還沒有任何票券</p>
-                <button 
-                  onClick={() => router.push('/events')}
-                  className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-                >
-                  瀏覽活動
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {ticketGroups.map((group) => (
-                  <div key={group.paymentId} className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="p-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                        <div>
-                          <h2 className="text-xl font-semibold">{group.eventName}</h2>
-                          <p className="text-sm text-gray-700 mt-1">
-                            <span className="font-medium">訂單編號：</span> 
-                            {group.paymentId}
-                          </p>
-                          <p className="text-sm text-gray-700 mt-1">
-                            <span className="font-medium">購買時間：</span> 
-                            {formatDate(group.purchaseDate)}
-                          </p>
-                          <p className="text-sm text-gray-700 mt-1">
-                            <span className="font-medium">活動時間：</span> 
-                            {formatDate(group.eventDate)}
-                          </p>
-                          <p className="text-sm text-gray-700 mt-1">
-                            <span className="font-medium">票券數量：</span> {group.tickets.length} 張
-                          </p>
-                        </div>
-                        
-                        <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
-                          <Link
-                            href="/user/tickets/transfer"
-                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors text-center"
-                          >
-                            轉贈票券
-                          </Link>
-                          <button 
-                            onClick={() => router.push(`/user/order/${group.paymentId}`)}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-                          >
-                            查看票券詳情
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         )}
       </div>

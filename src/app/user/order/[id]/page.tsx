@@ -7,7 +7,8 @@ import { Ticket } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
+import DynamicQRCode from '@/components/tickets/DynamicQRCode';
+import TicketHistory from '@/components/tickets/TicketHistory';
 
 interface OrderDetails {
   paymentId: string;
@@ -29,14 +30,14 @@ export default function OrderDetailPage() {
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState<boolean>(false);
 
   const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
-      // Safe localStorage access
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
-      // Fetch order details using payment ID
       const res = await fetch(`/api/payments/${paymentId}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,6 @@ export default function OrderDetailPage() {
       
       const data = await res.json();
       
-      // Process and validate the data before setting state
       const processedData = {
         ...data,
         purchaseDate: data.purchaseDate || new Date().toISOString(),
@@ -70,7 +70,6 @@ export default function OrderDetailPage() {
         tickets: Array.isArray(data.tickets) ? data.tickets : []
       };
       
-      // If event date is missing, try to fetch event details directly
       if (!processedData.eventDate && data.eventId) {
         try {
           const eventRes = await fetch(`/api/events/${data.eventId}`, {
@@ -95,7 +94,6 @@ export default function OrderDetailPage() {
         }
       }
       
-      // If we still don't have tickets, fetch them separately
       if (!processedData.tickets.length && data.paymentId) {
         try {
           const ticketsRes = await fetch(`/api/payments/${data.paymentId}/tickets`, {
@@ -125,24 +123,20 @@ export default function OrderDetailPage() {
   }, [paymentId, user, router]);
 
   useEffect(() => {
-    // Check authentication first
     if (!authLoading && !isAuthenticated) {
       router.push(`/login?redirect=${encodeURIComponent(`/user/order/${paymentId}`)}`);
       return;
     }
     
-    // Only fetch order details if user is authenticated
     if (!authLoading && isAuthenticated && user) {
       fetchOrderDetails();
     }
   }, [isAuthenticated, authLoading, user, paymentId, router, fetchOrderDetails]);
 
-  // Format date function
   const formatDate = (dateString?: string) => {
     if (!dateString) return '未知日期';
     
     try {
-      // Validate the dateString is actually a valid date
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
         return '日期格式有誤';
@@ -161,28 +155,9 @@ export default function OrderDetailPage() {
     }
   };
   
-  // Format currency
   const formatCurrency = (amount?: number) => {
     if (amount === undefined) return 'HKD 0';
     return `HKD ${amount.toLocaleString('en-HK')}`;
-  };
-
-  // Helper function to generate a QR code if none exists
-  const ensureQRCode = (ticket: Ticket) => {
-    if (!ticket.qrCode) {
-      // Fallback to ticket ID if no QR code exists
-      return ticket.ticketId;
-    }
-    
-    // If the QR code isn't already a data URL, convert it
-    // This ensures it displays as an actual QR code image
-    if (!ticket.qrCode.startsWith('data:image/') && !ticket.qrCode.startsWith('http')) {
-      // For real implementation, you might want to generate a proper QR code here
-      // For now, we'll just use the ticket ID
-      return ticket.ticketId;
-    }
-    
-    return ticket.qrCode;
   };
 
   return (
@@ -220,7 +195,6 @@ export default function OrderDetailPage() {
               </div>
             ) : orderDetails ? (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                {/* Order header */}
                 <div className="bg-blue-50 p-6 border-b border-blue-100">
                   <h2 className="text-xl font-semibold text-blue-800 mb-3">{orderDetails.eventName}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,7 +223,6 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
                 
-                {/* Payment details */}
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="font-semibold text-lg mb-3">付款詳情</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -270,7 +243,6 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
                 
-                {/* Tickets list */}
                 <div className="p-6">
                   <h3 className="font-semibold text-lg mb-3">票券清單</h3>
                   <p className="text-sm text-gray-500 mb-3">共 {orderDetails?.tickets?.length || 0} 張票券</p>
@@ -294,16 +266,37 @@ export default function OrderDetailPage() {
                             </div>
                           </div>
                           
-                          {/* QR code display */}
-                          <div className="mt-4 border-t pt-4 flex justify-center">
-                            <QRCodeDisplay 
-                              qrCode={ensureQRCode(ticket)} 
-                              ticketId={ticket.ticketId} 
-                              size={120}
-                            />
+                          <div className="text-center py-8">
+                            {ticket.qrCode ? (
+                              <div className="mb-4">
+                                <DynamicQRCode
+                                  ticketId={ticket.ticketId}
+                                  initialQrData={ticket.qrCode}
+                                  refreshInterval={300}
+                                  size={200}
+                                  showVerifyInfo={true}
+                                />
+                                <p className="mt-2 text-sm text-gray-600">請妥善保管您的票券，QR碼會使用區塊鏈技術保護以防偽造</p>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 p-4 rounded-lg">
+                                <div className="flex justify-center mb-3">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                </div>
+                                <p className="text-gray-700 mb-3">此票券的QR碼暫時無法顯示</p>
+                                <p className="text-sm text-gray-500 mb-4">可能是系統尚未生成QR碼或發生技術問題</p>
+                                <button 
+                                  onClick={() => fetchOrderDetails()}
+                                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                                >
+                                  重新獲取QR碼
+                                </button>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Ticket transfer option */}
                           <div className="p-4 bg-gray-50 flex justify-end">
                             <Link
                               href={`/user/tickets/transfer?ticketId=${ticket.ticketId}`}
@@ -312,6 +305,28 @@ export default function OrderDetailPage() {
                               轉贈給好友
                             </Link>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTicket(ticket.ticketId);
+                              setShowHistory(!showHistory);
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                          >
+                            {showHistory && selectedTicket === ticket.ticketId ? '隱藏交易歷史' : '查看交易歷史'}
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${
+                              showHistory && selectedTicket === ticket.ticketId ? 'rotate-180' : ''
+                            }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {showHistory && selectedTicket === ticket.ticketId && (
+                            <div className="mt-6">
+                              <TicketHistory ticketId={ticket.ticketId} />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -322,7 +337,6 @@ export default function OrderDetailPage() {
                   )}
                 </div>
                 
-                {/* Actions */}
                 <div className="p-6 bg-gray-50 border-t border-gray-100">
                   <div className="flex flex-wrap gap-3 justify-end">
                     <button 

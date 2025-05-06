@@ -9,11 +9,14 @@ export async function GET(request: NextRequest) {
       return createResponse({ user: null }, 200);
     }
     
-    // Return only necessary user data
+    // Return complete user data including role which is needed by the frontend
     return createResponse({
-      user: {
-        userId: user.userId,
-      }
+      userId: user.userId,
+      role: user.role || 'user',
+      userName: user.userName,
+      email: user.email,
+      isEmailVerified: user.isEmailVerified,
+      phoneNumber: user.phoneNumber
     }, 200);
   } catch (error) {
     console.error('Error fetching current user:', error);

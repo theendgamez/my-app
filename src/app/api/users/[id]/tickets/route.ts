@@ -4,55 +4,66 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const userId = (await params).id;
+    const userId = params.id;
     
-    console.log('API - Tickets requested for user:', userId);
+    // Improved logging with clear identification
+    console.log('[Tickets API] Request received:', { 
+      requestedUserId: userId,
+      url: request.url,
+      hasAuthHeader: !!request.headers.get('authorization')
+    });
 
-    if (!userId) {
-      return NextResponse.json({ error: '未提供用戶ID' }, { status: 400 });
+    if (!userId || userId === 'undefined') {
+      console.error('[Tickets API] Missing or invalid userId:', userId);
+      return NextResponse.json({ 
+        error: 'Missing or invalid userId',
+        details: 'A valid user ID must be provided in the URL path'
+      }, { status: 400 });
     }
 
-    // Authentication checks with improved logging
+    // Authentication check with fallbacks
     const user = await getCurrentUser(request);
     const headerUserId = request.headers.get('x-user-id');
-    const authHeader = request.headers.get('authorization');
     
-    console.log('Auth check for tickets API:', { 
-      currentUser: user?.userId || 'none', 
+    console.log('[Tickets API] Authentication check:', { 
+      authenticatedUser: user?.userId || 'none', 
       headerUserId: headerUserId || 'none',
-      requestedId: userId,
-      hasAuthHeader: !!authHeader
+      requestedUserId: userId
     });
     
-    if (user) {
-      if (user.userId !== userId && user.role !== 'admin') {
-        return NextResponse.json({ error: '無權訪問此用戶的票券' }, { status: 403 });
-      }
-    } else if (!headerUserId || headerUserId !== userId) {
-      // No authenticated user and header doesn't match
-      console.log('Authentication failed:', {
-        missingUser: !user,
-        missingHeader: !headerUserId,
-        headerMismatch: headerUserId !== userId
+    // Check permissions - allow access if:
+    // 1. User is authenticated and either matches the requested ID or is an admin
+    // 2. Header user ID matches the requested ID (fallback)
+    const hasAccess = (user && (user.userId === userId || user.role === 'admin')) ||
+                      (headerUserId && headerUserId === userId);
+    
+    if (!hasAccess) {
+      console.error('[Tickets API] Access denied:', { 
+        authenticatedUser: user?.userId || 'none',
+        headerUserId: headerUserId || 'none',
+        requestedUserId: userId
       });
       
       return NextResponse.json({ 
-        error: '請先登入以查看票券', 
-        message: 'Authentication required',
-        details: 'No valid authentication found'
+        error: 'Authorization required', 
+        code: 'UNAUTHORIZED_ACCESS',
+        message: 'You must be authenticated to access this resource'
       }, { status: 401 });
     }
 
     // Get tickets for the user
     const tickets = await db.tickets.findByUser(userId);
-    console.log(`Found ${tickets.length} tickets for user ${userId}`);
+    console.log(`[Tickets API] Found ${tickets.length} tickets for user ${userId}`);
     
     return NextResponse.json(tickets);
   } catch (error) {
-    console.error('Error fetching tickets:', error);
-    return NextResponse.json({ error: '獲取票券詳情時出錯' }, { status: 500 });
+    console.error('[Tickets API] Error:', error);
+    return NextResponse.json({ 
+      error: 'Failed to retrieve tickets',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

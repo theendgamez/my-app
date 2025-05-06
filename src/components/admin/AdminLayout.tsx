@@ -20,12 +20,12 @@ export default function AdminLayout({
 }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAdmin, isAuthenticated, loading } = useAuth();
+  const { isAdmin, isAuthenticated, loading, refreshAuthState } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
 
-  // Ensure component is mounted (client-side only) and check localStorage
+  // Ensure component is mounted and refresh auth state
   useEffect(() => {
     setIsMounted(true);
     
@@ -33,10 +33,13 @@ export default function AdminLayout({
     if (typeof window !== 'undefined') {
       const userRole = localStorage.getItem('userRole');
       setLocalAdmin(userRole === 'admin');
+      
+      // Refresh auth state from the server
+      refreshAuthState();
     }
-  }, []);
+  }, [refreshAuthState]);
 
-  // Admin access protection with improved Vercel compatibility
+  // Admin access protection with improved logic
   useEffect(() => {
     // Skip if not mounted or still loading auth state or already redirected
     if (!isMounted || hasRedirected) return;

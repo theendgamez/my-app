@@ -61,9 +61,6 @@ export default function FriendsList({ friends, onRemoveFriend }: Props) {
                     <span className="text-xs text-gray-400 mr-2">
                       成為好友於 {formatDate(friendship.acceptedAt)}
                     </span>
-                    <span className="text-xs bg-blue-100 text-blue-800 py-0.5 px-2 rounded-full">
-                      {friendship.friendshipDays} 天
-                    </span>
                     {friendship.canTransferTickets && (
                       <span className="text-xs bg-green-100 text-green-800 py-0.5 px-2 rounded-full ml-2">
                         可轉贈票券

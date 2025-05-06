@@ -142,7 +142,7 @@ export class Transaction {
           TableName: 'Events',
           Key: marshall({ eventId }),
           UpdateExpression: `SET zones[${zoneIndex}].zoneQuantity = :newValue`,
-          ExpressionAttributeValues: marshall({ ':newValue': newRemaining.toString() })
+          ExpressionAttributeValues: marshall({ ':newValue': newRemaining.toString() }, { removeUndefinedValues: true })
         }
       });
     }
@@ -193,6 +193,44 @@ export class Transaction {
 }
 
 /**
+ * Type definition for user purchase record
+ */
+interface UserPurchase {
+  userId: string;
+  eventId: string;
+  purchaseDate: string;
+  quantity: number;
+  paymentId: string;
+  purchaseId?: string; // Optional as it might be generated
+}
+
+/**
+ * Type definition for lottery history record
+ */
+interface LotteryHistory {
+  historyId?: string; // Primary key if not provided will be generated
+  userId: string;
+  eventId: string;
+  eventName: string;
+  result: 'won' | 'lost';
+  drawDate: string;
+}
+
+/**
+ * Type definition for ticket audit log
+ */
+interface TicketAuditLog {
+  auditId?: string;  // Primary key, will be generated if not provided
+  ticketId: string;
+  action: string;    // 'view', 'verify', 'transfer', etc.
+  userId: string;
+  userRole: string;
+  timestamp: string;
+  ipAddress?: string;
+  details?: string;
+}
+
+/**
  * Type definition for the database handler
  */
 interface DbHandler {
@@ -237,7 +275,8 @@ interface DbHandler {
     findById(ticketId: string): Promise<Ticket | null>;
     findByPayment(paymentId: string): Promise<Ticket[]>;
     update(ticketId: string, updates: Partial<Ticket>): Promise<Ticket>;
-    transfer(ticketId: string, newUserId: string, newUserRealName: string): Promise<Ticket>;
+    updateStatus(ticketId: string, status: 'available' | 'reserved' | 'sold' | 'used' | 'cancelled'): Promise<Ticket>;
+    transfer(ticketId: string, newUserId: string, newUserRealName: string): Promise<Ticket>; 
   };
   bookings: {
     create(bookingData: Booking): Promise<Booking>;
@@ -274,6 +313,20 @@ interface DbHandler {
     accept(friendshipId: string): Promise<Friendship>;
     reject(friendshipId: string): Promise<void>;
     remove(friendshipId: string): Promise<void>;
+  };
+  userPurchases: {
+    create(purchaseData: UserPurchase): Promise<UserPurchase>;
+    findByUser(userId: string): Promise<UserPurchase[]>;
+    findByPayment(paymentId: string): Promise<UserPurchase | null>;
+  };
+  lotteryHistory: {
+    create(data: LotteryHistory): Promise<LotteryHistory>;
+    findByUser(userId: string): Promise<LotteryHistory[]>;
+    findByEvent(eventId: string): Promise<LotteryHistory[]>;
+  };
+  ticketAudit: {
+    log(auditData: TicketAuditLog): Promise<TicketAuditLog>;
+    findByTicket(ticketId: string): Promise<TicketAuditLog[]>;
   };
   scanTable(tableName: string): Promise<unknown[]>;
   transaction<T>(callback: (trx: DbHandler) => Promise<T>): Promise<T>;
@@ -350,7 +403,7 @@ export const db: DbHandler = {
           TableName: 'Events',
           Key: marshall({ eventId }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames,
           ReturnValues: 'ALL_NEW'
         });
@@ -403,7 +456,7 @@ export const db: DbHandler = {
           TableName: 'Events',
           Key: marshall({ eventId }),
           UpdateExpression: `SET zones[${zoneIndex}].#propName = :newValue`,
-          ExpressionAttributeValues: marshall({ ':newValue': newValue.toString() }),
+          ExpressionAttributeValues: marshall({ ':newValue': newValue.toString() }, { removeUndefinedValues: true }),
           ExpressionAttributeNames: {
             '#propName': propertyName,
           }
@@ -440,6 +493,7 @@ export const db: DbHandler = {
    * User-related database operations
    */
   users: {
+
     /**
      * Retrieves all users
      * @returns Array of users
@@ -548,7 +602,7 @@ export const db: DbHandler = {
           TableName: 'Users',
           Key: marshall({ userId }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames,
           ReturnValues: 'ALL_NEW'
         });
@@ -590,7 +644,12 @@ export const db: DbHandler = {
           ? (unmarshall(result.Items[0]) as Users) 
           : null;
       });
-    }
+    },
+    /**
+     * Retrieves lottery statistics for a user
+     * @param userId - User identifier
+     * @returns Lottery statistics or null if not found
+     */
   },
 
   /**
@@ -671,7 +730,7 @@ export const db: DbHandler = {
           TableName: 'Payments',
           Key: marshall({ paymentId }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames,
           ReturnValues: 'ALL_NEW'
         });
@@ -844,7 +903,7 @@ export const db: DbHandler = {
           TableName: 'Tickets',
           Key: marshall({ ticketId }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames,
           ReturnValues: 'ALL_NEW'
         });
@@ -874,7 +933,7 @@ export const db: DbHandler = {
             ':newUserId': newUserId,
             ':newUserRealName': newUserRealName,
             ':transferredAt': new Date().toISOString()
-          }),
+          }, { removeUndefinedValues: true }),
           ReturnValues: 'ALL_NEW'
         });
         
@@ -882,8 +941,36 @@ export const db: DbHandler = {
         return result.Attributes ? unmarshall(result.Attributes) as Ticket : {
           ...currentTicket,
           userId: newUserId,
-          userRealName: newUserRealName
+          userRealName: newUserRealName,
+          status: currentTicket.status as Ticket['status']
         } as Ticket;
+      });
+    },
+    /**
+     * Updates the status of a ticket
+     * @param ticketId - Ticket identifier
+     * @param status - New status
+     * @returns Updated ticket
+     */
+    updateStatus: async (ticketId: string, status: 'available' | 'reserved' | 'sold' | 'used' | 'cancelled'): Promise<Ticket> => {
+      return executeDbCommand(async () => {
+        const currentTicket = await db.tickets.findById(ticketId);
+        if (!currentTicket) throw new Error(`Ticket with ID ${ticketId} not found`);
+        
+        const command = new UpdateItemCommand({
+          TableName: 'Tickets',
+          Key: marshall({ ticketId }),
+          UpdateExpression: 'SET #status = :status',
+          ExpressionAttributeValues: marshall({ ':status': status }, { removeUndefinedValues: true }),
+          ExpressionAttributeNames: { '#status': 'status' },
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? (unmarshall(result.Attributes) as Ticket) : { 
+          ...currentTicket, 
+          status 
+        };
       });
     }
   },
@@ -1053,7 +1140,7 @@ export const db: DbHandler = {
           TableName: 'Registration',
           Key: marshall({ registrationToken }),
           UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ExpressionAttributeNames: expressionAttributeNames,
           ReturnValues: 'ALL_NEW'
         });
@@ -1260,6 +1347,70 @@ export const db: DbHandler = {
   },
 
   /**
+   * Lottery history operations
+   */
+  lotteryHistory: {
+    /**
+     * Creates a new lottery history record
+     * @param data - Lottery history data
+     * @returns Created lottery history record
+     */
+    create: async (data: LotteryHistory): Promise<LotteryHistory> => {
+      return executeDbCommand(async () => {
+        // Generate a historyId if not provided
+        if (!data.historyId) {
+          data.historyId = `history_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        }
+        
+        const command = new PutItemCommand({
+          TableName: 'LotteryHistory',
+          Item: marshall(data, { removeUndefinedValues: true })
+        });
+        await client.send(command);
+        return data;
+      });
+    },
+
+    /**
+     * Finds lottery history records by user
+     * @param userId - User identifier
+     * @returns Array of lottery history records
+     */
+    findByUser: async (userId: string): Promise<LotteryHistory[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'LotteryHistory',
+          IndexName: 'userId-index',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: marshall({ ':userId': userId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as LotteryHistory) || [];
+      });
+    },
+
+    /**
+     * Finds lottery history records by event
+     * @param eventId - Event identifier
+     * @returns Array of lottery history records
+     */
+    findByEvent: async (eventId: string): Promise<LotteryHistory[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'LotteryHistory',
+          IndexName: 'eventId-index',
+          KeyConditionExpression: 'eventId = :eventId',
+          ExpressionAttributeValues: marshall({ ':eventId': eventId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as LotteryHistory) || [];
+      });
+    }
+  },
+
+  /**
    * Friendship-related database operations
    */
   friends: {
@@ -1428,7 +1579,7 @@ export const db: DbHandler = {
             ':status': 'accepted',
             ':acceptedAt': now,
             ':userRelation': 'user#all' // Indexed for querying all users' friendships
-          }),
+          }, { removeUndefinedValues: true }),
           ReturnValues: 'ALL_NEW'
         });
         
@@ -1468,6 +1619,118 @@ export const db: DbHandler = {
         });
         
         await client.send(command);
+      });
+    }
+  },
+
+  /**
+   * User purchase history operations
+   */
+  userPurchases: {
+    /**
+     * Creates a new user purchase record
+     * @param purchaseData - Purchase data
+     * @returns Created purchase record
+     */
+    create: async (purchaseData: UserPurchase): Promise<UserPurchase> => {
+      return executeDbCommand(async () => {
+        // Generate a purchaseId if not provided
+        if (!purchaseData.purchaseId) {
+          purchaseData.purchaseId = `purchase_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        }
+        
+        const command = new PutItemCommand({
+          TableName: 'UserPurchases',
+          Item: marshall(purchaseData, { removeUndefinedValues: true })
+        });
+        await client.send(command);
+        return purchaseData;
+      });
+    },
+
+    /**
+     * Finds purchases by user
+     * @param userId - User identifier
+     * @returns Array of purchase records
+     */
+    findByUser: async (userId: string): Promise<UserPurchase[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'UserPurchases',
+          IndexName: 'userId-index',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: marshall({ ':userId': userId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as UserPurchase) || [];
+      });
+    },
+
+    /**
+     * Finds a purchase by payment ID
+     * @param paymentId - Payment identifier
+     * @returns Purchase record or null if not found
+     */
+    findByPayment: async (paymentId: string): Promise<UserPurchase | null> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'UserPurchases',
+          IndexName: 'paymentId-index',
+          KeyConditionExpression: 'paymentId = :paymentId',
+          ExpressionAttributeValues: marshall({ ':paymentId': paymentId }),
+          Limit: 1
+        });
+        
+        const result = await client.send(command);
+        return result.Items && result.Items.length > 0 
+          ? (unmarshall(result.Items[0]) as UserPurchase) 
+          : null;
+      });
+    }
+  },
+
+  /**
+   * Ticket audit logging operations
+   */
+  ticketAudit: {
+    /**
+     * Logs a ticket audit event
+     * @param auditData - Audit data
+     * @returns Created audit log
+     */
+    log: async (auditData: TicketAuditLog): Promise<TicketAuditLog> => {
+      return executeDbCommand(async () => {
+        // Generate an auditId if not provided
+        if (!auditData.auditId) {
+          auditData.auditId = `audit_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        }
+        
+        const command = new PutItemCommand({
+          TableName: 'TicketAuditLogs',
+          Item: marshall(auditData, { removeUndefinedValues: true })
+        });
+        await client.send(command);
+        return auditData;
+      });
+    },
+
+    /**
+     * Finds audit logs by ticket ID
+     * @param ticketId - Ticket identifier
+     * @returns Array of audit logs
+     */
+    findByTicket: async (ticketId: string): Promise<TicketAuditLog[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'TicketAuditLogs',
+          IndexName: 'ticketId-index',
+          KeyConditionExpression: 'ticketId = :ticketId',
+          ExpressionAttributeValues: marshall({ ':ticketId': ticketId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item) as TicketAuditLog) || [];
       });
     }
   },

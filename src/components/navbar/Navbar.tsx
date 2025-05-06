@@ -23,7 +23,14 @@ const Navbar: React.FC = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
-  const { user, isAuthenticated, loading, logout } = useAuth();
+  const { user, isAuthenticated, loading, logout, refreshAuthState } = useAuth();
+
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window !== 'undefined') {
+      refreshAuthState();
+    }
+  }, [refreshAuthState]);
 
   useEffect(() => {
     if (!isAuthenticated) {

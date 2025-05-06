@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import Navbar from '@/components/navbar/Navbar';
+import { useAuth } from '@/context/AuthContext';
 
 // Loading fallback component
 const LoginFormSkeleton = () => (
@@ -33,6 +34,9 @@ const LoginForm = () => {
   const [loginError, setLoginError] = useState('');
   const [isProcessingRedirect, setIsProcessingRedirect] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Move useAuth to component level
+  const { login, refreshAuthState } = useAuth();
 
   useEffect(() => {
     // Show message if redirected due to auth error
@@ -86,62 +90,45 @@ const LoginForm = () => {
     setIsSubmitting(true);
     
     try {
-      // API call to authenticate user
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      // Call login with credentials object
+      const result = await login({
+        email: data.email,
+        password: data.password
       });
 
-      const result = await response.json();
+      if (result.success) {
+        // Store required auth data in localStorage
+        // (this is now redundant since login function does it, but keeping for safety)
+        if (result.token && result.user) {
+          localStorage.setItem('accessToken', result.token);
+          localStorage.setItem('userId', result.user.id);
+          localStorage.setItem('userRole', result.user.role);
+        }
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Login failed');
-      }
+        // Explicitly refresh auth state to ensure UI updates
+        await refreshAuthState();
 
-      // Type guard for the user object
-      if (result.user && typeof result.user === 'object' && 'userId' in result.user) {
-        // Make sure user ID is valid before storing
-        const userId = result.user.userId;
-        if (userId && typeof userId === 'string') {
-          // Store userId, role and accessToken in localStorage
-          localStorage.setItem('userId', userId);
-          
-          // IMPORTANT: Store the user role for admin sidebar visibility
-          if (result.user.role) {
-            localStorage.setItem('userRole', result.user.role);
-          }
-          
-          if (result.accessToken) {
-            localStorage.setItem('accessToken', result.accessToken);
-          }
-          
-          // Clear any redirect flags to prevent loops
-          localStorage.removeItem('redirect_attempt_count');
-          localStorage.removeItem('redirected_to_login');
-          localStorage.removeItem('last_redirect_time');
-          localStorage.removeItem('redirect_attempted');
-          
-          // Check if there was a source=admin parameter
-          const isFromAdmin = searchParams.get('source') === 'admin';
-          
-          // Redirect to intended destination or home
-          if (redirectPath) {
-            // Use replace instead of push for Vercel compatibility
-            router.replace(redirectPath);
-          } else {
-            // If coming from admin area and user is admin, go to admin dashboard
-            if (isFromAdmin && result.user.role === 'admin') {
-              router.replace('/admin/dashboard');
-            } else {
-              router.replace('/');
-            }
-          }
+        // Clear any redirect flags to prevent loops
+        localStorage.removeItem('redirect_attempt_count');
+        localStorage.removeItem('redirected_to_login');
+        localStorage.removeItem('last_redirect_time');
+        localStorage.removeItem('redirect_attempted');
+
+        // Check if there was a source=admin parameter
+        const isFromAdmin = searchParams.get('source') === 'admin';
+
+        // Redirect to intended destination or home
+        if (redirectPath) {
+          router.replace(redirectPath);
         } else {
-          throw new Error('Invalid user ID received from server');
+          if (isFromAdmin && result.user && result.user.role === 'admin') {
+            router.replace('/admin/dashboard');
+          } else {
+            router.replace('/');
+          }
         }
       } else {
-        throw new Error('Invalid user data received from server');
+        throw new Error(result.error || 'Invalid user data received from server');
       }
     } catch (err: unknown) {
       setLoginError(

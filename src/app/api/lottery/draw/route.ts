@@ -4,6 +4,13 @@ import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 
+// Define the Users interface
+interface Users {
+  userId: string;
+  createdAt?: string;
+  // Add other user properties as needed
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Check admin authentication
@@ -40,68 +47,76 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '沒有有效的付費登記' }, { status: 400 });
     }
 
+    // Calculate priority score for each user
+    for (const reg of registrations) {
+      try {
+        const user = await db.users.findById(reg.userId);
+        reg.priorityScore = await calculatePriorityScore(user);
+      } catch (error) {
+        console.error(`Error calculating priority score for user ${reg.userId}:`, error);
+        reg.priorityScore = 100; // Default score
+      }
+    }
+
     // Calculate ticket availability
     const availableTicketsByZone: Record<string, number> = {};
-    
-    // Initialize available tickets for each zone
     event.zones?.forEach(zone => {
       availableTicketsByZone[zone.name] = parseInt(String(zone.zoneQuantity)) || 0;
     });
 
-    // Define the registration type if not already defined
-    type Registration = {
-      registrationToken: string;
-      userId: string;
-      userRealName: string;
-      zoneName: string;
-      quantity: number;
-      paymentId: string;
-      email?: string;
-      phoneNumber?: string;
-      // add other properties if needed
-    };
-
-    // Track allocations per user to enforce maximum 2 tickets per person
-    const userAllocations: Record<string, number> = {};
-
-    /**
-     * Fisher-Yates (Knuth) Shuffle Algorithm
-     * This is a statistically fair algorithm for shuffling an array
-     * Reference: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-     */
-    const fairShuffle = (array: Registration[]): Registration[] => {
-      const shuffled = [...array];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        // Generate a random index between 0 and i (inclusive)
+    // Optimized lottery algorithm: weighted draw based on priority score
+    const weightedDraw = (registrations: Registration[]): Registration[] => {
+      // Create weighted pool
+      const weightedPool: Registration[] = [];
+      
+      // Add users to the lottery pool based on priority score
+      registrations.forEach(reg => {
+        const weight = Math.floor((reg.priorityScore || 100) / 10);
+        for (let i = 0; i < weight; i++) {
+          weightedPool.push(reg);
+        }
+      });
+      
+      // Apply Fisher-Yates shuffle for fairness
+      for (let i = weightedPool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        // Swap elements at i and j
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        [weightedPool[i], weightedPool[j]] = [weightedPool[j], weightedPool[i]];
       }
-      return shuffled;
+      
+      // Deduplicate, keeping the first occurrence of each registration
+      const uniqueResults: Record<string, boolean> = {};
+      return weightedPool.filter(reg => {
+        if (uniqueResults[reg.registrationToken]) {
+          return false;
+        }
+        uniqueResults[reg.registrationToken] = true;
+        return true;
+      });
     };
+
+    // Execute weighted draw
+    const shuffledRegistrations = weightedDraw(registrations);
     
-    // Apply fair shuffle algorithm to registrations
-    const shuffledRegistrations = fairShuffle(registrations) as Registration[];
-    
-    // Process each registration
-    const results = [];
+    // Process lottery results
+    const userAllocations: Record<string, number> = {};
     const winners = [];
     const losers = [];
+    const results = [];
     
     for (const reg of shuffledRegistrations) {
-      // Update status to 'drawn' first
+      // Update status to 'drawn'
       await db.registration.update(reg.registrationToken, {
         status: 'drawn'
       });
       
       const { zoneName, quantity, userId } = reg;
       
-      // Initialize user allocation if not exist
+      // Initialize user allocation
       if (!userAllocations[userId]) {
         userAllocations[userId] = 0;
       }
       
-      // Check if this allocation would exceed maximum tickets per user (2)
+      // Check if this allocation would exceed maximum tickets per user (default 2)
       const wouldExceedLimit = userAllocations[userId] + quantity > 2;
       
       // Check if enough tickets are available in the zone and user hasn't exceeded limit
@@ -133,13 +148,12 @@ export async function POST(request: NextRequest) {
             paymentId: reg.paymentId,
             status: 'available',
             purchaseDate: new Date().toISOString(),
-            // Required missing properties
             eventName: event.eventName,
             eventDate: event.eventDate,
             eventLocation: event.location || "TBD",
-            seatNumber: generateSeatNumber(zoneName), // You would need to implement this function
+            seatNumber: generateSeatNumber(zoneName),
             price: Number(event.zones.find(z => z.name === zoneName)?.price) || 0,
-            qrCode: await generateQrCode(ticketId) // Updated to use the QRCode library
+            qrCode: await generateQrCode(ticketId)
           });
         }
         
@@ -148,15 +162,24 @@ export async function POST(request: NextRequest) {
           ticketIds: ticketIds
         });
         
+        // Add lottery history
+        await db.lotteryHistory.create({
+          userId,
+          eventId,
+          eventName: event.eventName,
+          result: 'won',
+          drawDate: new Date().toISOString()
+        });
+        
         results.push({
           registrationToken: reg.registrationToken,
           userId: reg.userId,
-          result: 'won',
-          zoneName,
-          quantity
+          zoneName: reg.zoneName,
+          quantity: reg.quantity,
+          result: 'won'
         });
       } else {
-        // Loser (either no tickets left or would exceed 2 ticket limit)
+        // Loser
         losers.push(reg.registrationToken);
         
         // Update registration status
@@ -165,12 +188,21 @@ export async function POST(request: NextRequest) {
           drawnAt: new Date().toISOString()
         });
         
+        // Add lottery history
+        await db.lotteryHistory.create({
+          userId,
+          eventId,
+          eventName: event.eventName,
+          result: 'lost',
+          drawDate: new Date().toISOString()
+        });
+        
         results.push({
           registrationToken: reg.registrationToken,
           userId: reg.userId,
-          result: 'lost',
-          zoneName,
-          quantity
+          zoneName: reg.zoneName,
+          quantity: reg.quantity,
+          result: 'lost'
         });
       }
     }
@@ -192,30 +224,55 @@ export async function POST(request: NextRequest) {
         losers: losers.length
       },
       results,
-      // Add timestamp to prevent caching issues that might contribute to loops
       timestamp: Date.now()
     });
   } catch (error) {
     console.error('Lottery draw error:', error);
     return NextResponse.json({ 
       error: '執行抽籤時出錯', 
-      // Add error details if available to help with debugging
       details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    });
   }
 }
 
+
+// Calculate priority score based on user data
+async function calculatePriorityScore(user: Users | null): Promise<number> {
+  if (!user) return 100; // Default score if user not found
+  
+  // Get user's registration history
+  const userHistory = await db.lotteryHistory.findByUser(user.userId);
+  
+  // Basic algorithm: 
+  // - Base score: 100
+  // - Reduce score by 10 for each previous win (higher priority for those who rarely win)
+  // - Add 5 points per month of account age (up to 50)
+  
+  let score = 100;
+  
+  // Adjust based on previous wins
+  const wins = userHistory.filter(h => h.result === 'won').length;
+  score -= wins * 10;
+  
+  // Adjust based on account age if createdAt exists
+  if (user.createdAt) {
+    const accountAgeMonths = Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (30 * 24 * 60 * 60 * 1000));
+    score += Math.min(accountAgeMonths * 5, 50);
+  }
+  
+  // Ensure score is between 50 and 200
+  return Math.max(50, Math.min(200, score));
+}
+
 // Simple seat number generator: returns a random seat number in the format "<ZoneName>-<3-digit number>"
-// In production, you should ensure seat numbers are unique and not over-allocated per zone.
 function generateSeatNumber(zoneName: string): string {
-  const randomNum = Math.floor(100 + Math.random() * 900); // 3-digit number
+  const randomNum = Math.floor(100 + Math.random() * 900);
   return `${zoneName}-${randomNum}`;
 }
 
 // Generate QR code as a data URL
 async function generateQrCode(ticketId: string): Promise<string> {
   try {
-    // Generate QR code using the library
     const qrCodeDataUrl = await QRCode.toDataURL(ticketId, {
       width: 200,
       margin: 2,
@@ -224,8 +281,20 @@ async function generateQrCode(ticketId: string): Promise<string> {
     return qrCodeDataUrl;
   } catch (error) {
     console.error("Error generating QR code:", error);
-    // Fallback to external service if library fails
     return `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(ticketId)}&size=150x150`;
   }
 }
+
+// Define the registration type
+type Registration = {
+  registrationToken: string;
+  userId: string;
+  userRealName: string;
+  zoneName: string;
+  quantity: number;
+  paymentId: string;
+  email?: string;
+  phoneNumber?: string;
+  priorityScore?: number;
+};
 
