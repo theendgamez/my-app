@@ -7,8 +7,8 @@ import { Users } from '@/types';
 // Configuration constants
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY = '7d';
+const ACCESS_TOKEN_EXPIRY = '24h'; // Increased from '15m' to '24h'
+const REFRESH_TOKEN_EXPIRY = '30d'; // Increased from '7d' to '30d'
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Types
@@ -56,7 +56,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 15 * 60, // 15 minutes in seconds
+    maxAge: 24 * 60 * 60, // 24 hours in seconds
     path: '/'
   });
   
@@ -64,7 +64,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+    maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
     path: '/'
   });
 
@@ -82,7 +82,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: false, // Must be false so client JS can read it
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60, // Match refresh token expiry
+    maxAge: 30 * 24 * 60 * 60, // Match refresh token expiry
     path: '/'
   });
 };

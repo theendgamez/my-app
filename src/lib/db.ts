@@ -8,9 +8,11 @@ import {
   GetItemCommand,
   TransactWriteItemsCommand,
   TransactWriteItem,
+  QueryCommandInput,
+  ScanCommandInput
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
-import { Events, Users, Payment, Ticket, Booking, Friendship } from '@/types';
+import { Events, Users, Payment, Ticket, Booking, Friendship, UserPurchase, LotteryHistory, TicketAuditLog } from '@/types';
 
 /**
  * Initialize DynamoDB client with environment credentials
@@ -192,43 +194,6 @@ export class Transaction {
   }
 }
 
-/**
- * Type definition for user purchase record
- */
-interface UserPurchase {
-  userId: string;
-  eventId: string;
-  purchaseDate: string;
-  quantity: number;
-  paymentId: string;
-  purchaseId?: string; // Optional as it might be generated
-}
-
-/**
- * Type definition for lottery history record
- */
-interface LotteryHistory {
-  historyId?: string; // Primary key if not provided will be generated
-  userId: string;
-  eventId: string;
-  eventName: string;
-  result: 'won' | 'lost';
-  drawDate: string;
-}
-
-/**
- * Type definition for ticket audit log
- */
-interface TicketAuditLog {
-  auditId?: string;  // Primary key, will be generated if not provided
-  ticketId: string;
-  action: string;    // 'view', 'verify', 'transfer', etc.
-  userId: string;
-  userRole: string;
-  timestamp: string;
-  ipAddress?: string;
-  details?: string;
-}
 
 /**
  * Type definition for the database handler
@@ -327,6 +292,16 @@ interface DbHandler {
   ticketAudit: {
     log(auditData: TicketAuditLog): Promise<TicketAuditLog>;
     findByTicket(ticketId: string): Promise<TicketAuditLog[]>;
+    getLogsByTicketId(ticketId: string, actionType?: string): Promise<TicketAuditLog[]>;
+    logBlockchainSync(ticketId: string, blockchainRef: string): Promise<TicketAuditLog>;
+    getBlockchainHistory(ticketId: string): Promise<{
+      transactionDate: string;
+      action: string;
+      fromUser?: string;
+      toUser?: string;
+      blockchainRef?: string;
+    }[]>;
+    isRecordedOnBlockchain(ticketId: string): Promise<boolean>;
   };
   scanTable(tableName: string): Promise<unknown[]>;
   transaction<T>(callback: (trx: DbHandler) => Promise<T>): Promise<T>;
@@ -1731,6 +1706,160 @@ export const db: DbHandler = {
         
         const result = await client.send(command);
         return result.Items?.map(item => unmarshall(item) as TicketAuditLog) || [];
+      });
+    },
+    getLogsByTicketId: async (ticketId: string, actionType?: string): Promise<TicketAuditLog[]> => {
+      return executeDbCommand(async () => {
+        try {
+          // First try using ticketId-index (most tables would have this index)
+          const queryParams: QueryCommandInput = {
+            TableName: 'TicketAuditLogs',
+            IndexName: 'ticketId-index',
+            KeyConditionExpression: 'ticketId = :ticketId',
+            ExpressionAttributeValues: {
+              ':ticketId': { S: ticketId }
+            }
+          };
+          
+          // Add filter for action type if provided
+          if (actionType) {
+            queryParams.FilterExpression = '#a = :actionType';
+            queryParams.ExpressionAttributeNames = {
+              '#a': 'action'
+            };
+            queryParams.ExpressionAttributeValues![':actionType'] = { S: actionType };
+          }
+          
+          const command = new QueryCommand(queryParams);
+          const result = await client.send(command);
+          return result.Items?.map(item => unmarshall(item) as TicketAuditLog) || [];
+        } catch (error) {
+          console.warn('Query failed, falling back to scan:', error);
+          
+          // Fallback to a scan operation
+          const scanParams: ScanCommandInput = {
+            TableName: 'TicketAuditLogs',
+            FilterExpression: 'ticketId = :ticketId',
+            ExpressionAttributeValues: {
+              ':ticketId': { S: ticketId }
+            }
+          };
+          
+          // Add additional filter for action if provided
+          if (actionType) {
+            scanParams.FilterExpression += ' AND #a = :actionType';
+            scanParams.ExpressionAttributeNames = {
+              '#a': 'action'
+            };
+            scanParams.ExpressionAttributeValues![':actionType'] = { S: actionType };
+          }
+          
+          const scanCommand = new ScanCommand(scanParams);
+          const scanResult = await client.send(scanCommand);
+          return scanResult.Items?.map(item => unmarshall(item) as TicketAuditLog) || [];
+        }
+      });
+    },
+
+    /**
+     * Logs a blockchain synchronization event
+     * @param ticketId - Ticket identifier
+     * @param blockchainRef - Blockchain reference hash
+     * @returns Created audit log
+     */
+    logBlockchainSync: async (ticketId: string, blockchainRef: string): Promise<TicketAuditLog> => {
+      return executeDbCommand(async () => {
+        const auditData: TicketAuditLog = {
+          auditId: `audit_blockchain_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
+          ticketId,
+          action: 'blockchain_sync',
+          timestamp: new Date().toISOString(),
+          details: JSON.stringify({
+            blockchainRef,
+            syncedAt: Date.now()
+          }),
+          userId: 'system', // or provide the actual userId if available
+          userRole: 'system' // or provide the actual userRole if available
+        };
+        
+        const command = new PutItemCommand({
+          TableName: 'TicketAuditLogs',
+          Item: marshall(auditData, { removeUndefinedValues: true })
+        });
+        await client.send(command);
+        return auditData;
+      });
+    },
+
+    /**
+     * Gets blockchain history for a ticket
+     * @param ticketId - Ticket identifier
+     * @returns Array of blockchain transaction events
+     */
+    getBlockchainHistory: async (ticketId: string): Promise<{
+      transactionDate: string;
+      action: string;
+      fromUser?: string;
+      toUser?: string;
+      blockchainRef?: string;
+    }[]> => {
+      return executeDbCommand(async () => {
+        // Get all audit logs for this ticket
+        const logs = await db.ticketAudit.findByTicket(ticketId);
+        
+        // Filter blockchain-related logs
+        const blockchainLogs = logs.filter(log => 
+          log.action === 'transfer' || 
+          log.action === 'blockchain_sync' || 
+          log.action === 'use' ||
+          log.action === 'create'
+        );
+        
+        // Map to the required format
+        return blockchainLogs.map(log => {
+          let details: Record<string, unknown> = {};
+          if (typeof log.details === 'string') {
+            try {
+              details = JSON.parse(log.details);
+            } catch {
+              details = {};
+            }
+          } else if (typeof log.details === 'object' && log.details !== null) {
+            details = log.details;
+          }
+          return {
+            transactionDate: log.timestamp,
+            action: log.action,
+            fromUser: typeof details.fromUser === 'string' ? details.fromUser : undefined,
+            toUser: typeof details.toUser === 'string' ? details.toUser : undefined,
+            blockchainRef: typeof details.blockchainRef === 'string' ? details.blockchainRef : undefined
+          };
+        }).sort((a, b) => 
+          new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+        );
+      });
+    },
+
+    /**
+     * Checks if a ticket has been recorded on the blockchain
+     * @param ticketId - Ticket identifier
+     * @returns Boolean indicating if the ticket is on the blockchain
+     */
+    isRecordedOnBlockchain: async (ticketId: string): Promise<boolean> => {
+      return executeDbCommand(async () => {
+        const logs = await db.ticketAudit.findByTicket(ticketId);
+        return logs.some(log => {
+          if (log.action !== 'blockchain_sync') return false;
+          let details: unknown = log.details;
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch {
+              return false;
+            }
+          }
+          return typeof details === 'object' && details !== null && 'blockchainRef' in details;
+        });
       });
     }
   },

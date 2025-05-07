@@ -7,22 +7,31 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { Ticket } from '@/types';
 
+// Update the Friend interface to match the actual API response structure
 interface Friend {
   friendshipId: string;
-  userId: string;
-  userName: string;
+  friend: {
+    userId: string;
+    userName: string;
+    email: string;
+    phoneNumber: string;
+  };
+  acceptedAt: string;
+  friendshipDays: number;
+  canTransferTickets: boolean;
 }
 
 export default function TransferTicketContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('ticketId');
+  const friendId = searchParams.get('friendId'); // Add this line to get friendId from URL
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<string>(ticketId || '');
-  const [selectedFriend, setSelectedFriend] = useState<string>('');
+  const [selectedFriend, setSelectedFriend] = useState<string>(friendId || ''); // Initialize with friendId if available
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,12 +100,26 @@ export default function TransferTicketContent() {
       }
 
       const data = await response.json();
-      setFriends(data.friendships || []);
+      const friendsList = data.friendships || [];
+      setFriends(friendsList);
+      
+      // Verify if the friendId from URL is valid and exists in the friends list
+      if (friendId && friendsList.length > 0) {
+        // Look for the friend with the matching userId in the nested friend object
+        const validFriend: Friend | undefined = friendsList.find(
+          (f: Friend) => f.friend && f.friend.userId === friendId
+        );
+        
+        if (!validFriend) {
+          console.warn('Friend ID from URL not found in friends list');
+          // Don't reset selectedFriend here as we already initialized it
+        }
+      }
     } catch (err) {
       console.error('Error fetching friends:', err);
       setError(err instanceof Error ? err.message : '無法獲取好友列表');
     }
-  }, [user]);
+  }, [user, friendId]); // Add friendId to dependency array
 
   useEffect(() => {
     // Check authentication first
@@ -134,7 +157,7 @@ export default function TransferTicketContent() {
         },
         body: JSON.stringify({
           ticketId: selectedTicket,
-          recipientId: selectedFriend
+          friendId: selectedFriend  // Ensure friendId is correctly named
         })
       });
       
@@ -146,21 +169,13 @@ export default function TransferTicketContent() {
       
       setSuccess('票券轉贈成功！');
       
-      // Refresh the ticket list
-      fetchTickets();
-      
-      // Clear the form
-      setSelectedTicket('');
-      setSelectedFriend('');
-      
-      // Redirect after success
+      // Show success for a while, then redirect
       setTimeout(() => {
         router.push('/user/order');
       }, 2000);
     } catch (err) {
-      console.error('Error transferring ticket:', err);
-      setError(err instanceof Error ? err.message : '轉贈票券失敗');
-    } finally {
+      console.error('Ticket transfer error:', err);
+      setError(err instanceof Error ? err.message : '轉贈票券時出錯');
       setProcessing(false);
     }
   };
@@ -243,8 +258,8 @@ export default function TransferTicketContent() {
                   >
                     <option value="">請選擇好友</option>
                     {friends.map((friend) => (
-                      <option key={friend.friendshipId} value={friend.userId}>
-                        {friend.userName}
+                      <option key={friend.friendshipId} value={friend.friend.userId}>
+                        {friend.friend.userName}
                       </option>
                     ))}
                   </select>

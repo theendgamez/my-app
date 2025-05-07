@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
+import TicketHistory from '@/components/tickets/TicketHistory';
 import { Ticket } from '@/types';
 // Define proper ticket type
 
@@ -20,6 +21,7 @@ export default function AdminTicketDetailPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory] = useState(false);
   
   // 獲取票券資料
   useEffect(() => {
@@ -147,7 +149,12 @@ export default function AdminTicketDetailPage() {
               </div>
             </div>
             
-            {/* ...existing ticket details code... */}
+            {/* 顯示票券歷史 */}
+            {showHistory && (
+              <div className="mt-6">
+                <TicketHistory ticketId={ticket.ticketId} isAdminView={true} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-12">

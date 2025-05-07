@@ -129,6 +129,7 @@ export interface Ticket {
   transferredAt: string | null;
   dynamicData?: DynamicTicketData;
   price: string;
+  transferredTo ?: string | null;
 }
 
 // Booking related types
@@ -218,4 +219,36 @@ export interface PurchaseLimitConfig {
   maxTicketsPerEvent: number;    // 每活動最大票數
   maxTicketsPerDay: number;      // 每天最大票數
   cooldown: CooldownConfig;      // 冷卻期配置
+}
+
+export interface TicketAuditLog {
+    auditId?: string;  // Primary key, will be generated if not provided
+    ticketId: string;
+    action: string;    // 'view', 'verify', 'transfer', etc.
+    userId: string;
+    userRole: string;
+    timestamp: string;
+    ipAddress?: string;
+    details?: string;
+  }
+
+export interface UserPurchase {
+ userId: string;
+ eventId: string;
+ purchaseDate: string;
+ quantity: number;
+ paymentId: string;
+ purchaseId?: string; // Optional as it might be generated
+}
+
+/**
+* Type definition for lottery history record
+*/
+export interface LotteryHistory {
+ historyId?: string; // Primary key if not provided will be generated
+ userId: string;
+ eventId: string;
+ eventName?: string;
+ result: 'won' | 'lost' | 'cancelled';
+ drawDate: string;
 }

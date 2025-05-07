@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import DynamicQRCode from '@/components/tickets/DynamicQRCode';
 import TicketHistory from '@/components/tickets/TicketHistory';
+import BlockchainVisualizer from '@/components/blockchain/BlockchainVisualizer';
 
 interface OrderDetails {
   paymentId: string;
@@ -32,12 +33,61 @@ export default function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showBlockchain, setShowBlockchain] = useState<boolean>(false);
 
   const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null); // Reset error state at the beginning of each fetch attempt
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
+      // Detect if we're looking at a ticket ID directly (UUIDs are 36 chars) vs. a payment ID
+      const isLikelyTicketId = paymentId.length === 36 && paymentId.includes('-');
+      
+      // For UUID-format IDs, prioritize ticket lookup first
+      if (isLikelyTicketId) {
+        console.log("ID looks like a ticket ID, trying ticket API first");
+        
+        try {
+          // First, try direct ticket lookup which also handles transferred tickets
+          const ticketRes = await fetch(`/api/tickets/${paymentId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+              'x-user-id': user?.userId || ''
+            },
+            credentials: 'include'
+          });
+          
+          if (ticketRes.ok) {
+            const ticket = await ticketRes.json();
+            
+            // Create a minimal order details object from the ticket info
+            setOrderDetails({
+              paymentId: ticket.paymentId || paymentId,
+              eventName: ticket.eventName || '未知活動',
+              eventDate: ticket.eventDate || '',
+              eventLocation: ticket.eventLocation || '',
+              purchaseDate: ticket.purchaseDate || '',
+              totalAmount: 0, // Amount unknown for transferred tickets
+              tickets: [ticket]
+            });
+            setLoading(false);
+            return;
+          }
+          
+          // If status is 403, extract more detailed error
+          if (ticketRes.status === 403) {
+            const errorData = await ticketRes.json();
+            throw new Error(errorData.error || '無權訪問此票券');
+          }
+        } catch (ticketErr) {
+          console.error("Error fetching ticket directly:", ticketErr);
+          // Continue to other fallbacks
+        }
+      }
+      
+      // Standard payment lookup path
       const res = await fetch(`/api/payments/${paymentId}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -47,17 +97,87 @@ export default function OrderDetailPage() {
         credentials: 'include'
       });
       
+      // If payment details failed, try fallbacks
       if (!res.ok) {
-        if (res.status === 401) {
-          router.push(`/login?redirect=${encodeURIComponent(`/user/order/${paymentId}`)}`);
-          return;
+        console.log("Payment details fetch failed with status", res.status);
+        
+        // Only proceed with fallbacks if we haven't tried ticket lookup yet
+        if (!isLikelyTicketId) {
+          // Try to fetch the ticket directly
+          const ticketRes = await fetch(`/api/tickets/${paymentId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+              'x-user-id': user?.userId || ''
+            },
+            credentials: 'include'
+          });
+          
+          if (ticketRes.ok) {
+            const ticket = await ticketRes.json();
+            
+            // Create a minimal order details object from the ticket info
+            setOrderDetails({
+              paymentId: ticket.paymentId || paymentId,
+              eventName: ticket.eventName || '未知活動',
+              eventDate: ticket.eventDate || '',
+              eventLocation: ticket.eventLocation || '',
+              purchaseDate: ticket.purchaseDate || '',
+              totalAmount: 0,
+              tickets: [ticket]
+            });
+            setLoading(false);
+            return;
+          }
         }
-        if (res.status === 404) {
-          throw new Error('訂單不存在或您無權查看此訂單');
+        
+        // Try user-specific ticket endpoint as last resort
+        if (user?.userId) {
+          console.log("Ticket fetch failed, trying user-specific endpoint");
+          try {
+            const userTicketRes = await fetch(`/api/users/${user.userId}/tickets`, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+                'x-user-id': user.userId
+              },
+              credentials: 'include'
+            });
+            
+            if (userTicketRes.ok) {
+              const allTickets = await userTicketRes.json();
+              // Find the specific ticket we're looking for
+              const matchingTicket = allTickets.find((t: Ticket) => t.ticketId === paymentId);
+              
+              if (matchingTicket) {
+                setOrderDetails({
+                  paymentId: matchingTicket.paymentId || paymentId,
+                  eventName: matchingTicket.eventName || '未知活動',
+                  eventDate: matchingTicket.eventDate || '',
+                  eventLocation: matchingTicket.eventLocation || '',
+                  purchaseDate: matchingTicket.purchaseDate || '',
+                  totalAmount: 0,
+                  tickets: [matchingTicket]
+                });
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (userTicketError) {
+            console.error("Error with user-specific ticket lookup:", userTicketError);
+          }
         }
-        throw new Error('無法獲取訂單詳情');
+        
+        // All attempts failed, provide specific error based on the original response
+        if (res.status === 403) {
+          throw new Error('您無權查看此訂單資訊，可能屬於其他用戶');
+        } else if (res.status === 404) {
+          throw new Error('找不到此訂單或票券，請確認連結是否正確');
+        } else {
+          throw new Error('無法獲取訂單詳情或轉贈票券資訊，請返回票券列表重新查看');
+        }
       }
-      
+
       const data = await res.json();
       
       const processedData = {
@@ -104,6 +224,7 @@ export default function OrderDetailPage() {
             },
             credentials: 'include'
           });
+          
           if (ticketsRes.ok) {
             const ticketsData = await ticketsRes.json();
             processedData.tickets = Array.isArray(ticketsData) ? ticketsData : [];
@@ -116,11 +237,11 @@ export default function OrderDetailPage() {
       setOrderDetails(processedData);
     } catch (err) {
       console.error('Error fetching order details:', err);
-      setError(err instanceof Error ? err.message : '發生錯誤');
+      setError(err instanceof Error ? err.message : '無法獲取訂單詳情');
     } finally {
       setLoading(false);
     }
-  }, [paymentId, user, router]);
+  }, [paymentId, user]); // Removed 'router' from dependency array
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -306,25 +427,74 @@ export default function OrderDetailPage() {
                             </Link>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedTicket(ticket.ticketId);
-                              setShowHistory(!showHistory);
-                            }}
-                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-                          >
-                            {showHistory && selectedTicket === ticket.ticketId ? '隱藏交易歷史' : '查看交易歷史'}
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${
-                              showHistory && selectedTicket === ticket.ticketId ? 'rotate-180' : ''
-                            }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
+                          <div className="mt-4">
+                            <div className="flex items-center mb-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              <span className="text-sm text-gray-600">區塊鏈驗證票券</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-3">
+                              此票券使用區塊鏈技術記錄所有交易，確保票券真實性和防止偽造。
+                              {ticket.transferredAt && (
+                                <span className="block mt-1 text-blue-600">
+                                  此票券於 {new Date(ticket.transferredAt).toLocaleString()} 被轉讓
+                                </span>
+                              )}
+                            </p>
+                          
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTicket(ticket.ticketId);
+                                setShowHistory(!showHistory);
+                              }}
+                              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                            >
+                              {showHistory && selectedTicket === ticket.ticketId ? '隱藏交易歷史' : '查看交易歷史'}
+                              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${
+                                showHistory && selectedTicket === ticket.ticketId ? 'rotate-180' : ''
+                              }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </div>
 
                           {showHistory && selectedTicket === ticket.ticketId && (
-                            <div className="mt-6">
-                              <TicketHistory ticketId={ticket.ticketId} />
+                            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">票券交易歷史</h4>
+                              <div className="text-xs text-gray-600 mb-3">
+                                每筆交易均使用密碼學簽名並記錄在分散式區塊鏈上，確保票券資料不可篡改
+                              </div>
+                              
+                              {/* 交易歷史組件 */}
+                              <TicketHistory 
+                                ticketId={ticket.ticketId} 
+                                isAdminView={false} 
+                                emptyMessage="此票券尚無交易歷史記錄。初始交易將在首次使用時記錄。" 
+                              />
+                              
+                              {/* 顯示"查看區塊鏈"按鈕 */}
+                              <div className="mt-4 flex justify-end">
+                                <button
+                                  onClick={() => setShowBlockchain(!showBlockchain)}
+                                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                                >
+                                  {showBlockchain ? '隱藏區塊鏈視圖' : '查看區塊鏈視圖'}
+                                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${
+                                    showBlockchain ? 'rotate-180' : ''
+                                  }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              </div>
+                              
+                              {/* 區塊鏈可視化 */}
+                              {showBlockchain && (
+                                <div className="mt-4">
+                                  <BlockchainVisualizer ticketId={ticket.ticketId} />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

@@ -165,6 +165,7 @@ export class TicketBlockchain {
   public getTicketHistory(ticketId: string): TicketTransaction[] {
     const history: TicketTransaction[] = [];
     
+    // 從區塊鏈中獲取交易歷史
     for (const block of this.chain) {
       if (Array.isArray(block.data)) {
         const transactions = block.data as TicketTransaction[];
@@ -173,7 +174,51 @@ export class TicketBlockchain {
       }
     }
     
+    // 如果沒有找到交易記錄，但在pendingTransactions中有，也要包括它們
+    const pendingTransactionsForTicket = this.pendingTransactions.filter(tx => tx.ticketId === ticketId);
+    if (pendingTransactionsForTicket.length > 0) {
+      history.push(...pendingTransactionsForTicket);
+    }
+    
+    // 按時間排序
     return history.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  // 同步審計記錄到區塊鏈
+  public syncTransferFromAudit(ticketId: string, fromUserId: string, toUserId: string, timestamp: number, eventId: string): TicketTransaction {
+    // 檢查是否已存在此轉讓交易
+    const history = this.getTicketHistory(ticketId);
+    const hasTransfer = history.some(tx => 
+      tx.action === 'transfer' && 
+      tx.fromUserId === fromUserId && 
+      tx.toUserId === toUserId &&
+      Math.abs(tx.timestamp - timestamp) < 10000 // 10秒內的相同交易視為重複
+    );
+    
+    if (hasTransfer) {
+      console.log('此轉讓交易已存在於區塊鏈中');
+      const existingTx = history.find(tx => 
+        tx.action === 'transfer' && 
+        tx.fromUserId === fromUserId && 
+        tx.toUserId === toUserId
+      );
+      return existingTx as TicketTransaction;
+    }
+    
+    // 添加轉讓交易
+    const transaction = this.addTransaction({
+      ticketId,
+      timestamp,
+      action: 'transfer',
+      fromUserId,
+      toUserId,
+      eventId
+    });
+    
+    // 立即處理並記錄到區塊鏈
+    this.processPendingTransactions();
+    
+    return transaction;
   }
 }
 
@@ -196,6 +241,26 @@ export async function refreshTicketQrCode(ticket: Ticket): Promise<DynamicTicket
   ticketBlockchain.processPendingTransactions();
   
   return dynamicData;
+}
+
+// 同步轉讓記錄到區塊鏈
+export async function syncTicketTransferToBlockchain(
+  ticketId: string, 
+  fromUserId: string, 
+  toUserId: string, 
+  timestamp: number,
+  eventId: string
+): Promise<boolean> {
+  try {
+    // 確保時間戳是數字
+    const ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+    
+    ticketBlockchain.syncTransferFromAudit(ticketId, fromUserId, toUserId, ts, eventId);
+    return true;
+  } catch (error) {
+    console.error('同步轉讓記錄失敗:', error);
+    return false;
+  }
 }
 
 // 驗證票券
