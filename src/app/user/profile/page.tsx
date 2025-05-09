@@ -54,33 +54,33 @@ export default function ProfilePage() {
         setValue('phoneNumber', String(user.phoneNumber));
       } else {
         // If phone number is missing, fetch directly from API as a fallback
+        // Define the fetch function inside useEffect to avoid dependency issues
+        const fetchUserDataDirectly = async (userId: string) => {
+          try {
+            const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+            
+            const response = await fetch(`/api/users/${userId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken || ''}`,
+                'x-user-id': userId
+              }
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              if (userData && userData.phoneNumber) {
+                setValue('phoneNumber', String(userData.phoneNumber));
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching user data directly:', err);
+          }
+        };
+        
         fetchUserDataDirectly(targetUserId);
       }
     }
   }, [isAuthenticated, authLoading, user, setValue, urlUserId, router]);
-
-  // Direct API call to get user data if needed
-  const fetchUserDataDirectly = async (userId: string) => {
-    try {
-      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      
-      const response = await fetch(`/api/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken || ''}`,
-          'x-user-id': userId
-        }
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        if (userData && userData.phoneNumber) {
-          setValue('phoneNumber', String(userData.phoneNumber));
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching user data directly:', err);
-    }
-  };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setError('');

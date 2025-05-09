@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import authEvents from '@/utils/authEvents';
-import { REDIRECT_COOLDOWN, REDIRECT_COOLDOWN_MS } from '@/utils/authRedirect';
+import { REDIRECT_COOLDOWN} from '@/utils/authRedirect';
 
 // Constants to prevent auth check loops
 const AUTH_CHECK_FLAG = 'auth_check_in_progress';
@@ -301,7 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, fetchPermissions, shouldCheckPermissionsRef.current]);
+  }, [isAuthenticated, fetchPermissions]);
 
   // One-time initialization effect
   useEffect(() => {

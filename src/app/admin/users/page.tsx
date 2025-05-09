@@ -303,9 +303,6 @@ export default function AdminUsersPage() {
 
   // Update the user table row to show prediction status
   const renderUserRow = (user: User) => {
-    function handleRiskDetails(user: User): void {
-      throw new Error('Function not implemented.');
-    }
 
     return (
       <tr key={user.userId} className="hover:bg-gray-50">
@@ -360,16 +357,18 @@ export default function AdminUsersPage() {
           <Link href={`/admin/users/${user.userId}`} className="text-blue-600 hover:text-blue-900 mr-4">
             查看
           </Link>
+          {/* 
           <button
             onClick={() => handleRiskDetails(user)}
             className="text-blue-600 hover:text-blue-900 mr-4"
             title="查看風險評估詳情"
           >
             風險詳情
-          </button>
+          </button> 
+          */}
           <button
             onClick={() => handleDeleteUser(user.userId)}
-            className={`text-red-600 hover:text-red-900 ${deleteInProgress === user.userId ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="text-red-600 hover:text-red-900"
             disabled={deleteInProgress === user.userId}
           >
             刪除
