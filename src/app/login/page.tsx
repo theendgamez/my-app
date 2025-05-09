@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import { useAuth } from '@/context/AuthContext';
+import authEvents from '@/utils/authEvents';
 
 // Loading fallback component
 const LoginFormSkeleton = () => (
@@ -98,15 +99,17 @@ const LoginForm = () => {
 
       if (result.success) {
         // Store required auth data in localStorage
-        // (this is now redundant since login function does it, but keeping for safety)
         if (result.token && result.user) {
           localStorage.setItem('accessToken', result.token);
           localStorage.setItem('userId', result.user.id);
           localStorage.setItem('userRole', result.user.role);
+          
+          // Trigger auth event for components to update
+          authEvents.emit();
+          
+          // Explicitly refresh auth state to ensure UI updates
+          await refreshAuthState();
         }
-
-        // Explicitly refresh auth state to ensure UI updates
-        await refreshAuthState();
 
         // Clear any redirect flags to prevent loops
         localStorage.removeItem('redirect_attempt_count');
@@ -117,7 +120,7 @@ const LoginForm = () => {
         // Check if there was a source=admin parameter
         const isFromAdmin = searchParams.get('source') === 'admin';
 
-        // Redirect to intended destination or home
+        // Redirect to intended destination or home - use replace instead of push
         if (redirectPath) {
           router.replace(redirectPath);
         } else {

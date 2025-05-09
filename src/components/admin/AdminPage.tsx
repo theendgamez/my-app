@@ -4,10 +4,10 @@ import { ReactNode, useState } from 'react';
 import AdminLayout from './AdminLayout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-
 interface AdminPageProps {
+  children: React.ReactNode;
+  // currentPage: 'dashboard' | 'users' | 'events' | 'tickets' | 'payments' | 'lottery' | 'scalper-detection';
   title: string;
-  children: ReactNode;
   isLoading?: boolean;
   error?: string | null;
   actionButton?: ReactNode;
@@ -21,6 +21,7 @@ export default function AdminPage({
   actionButton
 }: AdminPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(error);
+
 
   return (
     <AdminLayout title={title}>

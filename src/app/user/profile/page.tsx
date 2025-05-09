@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter, useParams } from 'next/navigation';
-
 import { useAuth } from '@/context/AuthContext';
 
 interface FormData {
@@ -48,9 +47,40 @@ export default function ProfilePage() {
       // Set form values from context user
       setValue('userName', typeof user.userName === 'string' ? user.userName : '');
       setValue('email', typeof user.email === 'string' ? user.email : '');
-      setValue('phoneNumber', typeof user.phoneNumber === 'string' ? user.phoneNumber : '');
+      
+      
+      // Fix: More robust handling of phone number
+      if ('phoneNumber' in user && user.phoneNumber !== null && user.phoneNumber !== undefined) {
+        setValue('phoneNumber', String(user.phoneNumber));
+      } else {
+        // If phone number is missing, fetch directly from API as a fallback
+        fetchUserDataDirectly(targetUserId);
+      }
     }
   }, [isAuthenticated, authLoading, user, setValue, urlUserId, router]);
+
+  // Direct API call to get user data if needed
+  const fetchUserDataDirectly = async (userId: string) => {
+    try {
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      
+      const response = await fetch(`/api/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken || ''}`,
+          'x-user-id': userId
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        if (userData && userData.phoneNumber) {
+          setValue('phoneNumber', String(userData.phoneNumber));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user data directly:', err);
+    }
+  };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setError('');
@@ -66,6 +96,9 @@ export default function ProfilePage() {
       // Safe localStorage access
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
+      // Log what we're sending
+      console.log('Updating profile with data:', data);
+      
       const response = await fetch(`/api/users/${user.userId}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -78,7 +111,7 @@ export default function ProfilePage() {
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           'x-user-id': user.userId
         },
-        credentials: 'include' // Changed to include cookies consistently
+        credentials: 'include' 
       });
 
       const result = await response.json();
@@ -103,6 +136,14 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold mb-4">個人資料</h1>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         {success && <p className="text-green-500 text-sm mb-4">{success}</p>}
+        
+        {/* Add debug information (remove in production) 
+        /*{debugInfo && (
+          <div className="bg-gray-100 p-2 rounded text-xs mb-4 w-full max-w-md">
+            <strong>Debug Info:</strong>
+            <pre>{debugInfo}</pre>
+          </div>
+        )}*/}
         
         {authLoading ? (
           <div className="flex justify-center items-center h-48">

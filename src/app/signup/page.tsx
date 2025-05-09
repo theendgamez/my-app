@@ -4,6 +4,8 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navbar/Navbar";
 import { useState } from "react";
+import authEvents from "@/utils/authEvents";
+import { useAuth } from "@/context/AuthContext";
 
 interface FormData {
   userName: string;
@@ -17,6 +19,7 @@ export default function SignUpPage() {
   const { register, handleSubmit, setError, formState: { errors } } = useForm<FormData>();
   const [isSubmitting, setIsSubmitting] = useState(false); // 加載狀態
   const router = useRouter();
+  const { refreshAuthState } = useAuth();
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true); // 設置加載狀態
@@ -28,7 +31,27 @@ export default function SignUpPage() {
       });
 
       if (response.ok) {
-        router.push(`/verify-email`);
+        const data = await response.json();
+        
+        // Store authentication info
+        if (data.accessToken) {
+          localStorage.setItem('accessToken', data.accessToken);
+          localStorage.setItem('userId', data.user.userId);
+          
+          // Trigger auth state refresh
+          await refreshAuthState();
+          
+          // Emit auth event for other components
+          authEvents.emit();
+          
+          // Redirect to home page after a brief delay
+          setTimeout(() => {
+            router.push('/');
+          }, 1000);
+        } else {
+          // If email verification is required
+          router.push(`/verify-email`);
+        }
       } else {
         const errorData = await response.json();
         if (errorData.error === "該電子郵件已被註冊。") {

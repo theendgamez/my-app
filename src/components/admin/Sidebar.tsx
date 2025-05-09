@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { 
   FiHome, 
@@ -16,8 +16,7 @@ import {
   FiDollarSign,
   FiChevronDown,
   FiChevronRight,
-  FiUser,
-  FiAlertCircle
+  FiUser
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
 
@@ -36,9 +35,15 @@ type MenuItem = {
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
+  
+  // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
+  const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
+  
   const [sections, setSections] = useState<MenuSection[]>([
     {
       title: '儀表板',
@@ -92,12 +97,30 @@ const Sidebar: React.FC = () => {
   // Track component mounting and check localStorage for admin status
   useEffect(() => {
     setIsMounted(true);
+    
     // Also check localStorage for admin status as fallback for Vercel
     if (typeof window !== 'undefined') {
       const userRole = localStorage.getItem('userRole');
-      setLocalAdmin(userRole === 'admin');
+      // Only set localAdmin if user is authenticated
+      if (isAuthenticated) {
+        setLocalAdmin(userRole === 'admin');
+      } else {
+        setLocalAdmin(false);
+      }
     }
-  }, [isAdmin]);
+  }, [isAdmin, isAuthenticated]);
+
+  // Handle redirection in useEffect, not during render
+  useEffect(() => {
+    // Skip if not mounted yet or already redirected
+    if (!isMounted || hasRedirected) return;
+    
+    // If not authenticated or not admin, redirect
+    if (!authLoading && (!isAuthenticated || (!effectiveIsAdmin && isAuthenticated))) {
+      setHasRedirected(true);
+      router.replace('/');
+    }
+  }, [isMounted, authLoading, isAuthenticated, effectiveIsAdmin, router, hasRedirected]);
 
   // Toggle section collapse state
   const toggleSection = (index: number) => {
@@ -113,26 +136,8 @@ const Sidebar: React.FC = () => {
     return null; // Avoids hydration issues
   }
   
-  // Use either context admin state or localStorage admin state
-  const effectiveIsAdmin = isAdmin || localAdmin;
-  
-  // In case of auth issues, provide minimum visibility feedback
-  if (!isAuthenticated && !authLoading && !localAdmin) {
-    return (
-      <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10">
-        <div className="p-4 text-center">
-          <FiAlertCircle size={24} className="mx-auto text-yellow-500 mb-2" />
-          <p className="text-sm">認證失敗，請重新登入</p>
-          <Link href="/login?source=admin" className="mt-4 bg-blue-600 text-white px-4 py-2 rounded block text-center">
-            前往登入
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // If not admin, don't render the sidebar
-  if (!effectiveIsAdmin && !authLoading) {
+  // If not admin or not authenticated, don't render the sidebar
+  if (!isAuthenticated || (!effectiveIsAdmin && !authLoading)) {
     return null;
   }
 

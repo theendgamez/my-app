@@ -4,9 +4,9 @@
  */
 
 // Store attempted paths to avoid repeated redirects
-const REDIRECT_ATTEMPTED = 'auth_redirect_attempted';
-const REDIRECT_COOLDOWN = 'redirect_cooldown_time';
-const REDIRECT_COOLDOWN_MS = 3000;
+export const REDIRECT_ATTEMPTED = 'auth_redirect_attempted';
+export const REDIRECT_COOLDOWN = 'redirect_cooldown_time';
+export const REDIRECT_COOLDOWN_MS = 3000;
 
 /**
  * Check if the current page requires admin access and handle redirects

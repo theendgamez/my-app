@@ -9,7 +9,6 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { Registration } from '@/types';
 import { Users } from '@/types';
-
 interface EventDetails {
   eventId: string;
   eventName: string;
@@ -255,6 +254,7 @@ export default function AdminLotteryRegistrationDetailPage() {
                     )}
                   </div>
                 </div>
+
 
                 {/* Payment Card */}
                 <div className="bg-white rounded-lg shadow p-6">

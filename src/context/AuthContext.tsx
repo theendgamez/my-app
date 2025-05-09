@@ -3,12 +3,24 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import authEvents from '@/utils/authEvents';
+import { REDIRECT_COOLDOWN, REDIRECT_COOLDOWN_MS } from '@/utils/authRedirect';
 
 // Constants to prevent auth check loops
 const AUTH_CHECK_FLAG = 'auth_check_in_progress';
 const MAX_AUTH_ATTEMPTS = 3;
-const REDIRECT_COOLDOWN = 'redirect_cooldown_time';
-const REDIRECT_COOLDOWN_MS = 3000; // 3 seconds cooldown between redirects
+
+// Add a new constant for permissions check cooldown
+const PERMISSIONS_CHECK_FLAG = 'permissions_check_in_progress';
+const MAX_PERMISSIONS_ATTEMPTS = 3;
+
+// NEW: Add timestamps for API calls to enforce minimum spacing
+const LAST_AUTH_CHECK_TIME = 'last_auth_check_time';
+const LAST_PERMISSIONS_CHECK_TIME = 'last_permissions_check_time';
+const MIN_TIME_BETWEEN_CALLS_MS = 5000; // 5 seconds
+
+// NEW: Anti-loop flags
+const isAuthCheckRunning = { current: false };
+const isPermissionsCheckRunning = { current: false };
 
 interface UserType {
   userId: string;
@@ -37,6 +49,8 @@ interface AuthContextType {
   isAdmin: boolean;
   user: UserType | null;
   loading: boolean;
+  permissions: string[];
+  permissionsLoaded: boolean;
   login: (credentials: LoginCredentials) => Promise<LoginResult>;
   logout: () => void;
   redirectToLogin: (returnPath?: string) => void;
@@ -48,6 +62,8 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   user: null,
   loading: true,
+  permissions: [],
+  permissionsLoaded: false,
   login: async () => ({ success: false }),
   logout: () => {},
   redirectToLogin: () => {},
@@ -59,188 +75,267 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const router = useRouter();
+  
+  // NEW: Add a ref to track if we should check permissions after auth
+  const shouldCheckPermissionsRef = useRef(false);
+  // NEW: Track initialization status
+  const initialized = useRef(false);
 
-  // Function to redirect to login with protection against loops
-  const redirectToLogin = useCallback((returnPath?: string) => {
+  // Define logout first using useCallback
+  const logout = useCallback(async () => {
     if (typeof window === 'undefined') return;
 
-    const lastRedirectTime = parseInt(localStorage.getItem(REDIRECT_COOLDOWN) || '0', 10);
-    const now = Date.now();
+    try {
+      // Call logout API
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
 
-    if (now - lastRedirectTime < REDIRECT_COOLDOWN_MS) {
-      console.log('Redirect prevented: Too soon after previous redirect');
-      return;
+      // Clear local storage
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem(AUTH_CHECK_FLAG);
+      localStorage.removeItem(REDIRECT_COOLDOWN);
+      localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+      setUserPermissions([]);
+      setPermissionsLoaded(false);
+
+      authEvents.emit();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, []);
+
+  // Memoize fetchUserData with anti-loop protection
+  const fetchUserData = useCallback(async () => {
+    // NEW: Check if an auth check is already in progress
+    if (isAuthCheckRunning.current) {
+      console.log('Auth check already in progress, skipping duplicate call');
+      return false;
     }
 
-    localStorage.setItem(REDIRECT_COOLDOWN, now.toString());
+    // NEW: Check if we've made a request too recently
+    const lastAuthCheckTime = parseInt(localStorage.getItem(LAST_AUTH_CHECK_TIME) || '0', 10);
+    const now = Date.now();
+    if (now - lastAuthCheckTime < MIN_TIME_BETWEEN_CALLS_MS) {
+      console.log('Auth check skipped: Too soon after previous check');
+      return false;
+    }
 
-    const redirectPath = returnPath ? `/login?redirect=${encodeURIComponent(returnPath)}` : '/login';
-    router.push(redirectPath);
-  }, [router]);
-
-  const fetchUserData = async () => {
     try {
+      isAuthCheckRunning.current = true;
+      localStorage.setItem(LAST_AUTH_CHECK_TIME, now.toString());
       setLoading(true);
+      const token = localStorage.getItem('accessToken');
       const userId = localStorage.getItem('userId');
-      const accessToken = localStorage.getItem('accessToken');
+      const storedRole = localStorage.getItem('userRole');
 
-      if (!userId || userId.includes('...') || userId.length < 4) {
-        console.error('Invalid user ID found in localStorage:', userId);
-        localStorage.removeItem('userId');
-        localStorage.removeItem('accessToken');
+      if (!token || !userId) {
         setIsAuthenticated(false);
         setIsAdmin(false);
         setUser(null);
-        setLoading(false);
-        return;
+        return false;
       }
 
-      const cacheBuster = new Date().getTime();
-      const response = await fetch(`/api/users/${userId}?_=${cacheBuster}`, {
+      // Add loop prevention logic
+      const authCheckCount = parseInt(localStorage.getItem(AUTH_CHECK_FLAG) || '0', 10);
+      if (authCheckCount > MAX_AUTH_ATTEMPTS) {
+        console.error('Too many authentication check attempts, possible loop detected');
+        localStorage.removeItem(AUTH_CHECK_FLAG);
+        setLoading(false);
+        return false;
+      }
+
+      localStorage.setItem(AUTH_CHECK_FLAG, (authCheckCount + 1).toString());
+
+      // Check token validity
+      const checkResponse = await fetch('/api/auth/check', {
         headers: {
-          Authorization: `Bearer ${accessToken || ''}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          'Authorization': `Bearer ${token}`,
           'x-user-id': userId,
         },
       });
 
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+      if (checkResponse.ok) {
+        const userData = await checkResponse.json();
+
+        // Update user state
+        setUser({
+          userId,
+          userName: userData.userName,
+          email: userData.email,
+          role: userData.role || 'user',
+        });
+
+        // Update authentication state
         setIsAuthenticated(true);
         setIsAdmin(userData.role === 'admin');
-      } else {
-        console.error('Authentication failed:', response.status, response.statusText);
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('userId');
+
+        // Update local storage if role changed
+        if (storedRole !== userData.role) {
+          localStorage.setItem('userRole', userData.role);
         }
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-        setUser(null);
+
+        // NEW: Mark that we should check permissions but don't do it immediately
+        if (!permissionsLoaded) {
+          shouldCheckPermissionsRef.current = true;
+        }
+
+        localStorage.removeItem(AUTH_CHECK_FLAG);
+        return true;
+      } else {
+        // Token invalid, clear auth state
+        console.log('Auth token invalid, clearing state');
+        await logout();
+        localStorage.removeItem(AUTH_CHECK_FLAG);
+        return false;
       }
     } catch (error) {
-      console.error('Error in user authentication:', error);
+      console.error('Authentication check error:', error);
       setIsAuthenticated(false);
       setIsAdmin(false);
       setUser(null);
+      localStorage.removeItem(AUTH_CHECK_FLAG);
+      return false;
     } finally {
       setLoading(false);
+      isAuthCheckRunning.current = false;
     }
-  };
+  }, [setLoading, setIsAuthenticated, setIsAdmin, setUser, logout, permissionsLoaded]);
 
-  const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Add a fetchPermissions function with anti-loop protection
+  const fetchPermissions = useCallback(async () => {
+    // NEW: Check if a permissions check is already in progress
+    if (isPermissionsCheckRunning.current) {
+      console.log('Permissions check already in progress, skipping duplicate call');
+      return false;
+    }
+
+    // NEW: Check if we've made a request too recently
+    const lastPermissionsCheckTime = parseInt(localStorage.getItem(LAST_PERMISSIONS_CHECK_TIME) || '0', 10);
+    const now = Date.now();
+    if (now - lastPermissionsCheckTime < MIN_TIME_BETWEEN_CALLS_MS) {
+      console.log('Permissions check skipped: Too soon after previous check');
+      return false;
+    }
+
+    try {
+      isPermissionsCheckRunning.current = true;
+      localStorage.setItem(LAST_PERMISSIONS_CHECK_TIME, now.toString());
+      
+      // Prevent excessive permission checks
+      const permissionsCheckCount = parseInt(localStorage.getItem(PERMISSIONS_CHECK_FLAG) || '0', 10);
+      if (permissionsCheckCount > MAX_PERMISSIONS_ATTEMPTS) {
+        console.error('Too many permission check attempts, possible loop detected');
+        localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+        return false;
+      }
+
+      localStorage.setItem(PERMISSIONS_CHECK_FLAG, (permissionsCheckCount + 1).toString());
+
+      // Don't attempt to fetch permissions if not authenticated
+      if (!isAuthenticated) {
+        localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+        return false;
+      }
+
+      const response = await fetch('/api/permissions', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+          'x-user-id': localStorage.getItem('userId') || '',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserPermissions(data.permissions || []);
+        setPermissionsLoaded(true);
+        localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+        return true;
+      }
+
+      localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+      return false;
+    } catch (error) {
+      console.error('Permission check error:', error);
+      localStorage.removeItem(PERMISSIONS_CHECK_FLAG);
+      return false;
+    } finally {
+      isPermissionsCheckRunning.current = false;
+      // Reset flag to prevent immediate re-fetch
+      shouldCheckPermissionsRef.current = false;
+    }
+  }, [isAuthenticated]);
+
+  // Modified refreshAuthState function to prevent loops
   const refreshAuthState = useCallback(async () => {
-    if (typeof window === 'undefined') return;
-
-    if (refreshDebounceRef.current) {
-      clearTimeout(refreshDebounceRef.current);
+    // Don't refresh if we've done so recently
+    const lastAuthTime = parseInt(localStorage.getItem(LAST_AUTH_CHECK_TIME) || '0', 10);
+    const now = Date.now();
+    
+    if (now - lastAuthTime < MIN_TIME_BETWEEN_CALLS_MS) {
+      console.log('Auth refresh skipped: Too frequent');
+      return;
     }
+    
+    const authSuccess = await fetchUserData();
+    return authSuccess;
+  }, [fetchUserData]);
 
-    return new Promise<boolean | undefined>((resolve) => {
-      refreshDebounceRef.current = setTimeout(async () => {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          setUser(null);
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-          setLoading(false);
-          resolve(false);
-          return;
-        }
-
-        try {
-          const response = await fetch('/api/auth/me', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-            },
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-            setIsAuthenticated(true);
-            setIsAdmin(userData.role === 'admin');
-            authEvents.emit();
-            resolve(true);
-          } else {
-            if (response.status === 401 || response.status === 403) {
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('userId');
-            }
-            setUser(null);
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            resolve(false);
-          }
-        } catch (error) {
-          console.error('Error refreshing auth state:', error);
-          setUser(null);
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-          resolve(false);
-        } finally {
-          setLoading(false);
-        }
-      }, 300);
-    });
-  }, []);
-
+  // Scheduled permissions check that runs after auth completes
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Only run if permissions should be checked and auth is complete
+    if (shouldCheckPermissionsRef.current && isAuthenticated && !isPermissionsCheckRunning.current) {
+      const timer = setTimeout(() => {
+        fetchPermissions();
+      }, 1000); // Delay by 1 second to break potential loops
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, fetchPermissions, shouldCheckPermissionsRef.current]);
 
-    const checkAuth = async () => {
+  // One-time initialization effect
+  useEffect(() => {
+    // Skip if already initialized or running on server
+    if (initialized.current || typeof window === 'undefined') return;
+    
+    initialized.current = true;
+    
+    const initialize = async () => {
       try {
-        const lastRedirectTime = parseInt(localStorage.getItem(REDIRECT_COOLDOWN) || '0', 10);
-        const now = Date.now();
-        if (now - lastRedirectTime < REDIRECT_COOLDOWN_MS) {
-          console.log('Auth check skipped: Too soon after redirect');
+        // Check if we have authenticated in localStorage
+        const hasToken = !!localStorage.getItem('accessToken');
+        const hasUserId = !!localStorage.getItem('userId');
+        
+        if (hasToken && hasUserId) {
+          await fetchUserData();
+          
+          // Delay permissions fetch to avoid potential loop
+          setTimeout(() => {
+            if (isAuthenticated && !permissionsLoaded) {
+              fetchPermissions();
+            }
+          }, 1500);
+        } else {
           setLoading(false);
-          return;
         }
-
-        const authCheckCount = parseInt(localStorage.getItem(AUTH_CHECK_FLAG) || '0', 10);
-
-        if (authCheckCount > MAX_AUTH_ATTEMPTS) {
-          console.error('Too many authentication check attempts, possible loop detected');
-          localStorage.removeItem(AUTH_CHECK_FLAG);
-          setLoading(false);
-          return;
-        }
-
-        localStorage.setItem(AUTH_CHECK_FLAG, (authCheckCount + 1).toString());
-
-        const accessToken = localStorage.getItem('accessToken');
-        const userId = localStorage.getItem('userId');
-
-        if (!accessToken || !userId) {
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-          setUser(null);
-          setLoading(false);
-          localStorage.removeItem(AUTH_CHECK_FLAG);
-          return;
-        }
-
-        await fetchUserData();
       } catch (error) {
-        console.error('Auth check error:', error);
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-        setUser(null);
-      } finally {
+        console.error('Initialization error:', error);
         setLoading(false);
-        localStorage.removeItem(AUTH_CHECK_FLAG);
       }
     };
-
-    checkAuth();
-  }, []);
+    
+    initialize();
+  }, [fetchUserData, fetchPermissions, isAuthenticated, permissionsLoaded]);
 
   const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
     if (typeof window === 'undefined') return { success: false, error: 'Cannot run on server' };
@@ -299,24 +394,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = async () => {
+  const redirectToLogin = (returnPath?: string) => {
     if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('userId');
-
-      localStorage.removeItem(AUTH_CHECK_FLAG);
-      localStorage.removeItem(REDIRECT_COOLDOWN);
-
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-
-      authEvents.emit();
-    } catch (error) {
-      console.error('Logout error:', error);
+    if (returnPath) {
+      localStorage.setItem('postLoginRedirect', returnPath);
     }
+    localStorage.setItem(REDIRECT_COOLDOWN, Date.now().toString());
+    router.push('/login');
   };
 
   return (
@@ -326,6 +410,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         user,
         loading,
+        permissions: userPermissions,
+        permissionsLoaded,
         login,
         logout,
         redirectToLogin,

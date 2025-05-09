@@ -1,79 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import db from '@/lib/db';
 
-// Define permissions by role
-const ROLE_PERMISSIONS = {
-  admin: [
-    'events:read',
-    'events:create',
-    'events:update',
-    'events:delete',
-    'users:read',
-    'users:update',
-    'lottery:manage',
-    'dashboard:view',
-    'payments:view',
-  ],
-  user: [
-    'events:read',
-    'profile:read',
-    'profile:update',
-    'tickets:view',
-  ],
-};
+export const dynamic = 'force-dynamic'; // No caching for permissions
 
 export async function GET(request: NextRequest) {
   try {
-    // First try standard authentication
+    // Get the authenticated user
     const user = await getCurrentUser(request);
     
-    // Then check for direct user ID as fallback
-    const userIdHeader = request.headers.get('x-user-id');
-    let userId = null;
-    let userRole = 'guest';
-
-    // If we have a user from getCurrentUser
-    if (user) {
-      userId = user.userId;
-      userRole = user.role;
-    } 
-    // If not, but we have a user ID header, try to verify directly
-    else if (userIdHeader) {
-      try {
-        const dbUser = await db.users.findById(userIdHeader);
-        if (dbUser) {
-          userId = dbUser.userId;
-          userRole = dbUser.role;
-        }
-      } catch (error) {
-        console.error('Error fetching user via user ID:', error);
-      }
-    }
-
-    // If no authenticated user, return empty permissions
-    if (!userId) {
-      return NextResponse.json({
-        permissions: [],
-        role: 'guest'
+    // Return appropriate permissions based on user role
+    if (!user) {
+      return NextResponse.json({ 
+        permissions: ['public'], 
+        role: 'guest', 
+        authenticated: false 
       });
     }
-
-    // Get permissions for user's role
-    const permissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || [];
-
-    // Return permissions based on user role
+    
+    // Basic permissions mapping by role
+    const rolePermissions: { [key: string]: string[] } = {
+      admin: [
+        'admin.access',
+        'admin.users.manage',
+        'admin.events.manage',
+        'admin.tickets.manage',
+        'admin.lottery.manage',
+        'user.tickets.transfer',
+        'user.tickets.view',
+        'user.profile.edit'
+      ],
+      staff: [
+        'admin.access',
+        'admin.events.view',
+        'admin.tickets.view',
+        'user.tickets.view',
+        'user.profile.edit'
+      ],
+      user: [
+        'user.tickets.view',
+        'user.tickets.transfer',
+        'user.profile.edit'
+      ]
+    };
+    
+    // Get default permissions for user role, fallback to basic user permissions
+    const permissions = rolePermissions[user.role] || rolePermissions.user;
+    
     return NextResponse.json({
       permissions,
-      role: userRole
+      role: user.role,
+      authenticated: true,
+      userId: user.userId
     });
+    
   } catch (error) {
-    console.error('Error in permissions API:', error);
+    console.error('Error checking permissions:', error);
     return NextResponse.json(
-      { 
-        error: '獲取權限時出錯',
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      },
+      { error: 'Error checking permissions', permissions: ['public'] },
       { status: 500 }
     );
   }

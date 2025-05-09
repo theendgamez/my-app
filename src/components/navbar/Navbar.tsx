@@ -25,6 +25,7 @@ const Navbar: React.FC = () => {
   
   const { user, isAuthenticated, loading, logout, refreshAuthState } = useAuth();
 
+  // Add effect to refresh auth state on mount with proper dependencies
   useEffect(() => {
     // Only run on client side
     if (typeof window !== 'undefined') {
@@ -46,12 +47,15 @@ const Navbar: React.FC = () => {
     }
   };
 
+  // Enhanced logout handler
   const handleLogout = async () => {
     try {
       await logout();
       setIsNavOpen(false);
       setIsUserMenuOpen(false);
-      router.push('/login');
+      
+      // Use replace instead of push to prevent back button issues
+      router.replace('/login');
     } catch (err) {
       console.error('Logout error:', err);
     }
