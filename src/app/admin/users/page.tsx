@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
-import { predictScalper } from '@/utils/mlService';
+import {batchAnalyzeUsers } from '@/utils/mlService';
 
 interface User {
   userId: string;
@@ -179,125 +179,92 @@ export default function AdminUsersPage() {
     return new Date(dateString).toLocaleString('zh-HK');
   };
 
-  // Function to process email for feature extraction
-  const extractEmailFeatures = (email: string) => {
-    const domain = email.split('@')[1] || '';
-
-    const mainStreamDomains = ['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com'];
-    const tempEmailDomains = ['tempmail.com', 'temp-mail.org', 'mailinator.com', '10minutemail.com'];
-
-    const suspiciousPatterns = /\d{6,}|temp|disposable|fake|trash|junk/i;
-
-    // Calculate simple Shannon entropy for the domain as a measure of randomness
-    const calculateEntropy = (text: string): number => {
-      const len = text.length;
-      const frequencies = Array.from(text).reduce((freq: {[key: string]: number}, c) => {
-        freq[c] = (freq[c] || 0) + 1;
-        return freq;
-      }, {});
-      
-      return Object.values(frequencies).reduce((sum, f) => {
-        const p = f / len;
-        return sum - p * Math.log2(p);
-      }, 0);
-    };
-
-    // Check if domain contains numbers
-    const hasNumbers = /\d/.test(domain) ? 1 : 0;
-
-    return {
-      popularity: 1, // Default value, ideally would be calculated from actual data
-      is_common_provider: mainStreamDomains.includes(domain) ? 1 : 0,
-      domain_length: domain.length,
-      has_numbers: hasNumbers,
-      is_common_tld: tempEmailDomains.includes(domain) ? 0 : 1, // Inverted logic from is_temporary
-      entropy: calculateEntropy(domain),
-      has_suspicious_keyword: suspiciousPatterns.test(domain) ? 1 : 0
-    };
-  };
-
   // Enhanced function to analyze user risk
-  const analyzeUserRisk = async (users: User[]) => {
-    if (users.length === 0 || predictionsStarted.current) return users;
+  const analyzeUserRisk = async (allUsers: User[]) => {
+    // 只取有效 email：必须包含 “@”，且 “@” 前后都非空
+    const users = allUsers.filter(u => {
+      if (typeof u.email !== 'string') return false;
+      const parts = u.email.split('@');
+      return parts.length === 2
+        && parts[0].trim().length > 0
+        && parts[1].trim().length > 0;
+    });
+
+    if (users.length === 0 || predictionsStarted.current) {
+      return allUsers;
+    }
 
     predictionsStarted.current = true;
-    const newUsers = [...users];
-    const batchSize = 5; // Process users in small batches to avoid overwhelming the API
+    setPredictionsComplete(false);
+
+    // 标记预测中
+    users.forEach(u =>
+      setPredictingUsers(prev => new Set(prev).add(u.userId))
+    );
 
     try {
-      // Break users into batches to process
-      for (let i = 0; i < newUsers.length; i += batchSize) {
-        const batch = newUsers.slice(i, i + batchSize);
-
-        // Process this batch in parallel
-        await Promise.all(batch.map(async (user, index) => {
-          const userIndex = i + index;
-
-          // Skip if already has risk score
-          if (user.riskScore !== undefined) return;
-
-          setPredictingUsers(prev => new Set([...prev, user.userId]));
-
-          try {
-            // Extract features from email and user data
-            const features = extractEmailFeatures(user.email);
-
-            // Call ML service for prediction (pass features directly)
-            const prediction = await predictScalper(features);
-
-            if (!prediction.fallback) {
-              // If we got a real prediction (not a fallback)
-              const probabilityScore = prediction.prediction;
-
-              // Determine risk level
-              let riskLevel: 'low' | 'medium' | 'high' | 'very-high' = 'low';
-              if (probabilityScore > 0.7) riskLevel = 'very-high';
-              else if (probabilityScore > 0.5) riskLevel = 'high';
-              else if (probabilityScore > 0.3) riskLevel = 'medium';
-
-              // Update user with risk assessment
-              newUsers[userIndex] = {
-                ...newUsers[userIndex],
-                riskScore: probabilityScore,
-                riskLevel: riskLevel
-              };
-            }
-          } catch (err) {
-            console.error(`Error analyzing risk for user ${user.userId}:`, err);
-          } finally {
-            setPredictingUsers(prev => {
-              const updated = new Set([...prev]);
-              updated.delete(user.userId);
-              return updated;
-            });
-          }
-        }));
-
-        // Update state with processed batch
-        setUsers(newUsers);
-
-        // Brief pause between batches to avoid rate limiting
-        if (i + batchSize < newUsers.length) {
-          await new Promise(r => setTimeout(r, 500));
-        }
+      const batchResult = await batchAnalyzeUsers(users);
+      // Use the new batch analysis endpoint
+      if (batchResult.error) {
+        throw new Error(batchResult.message);
       }
+
+      // Update users with results
+      interface BatchAnalyzeResult {
+        userId: string;
+        prediction?: {
+          probability: number;
+          riskLevel: 'low' | 'medium' | 'high' | 'very-high';
+        };
+        error?: string;
+      }
+
+      interface BatchAnalyzeResponse {
+        results: BatchAnalyzeResult[];
+        error?: boolean;
+        message?: string;
+      }
+
+      (batchResult as BatchAnalyzeResponse).results.forEach((result: BatchAnalyzeResult) => {
+        const userIndex = allUsers.findIndex((u: User) => u.userId === result.userId);
+
+        if (userIndex >= 0) {
+          if (result.error) {
+            console.warn(`Error analyzing user ${result.userId}: ${result.error}`);
+          } else if (result.prediction) {
+            allUsers[userIndex] = {
+              ...allUsers[userIndex],
+              riskScore: result.prediction.probability,
+              riskLevel: result.prediction.riskLevel
+            };
+          }
+
+          // Remove from predicting set
+          setPredictingUsers((prev: Set<string>) => {
+            const updated = new Set([...prev]);
+            updated.delete(result.userId);
+            return updated;
+          });
+        }
+      });
+
+      // Update state with processed users
+      setUsers(allUsers);
+
     } catch (err) {
       console.error('Error during batch risk analysis:', err);
     } finally {
       setPredictionsComplete(true);
+      setPredictingUsers(new Set());
     }
 
-    return newUsers;
+    return allUsers;
   };
 
   // Trigger risk analysis when users are loaded
   useEffect(() => {
-    const analyzeUserRisk = async () => {
-      // Function implementation
-    };
-  
     if (users.length > 0 && !predictionsStarted.current && isAdmin) {
-      analyzeUserRisk();
+      analyzeUserRisk(users);
     }
   }, [users, isAdmin]);
 
