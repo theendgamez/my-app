@@ -5,11 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 
 // Define the Users interface
-interface Users {
-  userId: string;
-  createdAt?: string;
-  // Add other user properties as needed
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,55 +42,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '沒有有效的付費登記' }, { status: 400 });
     }
 
-    // Calculate priority score for each user
-    for (const reg of registrations) {
-      try {
-        const user = await db.users.findById(reg.userId);
-        reg.priorityScore = await calculatePriorityScore(user);
-      } catch (error) {
-        console.error(`Error calculating priority score for user ${reg.userId}:`, error);
-        reg.priorityScore = 100; // Default score
-      }
-    }
-
     // Calculate ticket availability
     const availableTicketsByZone: Record<string, number> = {};
     event.zones?.forEach(zone => {
       availableTicketsByZone[zone.name] = parseInt(String(zone.zoneQuantity)) || 0;
     });
 
-    // Optimized lottery algorithm: weighted draw based on priority score
-    const weightedDraw = (registrations: Registration[]): Registration[] => {
-      // Create weighted pool
-      const weightedPool: Registration[] = [];
+    // Simple random draw function - completely random without weighting
+    const randomDraw = (registrations: Registration[]): Registration[] => {
+      // Create a copy of the registrations array
+      const shuffled = [...registrations];
       
-      // Add users to the lottery pool based on priority score
-      registrations.forEach(reg => {
-        const weight = Math.floor((reg.priorityScore || 100) / 10);
-        for (let i = 0; i < weight; i++) {
-          weightedPool.push(reg);
-        }
-      });
-      
-      // Apply Fisher-Yates shuffle for fairness
-      for (let i = weightedPool.length - 1; i > 0; i--) {
+      // Apply Fisher-Yates shuffle for randomness
+      for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [weightedPool[i], weightedPool[j]] = [weightedPool[j], weightedPool[i]];
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
       
-      // Deduplicate, keeping the first occurrence of each registration
-      const uniqueResults: Record<string, boolean> = {};
-      return weightedPool.filter(reg => {
-        if (uniqueResults[reg.registrationToken]) {
-          return false;
-        }
-        uniqueResults[reg.registrationToken] = true;
-        return true;
-      });
+      return shuffled;
     };
 
-    // Execute weighted draw
-    const shuffledRegistrations = weightedDraw(registrations);
+    // Execute random draw
+    const shuffledRegistrations = randomDraw(registrations);
     
     // Process lottery results
     const userAllocations: Record<string, number> = {};
@@ -240,35 +208,6 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : String(error)
     });
   }
-}
-
-
-// Calculate priority score based on user data
-async function calculatePriorityScore(user: Users | null): Promise<number> {
-  if (!user) return 100; // Default score if user not found
-  
-  // Get user's registration history
-  const userHistory = await db.lotteryHistory.findByUser(user.userId);
-  
-  // Basic algorithm: 
-  // - Base score: 100
-  // - Reduce score by 10 for each previous win (higher priority for those who rarely win)
-  // - Add 5 points per month of account age (up to 50)
-  
-  let score = 100;
-  
-  // Adjust based on previous wins
-  const wins = userHistory.filter(h => h.result === 'won').length;
-  score -= wins * 10;
-  
-  // Adjust based on account age if createdAt exists
-  if (user.createdAt) {
-    const accountAgeMonths = Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (30 * 24 * 60 * 60 * 1000));
-    score += Math.min(accountAgeMonths * 5, 50);
-  }
-  
-  // Ensure score is between 50 and 200
-  return Math.max(50, Math.min(200, score));
 }
 
 // Simple seat number generator: returns a random seat number in the format "<ZoneName>-<3-digit number>"

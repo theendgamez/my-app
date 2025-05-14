@@ -59,9 +59,21 @@ export default function TransferTicketContent() {
 
       const data = await response.json();
       // Filter only available tickets that can be transferred
-      const availableTickets = Array.isArray(data) ? data.filter((ticket: Ticket) => 
-        ticket.status === 'available' || ticket.status === 'sold'
-      ) : [];
+      const availableTickets = Array.isArray(data) ? data.filter((ticket: Ticket) => {
+        // Basic status check - only allow available or sold tickets
+        const hasValidStatus = ticket.status === 'available' || ticket.status === 'sold';
+        
+        // Check for transfer cooldown period - only allow tickets that haven't been transferred in the last 7 days
+        let passedCooldown = true;
+        if (ticket.transferredAt) {
+          const lastTransferDate = new Date(ticket.transferredAt);
+          const now = new Date();
+          const diffDays = Math.floor((now.getTime() - lastTransferDate.getTime()) / (1000 * 60 * 60 * 24));
+          passedCooldown = diffDays >= 7;
+        }
+        
+        return hasValidStatus && passedCooldown;
+      }) : [];
       
       setTickets(availableTickets);
       

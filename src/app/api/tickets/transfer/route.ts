@@ -37,6 +37,21 @@ export async function POST(request: NextRequest) {
     if (ticket.userId !== userId) {
       return NextResponse.json({ error: '您不是此票券的擁有者，無法轉讓' }, { status: 403 });
     }
+
+    // Check if ticket was transferred within the last 7 days
+    if (ticket.transferredAt) {
+      const lastTransferDate = new Date(ticket.transferredAt);
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - lastTransferDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 7) {
+        return NextResponse.json({ 
+          error: `此票券在 ${7 - diffDays} 天後才能再次轉讓`,
+          cooldownDays: 7 - diffDays,
+          transferredAt: ticket.transferredAt
+        }, { status: 403 });
+      }
+    }
     
     // Get the recipient user details
     const recipient = await db.users.findById(friendId);

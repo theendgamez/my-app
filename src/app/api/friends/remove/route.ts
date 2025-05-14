@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
       recipientId: string;
       // Add other fields if necessary
     }
-    const friendship = await db.registration.findByToken(friendshipId) as Friendship | null;
+    // 修正：使用正確的方法查詢友誼關係
+    const friendship = await db.friends.findById(friendshipId) as Friendship | null;
     if (!friendship) {
       return NextResponse.json({ error: '找不到該好友關係' }, { status: 404 });
     }
