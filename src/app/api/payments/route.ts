@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +50,18 @@ export async function POST(request: NextRequest) {
     const event = await db.events.findById(booking.eventId);
     if (!event) {
       return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
+    }
+
+    // Get user details to ensure we have the real name
+    const userDetails = await db.users.findById(userId);
+    if (!userDetails) {
+      return NextResponse.json({ error: '找不到用戶資料' }, { status: 404 });
+    }
+
+    // Decrypt real name if needed
+    let userRealName = userDetails.realName || '未提供姓名';
+    if (userDetails.isDataEncrypted || isEncrypted(userRealName)) {
+      userRealName = decryptData(userRealName);
     }
 
     // Get zone details
@@ -136,7 +149,7 @@ export async function POST(request: NextRequest) {
           eventDate: event.eventDate,
           eventLocation: event.location || '',
           userId,
-          userRealName: '',
+          userRealName: userRealName,
           qrCode: ticketId,
           zone: booking.zone,
           seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,

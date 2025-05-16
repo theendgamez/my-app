@@ -85,24 +85,35 @@ export default function AdminTicketVerifyPage() {
         const accessToken = localStorage.getItem('accessToken') || '';
         const userId = localStorage.getItem('userId') || '';
         
-        // Add optional token and source from query parameters to the request
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': userId,
-          'x-ticket-checker': 'true'
-        };
+        // Improved handling for QR format - check if the ID is in QR code format
+        let ticketId = id as string;
+        let qrData = null;
         
-        // If we have a verification token, add it to the headers
-        if (token) {
-          headers['x-verification-token'] = token;
+        // Try to parse if it appears to be a JSON string
+        if (ticketId.includes('{') || ticketId.includes('[')) {
+          try {
+            const parsed = JSON.parse(ticketId);
+            console.log("Parsed QR data:", parsed);
+            
+            // If it's from our QR scanner with proper format, use the ticketId
+            if (parsed.ticketId) {
+              ticketId = parsed.ticketId;
+              qrData = parsed; // Save the entire QR data for verification
+            }
+          } catch (error) {
+            // If parsing fails, use the original ID
+            console.log('Could not parse QR code data, using as-is:', error);
+          }
         }
         
-        // If we have a source parameter, handle it accordingly
-        const sourceParam = source ? `&source=${source}` : '';
-        
-        const response = await fetch(`/api/tickets/${id}?verifying=true${sourceParam}`, {
-          headers
+        // Fetch the ticket data first
+        const response = await fetch(`/api/tickets/${ticketId}?verifying=true`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'x-user-id': userId,
+            'x-ticket-checker': 'true'
+          }
         });
         
         if (!response.ok) {
@@ -111,6 +122,29 @@ export default function AdminTicketVerifyPage() {
         
         const data = await response.json();
         setTicket(data);
+        
+        // If we have QR data from a dynamic QR code, also verify it
+        if (qrData && qrData.ticketId && qrData.signature) {
+          console.log("Verifying dynamic QR data for ticket:", ticketId);
+          
+          const verifyResponse = await fetch(`/api/tickets/${ticketId}/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'x-user-id': userId,
+              'x-ticket-checker': 'true'
+            },
+            body: JSON.stringify({ qrData })
+          });
+          
+          const verifyResult = await verifyResponse.json();
+          console.log("QR verification result:", verifyResult);
+          
+          if (!verifyResult.verified) {
+            setError(`票券QR碼驗證失敗: ${verifyResult.message}`);
+          }
+        }
         
         // Implement auto-redirect if requested via query parameter
         if (shouldRedirect && data.status === 'sold') {
@@ -280,7 +314,7 @@ export default function AdminTicketVerifyPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-500">持有者</p>
-                  <p className="font-medium">{ticket.userRealName}</p>
+                  <p className="font-medium">{ticket.userRealName || '未提供姓名'}</p>
                 </div>
                 
                 <div>

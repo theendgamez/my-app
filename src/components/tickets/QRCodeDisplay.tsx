@@ -22,12 +22,29 @@ export default function QRCodeDisplay({ qrCode, ticketId, size = 150 }: QRCodeDi
         }
         
         // Otherwise, generate a QR code from the string value
+        // Format as URL so iOS camera can recognize it
+        const baseUrl = typeof window !== 'undefined' ? 
+          `${window.location.protocol}//${window.location.host}` : 
+          'https://yourappurl.com';
+          
         if (qrCode) {
-          const dataUrl = await QRCode.toDataURL(qrCode);
+          // If qrCode is JSON data, encode it
+          let qrUrl = "";
+          try {
+            // Try to parse as JSON
+            JSON.parse(qrCode);
+            qrUrl = `${baseUrl}/verify?data=${encodeURIComponent(qrCode)}`;
+          } catch {
+            // Not JSON, treat as string ID
+            qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(qrCode)}`;
+          }
+          
+          const dataUrl = await QRCode.toDataURL(qrUrl);
           setQrDataUrl(dataUrl);
         } else if (ticketId) {
           // Fallback to ticketId if no qrCode is provided
-          const dataUrl = await QRCode.toDataURL(ticketId);
+          const qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(ticketId)}`;
+          const dataUrl = await QRCode.toDataURL(qrUrl);
           setQrDataUrl(dataUrl);
         }
       } catch (err) {

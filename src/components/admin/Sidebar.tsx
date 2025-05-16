@@ -16,7 +16,9 @@ import {
   FiDollarSign,
   FiChevronDown,
   FiChevronRight,
-  FiUser
+  FiUser,
+  FiMenu,
+  FiX
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
 
@@ -40,6 +42,7 @@ const Sidebar: React.FC = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
   const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
@@ -75,6 +78,14 @@ const Sidebar: React.FC = () => {
         { name: '用戶管理', icon: <FiUsers size={18} />, href: '/admin/users' },
         { name: '票券管理', icon: <FiTag size={18} />, href: '/admin/tickets' },
         { name: '訂單管理', icon: <FiShoppingBag size={18} />, href: '/admin/orders' },
+        {
+          name: '掃描票券',
+          href: '/admin/tickets/scan',
+          icon: <svg className="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0118.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>,
+        },
       ]
     },
     {
@@ -130,6 +141,16 @@ const Sidebar: React.FC = () => {
       )
     );
   };
+
+  // Toggle mobile sidebar
+  const toggleMobileSidebar = () => {
+    setIsMobileOpen(!isMobileOpen);
+  };
+
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname]);
   
   // Don't render on server or if not mounted yet
   if (!isMounted) {
@@ -142,75 +163,99 @@ const Sidebar: React.FC = () => {
   }
 
   return (
-    <div className="w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-10 overflow-hidden">
-      {/* Show loading state if authentication is still loading */}
-      {authLoading && !localAdmin && (
-        <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      )}
+    <>
+      {/* Mobile menu button */}
+      <button 
+        onClick={toggleMobileSidebar} 
+        className="md:hidden fixed z-50 bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg"
+        aria-label="Toggle menu"
+      >
+        {isMobileOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+      </button>
       
-      <div className="flex-1 py-4 overflow-y-auto">
-        {sections.map((section, sectionIndex) => (
-          <div key={section.title} className="mb-4">
-            <button
-              onClick={() => toggleSection(sectionIndex)}
-              className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-800"
-            >
-              <span className="font-medium text-sm uppercase tracking-wider">{section.title}</span>
-              {section.isOpen ? (
-                <FiChevronDown size={16} />
-              ) : (
-                <FiChevronRight size={16} />
+      <div className={`
+        md:w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-20 overflow-hidden
+        transition-all duration-300 ease-in-out
+        ${isMobileOpen ? 'w-64 translate-x-0' : '-translate-x-full w-0 md:translate-x-0 md:w-64'}
+      `}>
+        {/* Show loading state if authentication is still loading */}
+        {authLoading && !localAdmin && (
+          <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        )}
+        
+        <div className="flex-1 py-4 overflow-y-auto">
+          {sections.map((section, sectionIndex) => (
+            <div key={section.title} className="mb-4">
+              <button
+                onClick={() => toggleSection(sectionIndex)}
+                className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-800"
+              >
+                <span className="font-medium text-sm uppercase tracking-wider">{section.title}</span>
+                {section.isOpen ? (
+                  <FiChevronDown size={16} />
+                ) : (
+                  <FiChevronRight size={16} />
+                )}
+              </button>
+              
+              {section.isOpen && (
+                <div className="mt-1 space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={`
+                          flex items-center pl-8 pr-4 py-2 text-sm
+                          ${isActive 
+                            ? 'bg-blue-800 text-white font-medium border-l-4 border-blue-500' 
+                            : 'text-gray-300 hover:bg-gray-800 hover:text-white'}
+                        `}
+                      >
+                        <span className="mr-3">{item.icon}</span>
+                        <span>{item.name}</span>
+                        {item.badge && (
+                          <span className="ml-auto bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </button>
-            
-            {section.isOpen && (
-              <div className="mt-1 space-y-1">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={`
-                        flex items-center pl-8 pr-4 py-2 text-sm
-                        ${isActive 
-                          ? 'bg-blue-800 text-white font-medium border-l-4 border-blue-500' 
-                          : 'text-gray-300 hover:bg-gray-800 hover:text-white'}
-                      `}
-                    >
-                      <span className="mr-3">{item.icon}</span>
-                      <span>{item.name}</span>
-                      {item.badge && (
-                        <span className="ml-auto bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {/* Admin info section */}
-      <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 mt-auto">
-        <div className="flex items-center space-x-3">
-          <div className="bg-blue-600 rounded-full p-2">
-            <FiUser size={18} className="text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white">
-              {effectiveIsAdmin ? '系統管理員' : '訪問受限'}
-            </p>
-            <p className="text-xs text-gray-400">管理面板</p>
+            </div>
+          ))}
+        </div>
+        
+        {/* Admin info section */}
+        <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 mt-auto">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-600 rounded-full p-2">
+              <FiUser size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">
+                {effectiveIsAdmin ? '系統管理員' : '訪問受限'}
+              </p>
+              <p className="text-xs text-gray-400">管理面板</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      
+      {/* Overlay to close sidebar on mobile */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+    </>
   );
 };
 

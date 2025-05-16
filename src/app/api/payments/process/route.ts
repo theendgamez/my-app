@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           eventDate: event.eventDate,
           eventLocation: event.location,
           userId: user.userId,
-          userRealName: "",
+          userRealName: user.realName || '未提供姓名',
           qrCode: ticketId,
           zone: booking.zone,
           seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,

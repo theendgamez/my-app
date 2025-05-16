@@ -70,9 +70,16 @@ export default function DynamicQRCode({
         signature: newDynamicData.signature,
         nonce: newDynamicData.nonce
       });
-
+      
+      // 生成 URL 格式的 QR 碼，使 iOS 相機能夠直接識別
+      const baseUrl = typeof window !== 'undefined' ? 
+        `${window.location.protocol}//${window.location.host}` : 
+        'https://yourappurl.com';
+      
+      const qrUrl = `${baseUrl}/verify?data=${encodeURIComponent(Buffer.from(qrContent).toString('base64'))}`;
+      
       // 生成QR碼
-      const dataUrl = await QRCode.toDataURL(qrContent, {
+      const dataUrl = await QRCode.toDataURL(qrUrl, {
         width: size,
         margin: 2,
         errorCorrectionLevel: 'H',
@@ -102,7 +109,14 @@ export default function DynamicQRCode({
         setQrDataUrl(initialQrData);
       } else {
         // 是字符串，需要生成QR碼
-        const dataUrl = await QRCode.toDataURL(initialQrData || ticketId, {
+        // 使用 URL 格式的 QR 碼，使 iOS 相機能夠直接識別
+        const baseUrl = typeof window !== 'undefined' ? 
+          `${window.location.protocol}//${window.location.host}` : 
+          'https://yourappurl.com';
+        
+        const qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(ticketId)}`;
+        
+        const dataUrl = await QRCode.toDataURL(qrUrl, {
           width: size,
           margin: 2,
           errorCorrectionLevel: 'H',

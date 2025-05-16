@@ -2,8 +2,6 @@ import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { 
   createResponse, 
-  generateTokens, 
-  setAuthCookies, 
   verificationRateLimiter 
 } from '@/lib/auth';
 
@@ -43,37 +41,21 @@ export async function POST(request: NextRequest) {
 
     // Update user status and delete verification code
     await db.users.update(user.userId, {
-      isEmailVerified: true,
-      verificationCode: undefined,  // 成功驗證後，刪除驗證碼
-      verificationTimestamp: undefined  // 同時刪除驗證時間戳
+      isEmailVerified: true
     });
-
-    // Generate tokens
-    const { accessToken, refreshToken } = await generateTokens(user);
     
-    // Create response with user data
-    const response = createResponse({
-      user: {
-        userId: user.userId,
-        userName: user.userName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-      }
-    }, 200, '驗證成功！');
+    // Explicitly remove verification fields
+    await db.users.removeAttributes(user.userId, ['verificationCode', 'verificationTimestamp']);
     
-    // Set auth cookies
-    setAuthCookies(response, accessToken, refreshToken);
+    // Return success response without generating tokens or setting cookies
+    return createResponse({
+      success: true,
+      message: '電子郵件驗證成功！請登入您的帳號。',
+      redirectTo: '/login'
+    }, 200);
     
-    // Set HTTPS security headers
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
-    
-    return response;
   } catch (error) {
     console.error('Email verification error:', error);
     return createResponse({ error: '內部伺服器錯誤' }, 500);
   }
-
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 // 獲取用戶的好友列表
 export async function GET(request: NextRequest) {
@@ -29,6 +30,14 @@ export async function GET(request: NextRequest) {
         
         const friendInfo = await db.users.findById(friendId);
         
+        // 處理加密數據
+        let phoneNumber = friendInfo?.phoneNumber || '';
+        
+        // 如果電話號碼是加密的，則解密
+        if (friendInfo?.isDataEncrypted || isEncrypted(phoneNumber)) {
+          phoneNumber = decryptData(phoneNumber);
+        }
+        
         // 計算友誼時間（天數）
         const acceptedAt = friendship.acceptedAt ? new Date(friendship.acceptedAt) : new Date();
         const now = new Date();
@@ -40,7 +49,7 @@ export async function GET(request: NextRequest) {
             userId: friendId,
             userName: friendInfo?.userName || '未知用戶',
             email: friendInfo?.email || '',
-            phoneNumber: friendInfo?.phoneNumber || '',
+            phoneNumber: phoneNumber,
           },
           friendshipDays,
           canTransferTickets: friendshipDays >= 7

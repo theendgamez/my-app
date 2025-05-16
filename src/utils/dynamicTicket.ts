@@ -71,8 +71,15 @@ export function generateTicketQRData(ticketData: DynamicTicketData): string {
     n: ticketData.nonce.substring(0, 8)
   });
   
-  // Base64 編碼以減小QR碼大小
-  return Buffer.from(qrData).toString('base64');
+  // 將數據構造為URL格式，方便iOS相機掃描
+  // 確定基本URL，這里使用相對路徑，實際使用時會自動補全
+  const baseUrl = '/verify';
+  const urlParams = encodeURIComponent(Buffer.from(qrData).toString('base64'));
+  
+  // 對於國際使用，可能需要完整URL
+  // const baseUrl = 'https://yourappurl.com/verify';
+  
+  return `${baseUrl}?data=${urlParams}`;
 }
 
 // 模擬區塊鏈記錄

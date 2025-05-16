@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getCurrentUser, createResponse } from '@/lib/auth';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,14 +10,19 @@ export async function GET(request: NextRequest) {
       return createResponse({ user: null }, 200);
     }
     
-    // Return complete user data including role which is needed by the frontend
+    // Check if we need to decrypt phone number
+    const phoneNumber = user.phoneNumber && (user.isDataEncrypted || isEncrypted(user.phoneNumber)) 
+      ? decryptData(user.phoneNumber) 
+      : user.phoneNumber;
+    
+    // Return complete user data with decrypted phoneNumber
     return createResponse({
       userId: user.userId,
       role: user.role || 'user',
       userName: user.userName,
       email: user.email,
       isEmailVerified: user.isEmailVerified,
-      phoneNumber: user.phoneNumber
+      phoneNumber: phoneNumber
     }, 200);
   } catch (error) {
     console.error('Error fetching current user:', error);

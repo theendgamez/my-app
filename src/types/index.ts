@@ -13,6 +13,8 @@ export interface Users {
   createdAt: string;
   role: string;
   tokenVersion?: number;
+  // Add new flag to track if data is encrypted
+  isDataEncrypted?: boolean;
 }
 
 /**
@@ -252,3 +254,4 @@ export interface LotteryHistory {
  result: 'won' | 'lost' | 'cancelled';
  drawDate: string;
 }
+

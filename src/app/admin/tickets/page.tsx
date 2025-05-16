@@ -126,7 +126,7 @@ export default function AdminTicketsPage() {
     const matchesSearch = 
       (ticket.ticketId.toLowerCase()).includes(searchQuery.toLowerCase()) ||
       (ticket.eventName.toLowerCase()).includes(searchQuery.toLowerCase()) ||
-      (ticket.userRealName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      ((ticket.userRealName || '未提供姓名').toLowerCase()).includes(searchQuery.toLowerCase()) ||
       (ticket.userId.toLowerCase()).includes(searchQuery.toLowerCase()) ||
       (ticket.seatNumber?.toLowerCase() || '').includes(searchQuery.toLowerCase());
     
@@ -346,7 +346,7 @@ export default function AdminTicketsPage() {
                       <div className="text-sm text-gray-900">{formatDate(ticket.eventDate)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{ticket.userRealName || '未指定'}</div>
+                      <div className="text-sm text-gray-900">{ticket.userRealName || '未提供姓名'}</div>
                       <div className="text-xs text-gray-500">{ticket.userId.substring(0, 8)}...</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

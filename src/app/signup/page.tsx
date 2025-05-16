@@ -86,7 +86,11 @@ export default function SignUpPage() {
                 <input
                   type="text"
                   placeholder="用戶名稱"
-                  {...register("userName", { required: "用戶名稱是必填的。", maxLength: 20 })}
+                  {...register("userName", { 
+                    required: "用戶名稱是必填的。", 
+                    maxLength: { value: 20, message: "用戶名稱不能超過20個字符。" },
+                    minLength: { value: 3, message: "用戶名稱至少需要3個字符" }
+                  })}
                   className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 />
                 {errors.userName && <p className="text-red-500 text-sm mb-3">{errors.userName.message}</p>}

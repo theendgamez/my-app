@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { encryptData, decryptData, isEncrypted } from '@/utils/encryption';
 
 // GET user by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params:  Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get current user from token
@@ -35,9 +36,18 @@ export async function GET(
       );
     }
 
+    // Decrypt sensitive fields if they appear to be encrypted
+    if (user.isDataEncrypted || (user.phoneNumber && isEncrypted(user.phoneNumber))) {
+      return NextResponse.json({
+        ...user,
+        phoneNumber: user.phoneNumber ? decryptData(user.phoneNumber) : '',
+        realName: user.realName ? decryptData(user.realName) : ''
+      });
+    }
+
     // Return user data
     return NextResponse.json(user);
-  } catch  {
+  } catch {
     return NextResponse.json(
       { error: "Failed to retrieve user data" },
       { status: 500 }
@@ -48,7 +58,7 @@ export async function GET(
 // PATCH to update user profile
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // Fix: Remove Promise wrapper
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = (await params).id
@@ -60,11 +70,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const updates = { userName, email, phoneNumber };
+    // Encrypt sensitive data during updates
+    const updates = { 
+      userName, 
+      email, 
+      phoneNumber: encryptData(phoneNumber),
+      isDataEncrypted: true
+    };
     
     await db.users.update(userId, updates);
+    
+    // Return decrypted data in response
     return NextResponse.json(
-      { message: 'Profile updated successfully', user: { userId, ...updates } },
+      { 
+        message: 'Profile updated successfully', 
+        user: { 
+          userId, 
+          userName, 
+          email, 
+          phoneNumber // Return original non-encrypted value in response
+        } 
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -79,7 +105,7 @@ export async function PATCH(
 // DELETE user (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params:  Promise<{ id: string }> } // Fix: Remove Promise wrapper
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = (await params).id;

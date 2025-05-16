@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { ticketBlockchain } from '@/lib/blockchain';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,8 +65,16 @@ export async function POST(request: NextRequest) {
     const originalOwner = ticket.userId;
     const originalOwnerDetails = await db.users.findById(originalOwner);
     
+    // Handle encrypted/decrypted real name for recipient
+    let recipientRealName = recipient.realName || recipient.userName;
+    
+    // If recipient data is encrypted, decrypt it
+    if (recipient.isDataEncrypted || isEncrypted(recipientRealName)) {
+      recipientRealName = decryptData(recipientRealName);
+    }
+    
     // Transfer ticket
-    const transferredTicket = await db.tickets.transfer(ticketId, friendId, recipient.realName || recipient.userName);
+    const transferredTicket = await db.tickets.transfer(ticketId, friendId, recipientRealName);
 
     // Add blockchain transaction for the transfer (directly call the method without storing the result)
     ticketBlockchain.addTransaction({

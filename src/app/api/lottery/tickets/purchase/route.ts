@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 // Define purchase limit configuration with sensible defaults
 const purchaseLimitConfig = {
@@ -156,6 +157,12 @@ export async function POST(request: NextRequest) {
       cardDetails
     });
 
+    // 處理用戶姓名 - 解密如果需要
+    let userRealName = user.realName || "";
+    if (user.isDataEncrypted || isEncrypted(userRealName)) {
+      userRealName = decryptData(userRealName);
+    }
+
     // 創建票券
     const tickets = [];
     for (let i = 0; i < quantity; i++) {
@@ -165,7 +172,7 @@ export async function POST(request: NextRequest) {
         eventId: registration.eventId,
         eventName: event.eventName,
         userId: user.userId,
-        userRealName: user.realName || "",
+        userRealName: userRealName,
         zone: registration.zoneName,
         paymentId,
         bookingToken,

@@ -22,9 +22,26 @@ export async function POST(
     
     // 獲取請求體中的QR碼數據
     const requestData = await request.json();
-    const qrData = requestData.qrData as DynamicTicketData;
+    let qrData = requestData.qrData as DynamicTicketData | string;
     
-    if (!qrData || !qrData.ticketId || qrData.ticketId !== ticketId) {
+    // Parse QR data if it's a string that looks like JSON
+    if (typeof qrData === 'string' && (qrData.startsWith('{') || qrData.startsWith('['))) {
+      try {
+        qrData = JSON.parse(qrData);
+      } catch (e) {
+        console.error('Failed to parse QR data JSON:', e);
+        return NextResponse.json(
+          { error: 'QR碼數據格式無效' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // At this point qrData should be an object, either parsed or from the original request
+    // Validate that we have the necessary ticket ID, either in the dynamic data or directly
+    const ticketIdFromQR = typeof qrData === 'object' ? qrData.ticketId : null;
+    
+    if (!ticketIdFromQR || ticketIdFromQR !== ticketId) {
       return NextResponse.json(
         { error: '無效的QR碼數據' },
         { status: 400 }
@@ -57,7 +74,7 @@ export async function POST(
       });
     }
     
-    // 使用區塊鏈驗證QR碼
+    // 使用區塊鏈驗證QR碼 - directly use the ticket data
     const isValid = verifyTicket(qrData);
     
     // 如果要驗證並使用票券

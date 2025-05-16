@@ -223,6 +223,8 @@ interface DbHandler {
     update(userId: string, updates: Partial<Users>): Promise<Users>;
     delete(userId: string): Promise<void>;
     getAdmin(): Promise<Users | null>;
+    removeAttributes(userId: string, attributes: string[]): Promise<Users>;
+
   };
   payments: {
     create(paymentData: Payment): Promise<Payment>;
@@ -620,11 +622,38 @@ export const db: DbHandler = {
           : null;
       });
     },
+
     /**
-     * Retrieves lottery statistics for a user
+     * Removes specific attributes from a user
      * @param userId - User identifier
-     * @returns Lottery statistics or null if not found
+     * @param attributes - Array of attribute names to remove
+     * @returns Updated user
      */
+    removeAttributes: async (userId: string, attributes: string[]): Promise<Users> => {
+      return executeDbCommand(async () => {
+        const currentUser = await db.users.findById(userId);
+        if (!currentUser) throw new Error(`User with ID ${userId} not found`);
+        
+        // Build REMOVE expression
+        const removeExpressions = attributes.map(attr => `#${attr}`).join(', ');
+        const expressionAttributeNames: Record<string, string> = {};
+        
+        attributes.forEach(attr => {
+          expressionAttributeNames[`#${attr}`] = attr;
+        });
+
+        const command = new UpdateItemCommand({
+          TableName: 'Users',
+          Key: marshall({ userId }),
+          UpdateExpression: `REMOVE ${removeExpressions}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW'
+        });
+        
+        const result = await client.send(command);
+        return result.Attributes ? (unmarshall(result.Attributes) as Users) : currentUser;
+      });
+    },
   },
 
   /**
