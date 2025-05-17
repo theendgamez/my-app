@@ -72,15 +72,20 @@ export default function LotteryTicketPurchasePage() {
     const fetchDetails = async () => {
       try {
         setLoading(true);
+        setError(null);
+        console.log(`Fetching details for registration token: ${registrationToken}`);
+        
+        const accessToken = localStorage.getItem('accessToken') || '';
         const response = await fetch(`/api/lottery/registration/${registrationToken}/details`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+            'Authorization': `Bearer ${accessToken}`,
             'x-user-id': user?.userId || ''
           }
         });
 
         if (!response.ok) {
-          throw new Error('無法獲取抽籤登記詳情');
+          const errorData = await response.json();
+          throw new Error(errorData.error || '無法獲取抽籤登記詳情');
         }
 
         const data = await response.json();
@@ -100,11 +105,25 @@ export default function LotteryTicketPurchasePage() {
           return;
         }
         
+        // More precise check for ticket purchase status
+        // Check both direct flag and presence of tickets
+        const hasTickets = Boolean(registrationData.ticketsPurchased || 
+                                 (registrationData.ticketIds && 
+                                  registrationData.ticketIds.length > 0 && 
+                                  registrationData.paymentId));
+        
+        console.log("Ticket purchase status check:", { 
+          ticketsPurchased: registrationData.ticketsPurchased,
+          hasTicketIds: Boolean(registrationData.ticketIds && registrationData.ticketIds.length > 0),
+          hasPaymentId: Boolean(registrationData.paymentId),
+          finalResult: hasTickets
+        });
+        
         // Check if tickets have already been purchased
-        if (registrationData.ticketsPurchased) {
+        if (hasTickets) {
           setError('您已經購買了此活動的門票');
           setTimeout(() => {
-            router.push('/user/tickets');
+            router.push('/user/order');
           }, 2000);
           return;
         }

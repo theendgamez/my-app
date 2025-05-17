@@ -90,6 +90,24 @@ export async function GET(
       }, { status: 403 });
     }
 
+    // Check if this ticket is from a lottery and payment is required
+    if (ticket.status === 'reserved') {
+      // Find associated registration
+      const registrations = await db.registration.findByTicket(ticket.ticketId);
+      const registration = registrations && Array.isArray(registrations) ? registrations[0] : undefined;
+      
+      if (registration && registration.paymentStatus !== 'paid') {
+        // Enhance ticket with lottery info
+        return NextResponse.json({
+          ...ticket,
+          lotteryInfo: {
+            requiresPayment: true,
+            registrationToken: registration.registrationToken
+          }
+        });
+      }
+    }
+    
     // Return ticket data
     return NextResponse.json(ticket);
   } catch (error) {

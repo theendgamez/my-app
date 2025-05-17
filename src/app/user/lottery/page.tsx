@@ -55,6 +55,11 @@ export default function UserLotteryPage() {
   }, [isAuthenticated, authLoading, router, user]);
 
   const getStatusBadge = (status: string, paymentStatus: string) => {
+    // If we know tickets are purchased, show that status regardless of other statuses
+    if (status === 'won' && paymentStatus === 'paid') {
+      return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購票</span>;
+    }
+
     if (paymentStatus === 'pending') {
       return <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded">未付款</span>;
     }
@@ -142,16 +147,16 @@ export default function UserLotteryPage() {
                           {getStatusBadge(reg.status, reg.paymentStatus)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {reg.paymentStatus === 'pending' ? (
+                          {reg.status === 'won' && reg.paymentStatus === 'pending' && !reg.ticketsPurchased ? (
                             <Link 
-                              href={`/events/${reg.eventId}/lottery/payment?registrationToken=${reg.registrationToken}`}
+                              href={`/events/${reg.eventId}/tickets/purchase?registrationToken=${reg.registrationToken}`}
                               className="text-blue-600 hover:text-blue-900"
                             >
                               付款
                             </Link>
-                          ) : reg.status === 'won' ? (
+                          ) : reg.status === 'won' && (reg.paymentStatus === 'paid' || (typeof reg.ticketsPurchased === 'function' ? Boolean(reg.ticketsPurchased(null)) : reg.ticketsPurchased)) ? (
                             <Link 
-                              href={`/events/${reg.eventId}/lottery/result?registrationToken=${reg.registrationToken}`}
+                              href={`/user/order`}
                               className="text-blue-600 hover:text-blue-900"
                             >
                               查看門票

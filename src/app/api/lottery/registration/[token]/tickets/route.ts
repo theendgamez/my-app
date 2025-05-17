@@ -18,7 +18,14 @@ export async function GET(
     const headerUserId = request.headers.get('x-user-id');
 
     // Get registration
-    const registration = await db.registration.findByToken(token) as { ticketIds?: string[]; userId: string };
+    const registration = await db.registration.findByToken(token) as { 
+      ticketIds?: string[]; 
+      userId: string; 
+      status: string;
+      paymentStatus?: string;
+      ticketsPurchased?: boolean;
+    };
+    
     if (!registration) {
       return NextResponse.json({ error: '找不到該抽籤登記' }, { status: 404 });
     }
@@ -26,6 +33,23 @@ export async function GET(
     // Authorization check
     if (!user && (!headerUserId || headerUserId !== registration.userId)) {
       return NextResponse.json({ error: '請先登入以查看票券' }, { status: 401 });
+    }
+
+    // Check if tickets are actually purchased
+    if (registration.status === 'won' && !registration.ticketsPurchased) {
+      return NextResponse.json({ 
+        error: '您需要先支付票款才能查看票券詳情',
+        requiresPayment: true,
+        registrationToken: token
+      }, { status: 403 });
+    }
+
+    // Make sure ticketIds exists and is not empty
+    if (!registration.ticketIds || registration.ticketIds.length === 0) {
+      return NextResponse.json({ 
+        error: '找不到相關票券',
+        noTickets: true 
+      }, { status: 404 });
     }
 
     // Get tickets associated with this registration
@@ -38,9 +62,18 @@ export async function GET(
       : [];
 
     // Filter out any null values and ensure tickets are valid
-    const validTickets = tickets.filter(Boolean);
+    // Add payment status to each ticket
+    const validTickets = tickets.filter(Boolean).map(ticket => ({
+      ...ticket,
+      paymentRequired: !registration.ticketsPurchased,
+      registrationToken: token
+    }));
     
-    return NextResponse.json({ tickets: validTickets });
+    return NextResponse.json({ 
+      tickets: validTickets,
+      paymentStatus: registration.paymentStatus || 'pending',
+      ticketsPurchased: registration.ticketsPurchased || false
+    });
   } catch (error) {
     console.error('Error fetching lottery tickets:', error);
     return NextResponse.json(

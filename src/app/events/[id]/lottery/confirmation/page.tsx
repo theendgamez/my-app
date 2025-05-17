@@ -74,7 +74,9 @@ export default function LotteryConfirmationPage() {
           platformFee: registration.platformFee || 0,
           createdAt: registration.createdAt || '',
           paymentStatus: registration.paymentStatus || '',
-          isDrawn: typeof registration.isDrawn === 'boolean' ? registration.isDrawn : false
+          isDrawn: typeof registration.isDrawn === 'boolean' ? registration.isDrawn : false,
+          ticketIds: registration.ticketIds || [],
+          ticketsPurchased: registration.ticketsPurchased || false
         };
         
         setDetails(detailsWithDefaults);

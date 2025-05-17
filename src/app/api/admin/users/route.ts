@@ -1,92 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { decryptData, isEncrypted, encryptData } from '@/utils/encryption';
 
-// GET all users (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin access
-    const user = await getCurrentUser(request);
+    // Verify admin authentication
+    const currentUser = await getCurrentUser(request);
     
-    // Also check header auth as fallback
-    const userIdHeader = request.headers.get('x-user-id');
-    let isAdmin = false;
-
-    if (user && user.role === 'admin') {
-      isAdmin = true;
-    } else if (userIdHeader) {
-      try {
-        const dbUser = await db.users.findById(userIdHeader);
-        if (dbUser?.role === 'admin') {
-          isAdmin = true;
-        }
-      } catch (error) {
-        console.error('Error verifying admin via user ID:', error);
-      }
-    }
-
-    if (!isAdmin) {
+    if (!currentUser || currentUser.role !== 'admin') {
       return NextResponse.json(
-        { error: '僅管理員可訪問此API' },
+        { error: "Unauthorized access" },
         { status: 403 }
       );
     }
 
-    // Get all users
-    const users = await db.users.findMany();
+    // Get query parameters for pagination/filtering
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const search = searchParams.get('search') || '';
     
-    return NextResponse.json({ users });
+    // Fetch users from database
+    const allUsers = await db.users.findMany();
+    // Apply search filter
+    const filteredUsers = search
+      ? allUsers.filter(user =>
+          user.realName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.email?.toLowerCase().includes(search.toLowerCase())
+        )
+      : allUsers;
+    // Apply pagination
+    const start = (page - 1) * limit;
+    const users = filteredUsers.slice(start, start + limit);
+    
+    // Decrypt sensitive user data
+    const decryptedUsers = users.map((user): typeof user => {
+      // Create a new object to avoid modifying the original
+      const decryptedUser = { ...user };
+      
+      // Decrypt phone number if it's encrypted
+      if (user.phoneNumber && (user.isDataEncrypted || isEncrypted(user.phoneNumber))) {
+        decryptedUser.phoneNumber = decryptData(user.phoneNumber);
+      }
+      return decryptedUser;
+    });
+
+    // Get total count for pagination
+    const totalUsers = filteredUsers.length;
+    
+    return NextResponse.json({
+      users: decryptedUsers,
+      pagination: {
+        total: totalUsers,
+        page,
+        limit,
+        totalPages: Math.ceil(totalUsers / limit)
+      }
+    });
+    
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json(
-      { error: '獲取用戶數據時出錯' },
+      { error: "Failed to retrieve user data" },
       { status: 500 }
     );
   }
 }
 
-// DELETE user (admin only)
-export async function DELETE(request: NextRequest) {
+// Handle user updates from admin panel
+export async function PATCH(request: NextRequest) {
   try {
-    // Verify admin access
-    const user = await getCurrentUser(request);
+    // Verify admin authentication
+    const currentUser = await getCurrentUser(request);
     
-    if (!user || user.role !== 'admin') {
+    if (!currentUser || currentUser.role !== 'admin') {
       return NextResponse.json(
-        { error: '僅管理員可刪除用戶' },
+        { error: "Unauthorized access" },
         { status: 403 }
       );
     }
 
-    // Get user ID from request body
-    const { userId } = await request.json();
+    const { userId, updates } = await request.json();
     
     if (!userId) {
       return NextResponse.json(
-        { error: '必須提供用戶ID' },
+        { error: "User ID is required" },
         { status: 400 }
       );
     }
-
-    // Prevent deleting yourself
-    if (userId === user.userId) {
-      return NextResponse.json(
-        { error: '無法刪除當前登入的管理員帳戶' },
-        { status: 400 }
-      );
+    
+    // Encrypt sensitive fields before updating
+    const updatesToSave = { ...updates };
+    
+    if (updates.phoneNumber !== undefined) {
+      updatesToSave.phoneNumber = encryptData(updates.phoneNumber);
+      updatesToSave.isDataEncrypted = true;
     }
-
-    // Delete the user
-    await db.users.delete(userId);
-
-    return NextResponse.json(
-      { message: '用戶已成功刪除' },
-      { status: 200 }
-    );
+    
+    if (updates.realName !== undefined) {
+      updatesToSave.realName = encryptData(updates.realName);
+      updatesToSave.isDataEncrypted = true;
+    }
+    
+    // Update user in database
+    await db.users.update(userId, updatesToSave);
+    
+    return NextResponse.json({
+      success: true,
+      message: "User updated successfully"
+    });
+    
   } catch (error) {
-    console.error('Error deleting user:', error);
+    console.error('Error updating user:', error);
     return NextResponse.json(
-      { error: '刪除用戶時出錯' },
+      { error: "Failed to update user data" },
       { status: 500 }
     );
   }

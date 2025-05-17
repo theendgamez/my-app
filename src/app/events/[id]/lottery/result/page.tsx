@@ -19,6 +19,7 @@ export default function LotteryResultPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [requiresPayment, setRequiresPayment] = useState(false);
 
   useEffect(() => {
     // Check authentication first
@@ -44,11 +45,18 @@ export default function LotteryResultPage() {
           }
         });
 
+        const data = await response.json();
+        
         if (!response.ok) {
-          throw new Error('無法獲取票券詳情');
+          // Handle the specific case when payment is required
+          if (response.status === 403 && data.requiresPayment) {
+            setError('您需要先支付票款才能查看票券詳情');
+            setRequiresPayment(true); // Add this state variable
+            return;
+          }
+          throw new Error(data.error || '無法獲取票券詳情');
         }
 
-        const data = await response.json();
         setTickets(data.tickets || []);
       } catch (err) {
         console.error('Error fetching tickets:', err);
@@ -81,12 +89,21 @@ export default function LotteryResultPage() {
         <div className="container mx-auto p-4 pt-20">
           <Alert type="error" title="錯誤" message={error} />
           <div className="mt-4 flex justify-center">
-            <button
-              onClick={() => router.push('/user/lottery')}
-              className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
-            >
-              返回抽籤記錄
-            </button>
+            {requiresPayment ? (
+              <button
+                onClick={() => router.push(`/events/${id}/tickets/purchase?registrationToken=${registrationToken}`)}
+                className="px-6 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                前往付款頁面
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push('/user/lottery')}
+                className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
+              >
+                返回抽籤記錄
+              </button>
+            )}
           </div>
         </div>
       </>

@@ -13,7 +13,6 @@ export interface Users {
   createdAt: string;
   role: string;
   tokenVersion?: number;
-  // Add new flag to track if data is encrypted
   isDataEncrypted?: boolean;
 }
 
@@ -156,6 +155,8 @@ export interface BookingDetails {
 }
 
 export interface Registration {
+  ticketIds: boolean;
+  ticketsPurchased(ticketsPurchased: unknown): unknown;
   registrationToken: string;
   eventId: string;
   userId: string;
@@ -175,9 +176,9 @@ export interface Registration {
   drawDate?: string;
   isDrawn?: boolean;
   sessionId?: string;
-  priorityScore?: number;  // 優先權分數
-  riskScore?: number;      // 風險評分
-  lastPurchaseDate?: string; // 上次購票日期
+  priorityScore?: number;  
+  riskScore?: number;      
+  lastPurchaseDate?: string;
   
 }
 

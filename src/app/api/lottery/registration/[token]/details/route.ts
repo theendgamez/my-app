@@ -17,13 +17,44 @@ export async function GET(
       return NextResponse.json({ error: 'Registration not found', registrationToken: token }, { status: 404 });
     }
 
+    // Check for associated tickets to determine purchase status
+    let associatedTickets: unknown[] = [];
+    let ticketsPurchased = Boolean(registration.ticketsPurchased);
+    
+    // If ticketIds exists, use them to check for actual tickets
+    if (Array.isArray(registration.ticketIds) && registration.ticketIds.length > 0) {
+      try {
+        associatedTickets = await Promise.all(
+          registration.ticketIds.map(ticketId => db.tickets.findById(ticketId))
+        );
+        
+        // Filter out any null results
+        associatedTickets = associatedTickets.filter(ticket => ticket !== null);
+        
+        // If we have valid tickets and a payment, then tickets were purchased
+        if (associatedTickets.length > 0 && registration.paymentId) {
+          ticketsPurchased = true;
+        }
+      } catch (ticketError) {
+        console.error(`Error fetching associated tickets for registration ${token}:`, ticketError);
+      }
+    }
+    
+    // Provide more detailed purchase status in the response
+    const enhancedRegistration = {
+      ...registration,
+      ticketsPurchased,
+      hasAssociatedTickets: associatedTickets.length > 0,
+      ticketCount: associatedTickets.length
+    };
+
     // Fetch event details with better error handling
     const event = await db.events.findById(registration.eventId);
     if (!event) {
       console.error(`Event not found for registration: ${token}, eventId: ${registration.eventId}`);
       // Return a placeholder event object if the real event data is missing
       return NextResponse.json({
-        registration,
+        registration: enhancedRegistration,
         event: {
           eventId: registration.eventId,
           eventName: '活動資料暫時無法獲取',
@@ -77,8 +108,8 @@ export async function GET(
 
     return NextResponse.json({
       registration: {
-        ...registration,
-        phoneNumber: registration.phoneNumber || '',
+        ...enhancedRegistration,
+        phoneNumber: enhancedRegistration.phoneNumber || '',
       },
       event: {
         eventId: event.eventId,

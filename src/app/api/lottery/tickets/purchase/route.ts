@@ -3,11 +3,12 @@ import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { decryptData, isEncrypted } from '@/utils/encryption';
+import { Ticket } from '@/types';
 
 // Define purchase limit configuration with sensible defaults
 const purchaseLimitConfig = {
-  maxTicketsPerEvent: 4,
-  maxTicketsPerUser: 10
+  maxTicketsPerEvent: 2,
+  maxTicketsPerUser: 5
 };
 
 /**
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
       status: string;
       ticketsPurchased: boolean;
       zoneName: string;
+      ticketIds?: string[]; // 可能包含的已購票券 ID 列表
     };
     const registration = await db.registration.findByToken(registrationToken) as Registration;
     if (!registration) {
@@ -163,37 +165,55 @@ export async function POST(request: NextRequest) {
       userRealName = decryptData(userRealName);
     }
 
-    // 創建票券
-    const tickets = [];
-    for (let i = 0; i < quantity; i++) {
-      const ticketId = uuidv4();
-      const ticket = {
-        ticketId,
-        eventId: registration.eventId,
-        eventName: event.eventName,
-        userId: user.userId,
-        userRealName: userRealName,
-        zone: registration.zoneName,
-        paymentId,
-        bookingToken,
-        status: "sold" as const,
-        purchaseDate: now,
-        eventDate: event.eventDate,
-        eventLocation: event.location ?? '',
-        seatNumber: '',
-        price: String(totalAmount / quantity),
-        qrCode: ticketId,
-        lastRefreshed: '',
-        nextRefresh: '',
-        lastVerified: null,
-        verificationCount: 0,
-        transferredAt: null,
-        transferredFrom: null,
-        adminNotes: ''
-      };
-      
-      tickets.push(ticket);
-      await db.tickets.create(ticket);
+    // Prepare tickets array to collect ticket info for response
+    const tickets: Ticket[] = [];
+
+    // Check if there are existing tickets that need to be updated from "reserved" to "sold"
+    if (registration.ticketIds && registration.ticketIds.length > 0) {
+      for (const ticketId of registration.ticketIds) {
+        await db.tickets.update(ticketId, {
+          status: 'sold',
+          paymentId,
+          purchaseDate: now
+        });
+        // Optionally, fetch the updated ticket to include in the response
+        const updatedTicket = await db.tickets.findById(ticketId);
+        if (updatedTicket) {
+          tickets.push(updatedTicket);
+        }
+      }
+    } else {
+      // Create new tickets if needed
+      for (let i = 0; i < quantity; i++) {
+        const ticketId = uuidv4();
+        const ticket = {
+          ticketId,
+          eventId: registration.eventId,
+          eventName: event.eventName,
+          userId: user.userId,
+          userRealName: userRealName,
+          zone: registration.zoneName,
+          paymentId,
+          bookingToken,
+          status: "sold" as const,
+          purchaseDate: now,
+          eventDate: event.eventDate,
+          eventLocation: event.location ?? '',
+          seatNumber: '',
+          price: String(totalAmount / quantity),
+          qrCode: ticketId,
+          lastRefreshed: '',
+          nextRefresh: '',
+          lastVerified: null,
+          verificationCount: 0,
+          transferredAt: null,
+          transferredFrom: null,
+          adminNotes: ''
+        };
+        
+        tickets.push(ticket);
+        await db.tickets.create(ticket);
+      }
     }
 
     // 更新註冊信息

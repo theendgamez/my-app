@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
             eventId: eventId,
             zone: zoneName,
             paymentId: reg.paymentId,
-            status: 'available',
+            status: 'reserved', // Change from 'available' to 'reserved'
             purchaseDate: new Date().toISOString(),
             eventName: event.eventName,
             eventDate: event.eventDate,

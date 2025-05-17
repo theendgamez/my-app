@@ -53,12 +53,17 @@ export function verifyTicketData(
   ticketData: DynamicTicketData,
   secretKey: string
 ): boolean {
-  // 重建簽名數據
-  const dataToSign = `${ticketData.ticketId}:${ticketData.timestamp}:${ticketData.nonce}:${ticketData.previousHash || ''}`;
-  const expectedSignature = createSignature(dataToSign, secretKey);
+  // 從票券數據中提取必要信息
+  const { ticketId, timestamp, nonce, previousHash, signature } = ticketData;
   
-  // 檢查簽名是否匹配
-  return ticketData.signature === expectedSignature;
+  // 重建簽名數據，與生成時使用的格式相同
+  const dataToSign = `${ticketId}:${timestamp}:${nonce}:${previousHash || ''}`;
+  
+  // 使用相同的密鑰重新計算簽名
+  const calculatedSignature = createSignature(dataToSign, secretKey);
+  
+  // 比較原始簽名與重新計算的簽名
+  return calculatedSignature === signature;
 }
 
 // 生成票券QR碼數據

@@ -128,10 +128,22 @@ export default function UserOrderPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'sold':
-        return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">已售出</span>;
+  // Modify the getStatusBadge function
+  const getStatusBadge = (ticket: Ticket) => {
+    // Handle reserved tickets from lottery that need payment
+    if (ticket.status === 'reserved') {
+      return (
+        <div className="flex flex-col items-center">
+          <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">已預訂</span>
+          <span className="mt-1 text-xs text-red-600">需付款</span>
+        </div>
+      );
+    }
+    
+    // Handle other status types
+    switch (ticket.status) {
+      case "sold":
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購買</span>;
       case 'used':
         return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">已使用</span>;
       case 'cancelled':
@@ -139,6 +151,33 @@ export default function UserOrderPage() {
       default:
         return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">已預訂</span>;
     }
+  };
+
+  // Update the action buttons for tickets
+  const renderActions = (ticket: Ticket) => {
+    if (ticket.status === 'reserved') {
+      // Find registration token if available
+      return (
+        <div className="flex flex-col space-y-2">
+          <Link 
+            href={`/events/${ticket.eventId}/lottery/payment?ticketId=${ticket.ticketId}`}
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            完成付款
+          </Link>
+        </div>
+      );
+    }
+    
+    // Regular view details link for other tickets
+    return (
+      <Link 
+        href={`/user/order/${ticket.paymentId || ticket.ticketId}`}
+        className="text-blue-600 hover:text-blue-800"
+      >
+        查看詳情
+      </Link>
+    );
   };
 
   return (
@@ -214,15 +253,10 @@ export default function UserOrderPage() {
                             {formatDate(ticket.purchaseDate)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(ticket.status)}
+                            {getStatusBadge(ticket)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <Link 
-                              href={`/user/order/${ticket.paymentId}`}
-                              className="text-blue-600 hover:text-blue-800 mr-4"
-                            >
-                              查看詳情
-                            </Link>
+                            {renderActions(ticket)}
                           </td>
                         </tr>
                       ))}

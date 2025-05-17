@@ -260,6 +260,7 @@ interface DbHandler {
     delete(registrationToken: string): Promise<void>;
     findByUser(userId: string): Promise<unknown[]>;
     findByEvent(eventId: string): Promise<unknown[]>;
+    findByTicket(ticketId: string): Promise<unknown | null>;
     findByEventAndUser(eventId: string, userId: string): Promise<unknown[]>;
     findByEventAndStatus(eventId: string, status: string): Promise<unknown[]>;
     findByUserRecentDrawn(userId: string): Promise<unknown[]>;
@@ -758,7 +759,7 @@ export const db: DbHandler = {
       return executeDbCommand(async () => {
         const command = new PutItemCommand({
           TableName: 'Tickets',
-          Item: marshall(ticketData)
+          Item: marshall(ticketData, { removeUndefinedValues: true })
         });
         await client.send(command);
         return ticketData;
@@ -1182,6 +1183,26 @@ export const db: DbHandler = {
           IndexName: 'eventId-index',
           KeyConditionExpression: 'eventId = :eventId',
           ExpressionAttributeValues: marshall({ ':eventId': eventId })
+        });
+        
+        const result = await client.send(command);
+        return result.Items?.map(item => unmarshall(item)) || [];
+      });
+
+    },
+    /**
+     * Finds registrations by event and user
+     * @param eventId - Event identifier
+     * @param userId - User identifier
+     * @returns Array of registrations
+     */
+    findByTicket: async (ticketId: string): Promise<unknown[]> => {
+      return executeDbCommand(async () => {
+        const command = new QueryCommand({
+          TableName: 'Registration',
+          IndexName: 'ticketId-index',
+          KeyConditionExpression: 'ticketId = :ticketId',
+          ExpressionAttributeValues: marshall({ ':ticketId': ticketId })
         });
         
         const result = await client.send(command);
