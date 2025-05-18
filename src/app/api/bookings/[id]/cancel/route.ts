@@ -8,8 +8,73 @@ export async function POST(
     try {
         const bookingId = (await params).id; // Access id directly
         
-        // Get request body
-        const body = await request.json();
+        // First check if the request has any content at all
+        const contentLength = request.headers.get('content-length');
+        if (!contentLength || parseInt(contentLength) === 0) {
+            return NextResponse.json(
+                { error: "請求主體為空，需要包含 JSON 格式數據" },
+                { status: 400 }
+            );
+        }
+        
+        // Check content type
+        const contentType = request.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return NextResponse.json(
+                { error: "請求格式錯誤，需要 JSON 格式 (Content-Type: application/json)" },
+                { status: 400 }
+            );
+        }
+        
+        // Get request body with error handling
+        let body;
+        try {
+            // Read request as text first for diagnostic purposes (if needed)
+            const rawText = await request.text();
+            console.log("Raw request body:", rawText);
+            
+            if (!rawText || rawText.trim() === '') {
+                return NextResponse.json(
+                    { error: "請求主體為空，需要包含 userId" },
+                    { status: 400 }
+                );
+            }
+            
+            // Parse the text as JSON
+            try {
+                body = JSON.parse(rawText);
+            } catch (jsonError) {
+                console.error("JSON parsing error:", jsonError);
+                return NextResponse.json(
+                    { error: "請求格式錯誤，無效的 JSON 格式", details: jsonError instanceof Error ? jsonError.message : 'Unknown parsing error' },
+                    { status: 400 }
+                );
+            }
+            
+            // If parsing succeeds but body is empty
+            if (!body || Object.keys(body).length === 0) {
+                return NextResponse.json(
+                    { error: "請求主體為空，需要包含 userId" },
+                    { status: 400 }
+                );
+            }
+        } catch (error) {
+            // General error catch for the entire body parsing process
+            console.error("Error processing request body:", error);
+            return NextResponse.json(
+                { error: "處理請求主體時出錯", details: error instanceof Error ? error.message : 'Unknown error' },
+                { status: 400 }
+            );
+        }
+        
+        // Check if userId is provided
+        if (!body.userId) {
+            return NextResponse.json(
+                { error: "缺少使用者ID" },
+                { status: 400 }
+            );
+        }
+        
         const { userId } = body;
         
         // Check if booking exists

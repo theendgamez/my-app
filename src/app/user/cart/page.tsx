@@ -116,15 +116,8 @@ export default function CartPage() {
   };
 
   const cancelBooking = async (bookingToken: string) => {
-    if (actionInProgress || !user) return;
-
-    if (!confirm('確定要取消此訂單嗎？此操作無法撤銷。')) {
-      return;
-    }
-
     try {
-      setActionInProgress(bookingToken);
-      // Safe localStorage access
+      // Retrieve accessToken from localStorage
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
       const response = await fetch(`/api/bookings/${bookingToken}/cancel`, {
@@ -132,16 +125,11 @@ export default function CartPage() {
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-          'x-user-id': user.userId
+          'x-user-id': user?.userId || ''
         },
-        credentials: 'include' // Changed to 'include' for consistency
+        body: JSON.stringify({ userId: user?.userId })
       });
-
       if (!response.ok) {
-        if (response.status === 401) {
-          router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
-          return;
-        }
         const errorData = await response.json();
         throw new Error(errorData.error || '取消訂單失敗');
       }

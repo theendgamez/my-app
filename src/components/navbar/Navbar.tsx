@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 
 import { 
   FiSearch, 
@@ -88,10 +89,10 @@ const Navbar: React.FC = () => {
           </div>
 
           <div className="hidden md:flex md:items-center md:space-x-4">
-            <Link href="/events" className="text-gray-100 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
+            <Link href="/events" className="flex items-center text-gray-100 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
               活動
             </Link>
-            <form onSubmit={handleSearch} className="relative">
+            <form onSubmit={handleSearch} className="relative flex items-center">
               <input
                 type="text"
                 value={searchQuery}
@@ -101,7 +102,7 @@ const Navbar: React.FC = () => {
               />
               <button 
                 type="submit" 
-                className="absolute right-0 top-0 h-full px-3 text-white"
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 px-3 text-white"
               >
                 <FiSearch />
               </button>
@@ -111,15 +112,19 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex md:items-center md:space-x-4">
             {isAuthenticated && user ? (
               <div className="relative flex items-center space-x-4">
-                <Link href="/user/cart" className="text-white hover:text-gray-200 transition-colors flex items-center">
-                  <div className="flex items-center justify-center">
-                    <FiShoppingCart className="h-6 w-6" />
-                  </div>
+                <Link
+                  href="/user/cart"
+                  className="text-white hover:text-gray-200 transition-colors flex items-center"
+                >
+                  <FiShoppingCart className="h-6 w-6" />
                 </Link>
                 
-                <div className="relative" ref={userMenuRef}>
+                {/* User menu with notification dropdown */}
+                <NotificationDropdown />
+                
+                <div className="relative flex items-center justify-center" ref={userMenuRef}>
                   <button 
-                    className="flex items-center space-x-1 text-gray-100 hover:text-white"
+                    className="flex items-center space-x-1 text-gray-100 hover:text-white justify-center"
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   >
                     <span>{typeof user.userName === 'string' && user.userName.trim() !== '' ? user.userName : '用戶'}</span>
@@ -127,7 +132,7 @@ const Navbar: React.FC = () => {
                   </button>
                   
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
+                    <div className="absolute right-0 top-full mt-4 w-48 bg-white rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5">
                       <Link 
                         href="/user/profile" 
                         className="flex px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"

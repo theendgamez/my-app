@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ClientLayout } from "./ClientLayout";
 import "./globals.css";
-import LotteryNotification from '@/components/notifications/LotteryNotification';
 import { AuthProvider } from '@/context/AuthContext';
+import { NotificationProvider } from '@/context/NotificationContext';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -32,12 +33,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <ClientLayout>
-            <div className="min-h-screen pt-16">
-              {children}
-            </div>
-          </ClientLayout>
-          <LotteryNotification />
+          <NotificationProvider>
+            <ClientLayout>
+              <div className="min-h-screen pt-16">
+                {children}
+              </div>
+            </ClientLayout>
+            <ToastContainer position="bottom-right" />
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>
