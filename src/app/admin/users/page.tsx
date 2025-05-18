@@ -351,23 +351,23 @@ export default function AdminUsersPage() {
       isLoading={loading}
       error={error}
     >
-      {/* Filter Controls */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
+      {/* Filter Controls - Mobile Friendly */}
+      <div className="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center gap-2 sm:gap-4">
           <div className="flex-1">
             <input
               type="text"
               placeholder="搜索用戶名、電郵或ID..."
-              className="w-full p-2 border rounded-md"
+              className="w-full p-3 border rounded-md"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="p-2 border rounded-md"
+              className="p-3 border rounded-md flex-1 min-w-[120px]"
             >
               <option value="all">所有角色</option>
               <option value="admin">管理員</option>
@@ -376,7 +376,7 @@ export default function AdminUsersPage() {
             </select>
             <select
               id="risk-filter"
-              className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              className="p-3 border rounded-md flex-1 min-w-[120px]"
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value)}
             >
@@ -387,20 +387,12 @@ export default function AdminUsersPage() {
               <option value="low">低風險</option>
             </select>
           </div>
-          <div className="ml-auto">
-            <Link
-              href="/admin/scalper-detection"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
-            >
-              黄牛檢測系統
-            </Link>
-          </div>
         </div>
-
-        {/* Add prediction status indicator */}
-        {users.length > 0 && (
-          <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
-            <div>
+        
+        <div className="mt-3 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+          {/* Prediction status */}
+          {users.length > 0 && (
+            <div className="text-sm text-gray-500">
               {!predictionsComplete && predictingUsers.size > 0 ? (
                 <div className="flex items-center">
                   <LoadingSpinner size="small" />
@@ -410,7 +402,10 @@ export default function AdminUsersPage() {
                 <span className="text-green-600">✓ 風險評估已完成</span>
               ) : null}
             </div>
-
+          )}
+          
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
             <button 
               onClick={() => {
                 predictionsStarted.current = false;
@@ -418,17 +413,24 @@ export default function AdminUsersPage() {
                 analyzeUserRisk(users);
               }}
               disabled={predictingUsers.size > 0}
-              className="text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+              className="px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded disabled:opacity-50"
             >
               重新評估風險
             </button>
+            <Link
+              href="/admin/scalper-detection"
+              className="px-3 py-2 text-sm bg-purple-600 text-white rounded"
+            >
+              黄牛檢測系統
+            </Link>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Users Table */}
+      {/* Users Table with Mobile Cards View */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -515,6 +517,82 @@ export default function AdminUsersPage() {
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Mobile Cards View */}
+        <div className="md:hidden">
+          {sortedUsers.length > 0 ? (
+            <div className="divide-y divide-gray-200">
+              {sortedUsers.map((user) => (
+                <div key={user.userId} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{user.userName || '未設定'}</h3>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-gray-400">ID: {user.userId.substring(0, 8)}...</p>
+                    </div>
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
+                      {user.role === 'admin' && '管理員'}
+                      {user.role === 'staff' && '員工'}
+                      {user.role === 'user' && '一般用戶'}
+                    </span>
+                  </div>
+                  
+                  {/* Risk Level */}
+                  <div className="mt-3">
+                    {predictingUsers.has(user.userId) ? (
+                      <div className="flex items-center">
+                        <LoadingSpinner size="tiny" />
+                        <span className="ml-2 text-xs text-gray-500">分析中...</span>
+                      </div>
+                    ) : user.riskLevel ? (
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRiskBadgeColor(user.riskLevel)}`}>
+                          {user.riskLevel === 'very-high' && '極高風險'}
+                          {user.riskLevel === 'high' && '高風險'}
+                          {user.riskLevel === 'medium' && '中風險'}
+                          {user.riskLevel === 'low' && '低風險'}
+                        </span>
+                        {user.riskScore !== undefined && (
+                          <span className="text-xs text-gray-500">
+                            {(user.riskScore * 100).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                        未分析
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="mt-3 flex gap-2">
+                    <Link href={`/admin/users/${user.userId}`} className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded text-center text-sm">
+                      查看
+                    </Link>
+                    <button
+                      onClick={() => handleDeleteUser(user.userId)}
+                      disabled={deleteInProgress === user.userId}
+                      className="flex-1 px-3 py-2 bg-red-50 text-red-600 rounded text-center text-sm disabled:opacity-50"
+                    >
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-gray-500">
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <LoadingSpinner size="small" />
+                </div>
+              ) : (
+                '沒有找到匹配的用戶'
+              )}
+            </div>
+          )}
         </div>
       </div>
     </AdminPage>

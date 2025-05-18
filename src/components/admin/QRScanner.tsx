@@ -3,6 +3,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Define an interface for parsed QR data
+interface ParsedQRData {
+  ticketId: string;
+  timestamp?: number;
+  signature?: string;
+  nonce?: string;
+  [key: string]: unknown;
+}
+
 interface QRScannerProps {
   onScan?: (result: string) => void;
   onError?: (error: string) => void;
@@ -164,38 +173,56 @@ export default function QRScanner({
   // Detect barcodes using BarcodeDetector API
   const detectBarcodes = async () => {
     if (!videoRef.current || !scanning || !('BarcodeDetector' in window)) return;
-
     try {
       // @ts-expect-error - BarcodeDetector may not be recognized by TypeScript
       const barcodeDetector = new BarcodeDetector({
         // Only use formats that are actually supported by the browser
         formats: supportedFormats.length > 0 ? supportedFormats : ['qr_code']
       });
-
-      // Use requestAnimationFrame for continuous scanning
+      
       const detectFrame = async () => {
         if (!videoRef.current || !scanning) return;
-        
         try {
           const barcodes = await barcodeDetector.detect(videoRef.current);
-          
           for (const barcode of barcodes) {
             // Found a barcode
             console.log('Barcode detected:', barcode.rawValue);
+            const rawValue = barcode.rawValue;
+            let ticketId = rawValue;
             
-            const ticketId = barcode.rawValue;
-            
-            // Handle iOS camera numeric QR code scanning results
-            // Check if it's a pure number that might be a timestamp or ticket ID
-            if (/^\d+$/.test(ticketId) && ticketId.length > 8) {
-              console.log('Detected numeric ticket ID:', ticketId);
+            // Check if the scanned value is a URL
+            if (rawValue.startsWith('http') || rawValue.includes('://')) {
+              try {
+                // Parse the URL
+                const url = new URL(rawValue);
+                
+                // If it has a 'data' parameter, try to extract ticket info
+                if (url.searchParams.has('data')) {
+                  const data = url.searchParams.get('data');
+                  try {
+                    // Try to decode and parse the data parameter
+                    if (data) {
+                      const decodedData = JSON.parse(atob(decodeURIComponent(data))) as ParsedQRData;
+                      if (decodedData && decodedData.ticketId) {
+                        console.log('Extracted ticketId from URL data:', decodedData.ticketId);
+                        ticketId = decodedData.ticketId;
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Error parsing URL data parameter:', e);
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing scanned URL:', e);
+              }
             }
             
-            // Handle the scanned result
+            // Handle the scanned result with the extracted ticket ID
             if (redirectToVerify) {
               // Stop scanner before redirecting
               stopScanner();
               // Redirect to the ticket verification page with the scanned ID
+              console.log('Redirecting to verify with ticket ID:', ticketId);
               router.push(`/admin/tickets/verify/${encodeURIComponent(ticketId)}`);
               return;
             } else if (onScan) {
@@ -243,16 +270,56 @@ export default function QRScanner({
     e.preventDefault();
     if (!manualTicketId.trim()) return;
     
+    let ticketId = manualTicketId.trim();
+    
+    // Check if the input might be a URL
+    if (ticketId.startsWith('http') || ticketId.includes('://')) {
+      try {
+        const url = new URL(ticketId);
+        
+        // If it has a 'data' parameter, extract ticket info
+        if (url.searchParams.has('data')) {
+          const data = url.searchParams.get('data');
+          if (data) {
+            try {
+              const decodedData = JSON.parse(atob(decodeURIComponent(data))) as ParsedQRData;
+              if (decodedData && decodedData.ticketId) {
+                ticketId = decodedData.ticketId;
+                console.log('Extracted ticket ID from manual URL input:', ticketId);
+              }
+            } catch (e) {
+              console.error('Error parsing data parameter:', e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing URL:', e);
+      }
+    } else if (ticketId.length > 20) {
+      // This could be base64 data directly from iOS camera
+      try {
+        const data = JSON.parse(atob(ticketId)) as ParsedQRData;
+        if (data && data.ticketId) {
+          ticketId = data.ticketId;
+          console.log('Extracted ticket ID from base64 data:', ticketId);
+        }
+      } catch {
+        // Not base64 data, use as-is
+        console.log('Not valid base64 data, using as-is');
+      }
+    }
+    
     if (redirectToVerify) {
-      router.push(`/admin/tickets/verify/${encodeURIComponent(manualTicketId.trim())}`);
+      console.log('Manual redirect to verify with ticket ID:', ticketId);
+      router.push(`/admin/tickets/verify/${encodeURIComponent(ticketId)}`);
     } else if (onScan) {
-      onScan(manualTicketId.trim());
+      onScan(ticketId);
     }
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-full px-4 sm:px-0 sm:max-w-lg mx-auto">
-      <div className="relative mb-4 bg-black rounded-lg overflow-hidden w-full aspect-[4/3]">
+    <div className="flex flex-col items-center w-full max-w-full px-2 sm:px-4 md:px-0 sm:max-w-lg mx-auto">
+      <div className="relative mb-3 sm:mb-4 bg-black rounded-lg overflow-hidden w-full aspect-[4/3]">
         {scanning && (
           <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black to-transparent p-2 text-white text-sm text-center font-medium">
             {isIOS ? '相機已啟動，請對準QR碼' : '使用相機掃描票券QR碼以進行檢票驗證'}
@@ -291,13 +358,13 @@ export default function QRScanner({
       </div>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 w-full">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 sm:px-4 sm:py-3 rounded relative mb-3 sm:mb-4 w-full">
           <span className="block text-sm whitespace-pre-line">{error}</span>
           
           {isIOS && (
-            <div className="mt-3 text-xs bg-white p-2 rounded border border-gray-200">
+            <div className="mt-2 sm:mt-3 text-xs bg-white p-2 rounded border border-gray-200">
               <p className="font-medium mb-1">iPhone/iPad用戶掃描方法:</p>
-              <ol className="list-decimal pl-5 space-y-1">
+              <ol className="list-decimal pl-4 sm:pl-5 space-y-1">
                 <li>使用iOS相機App直接掃描QR碼</li>
                 <li>如獲得純數字（如1747419192075），請使用下方「手動輸入」</li>
                 <li>或複製數字後點擊「手動輸入」按鈕</li>
@@ -307,7 +374,7 @@ export default function QRScanner({
         </div>
       )}
       
-      <div className="flex flex-col w-full space-y-3">
+      <div className="flex flex-col w-full space-y-2 sm:space-y-3">
         <button
           onClick={toggleScanner}
           onTouchStart={(e) => {
@@ -317,7 +384,7 @@ export default function QRScanner({
             }
           }}
           disabled={!hasCamera}
-          className={`px-6 py-3 rounded-lg font-medium text-base w-full sm:w-auto ${
+          className={`px-4 sm:px-6 py-3 rounded-lg font-medium text-base w-full sm:w-auto ${
             scanning
               ? 'bg-red-600 active:bg-red-800 text-white'
               : 'bg-blue-600 active:bg-blue-800 text-white'
@@ -336,7 +403,7 @@ export default function QRScanner({
         {isIOS && (
           <button
             onClick={() => setShowManualEntry(!showManualEntry)}
-            className="px-6 py-2 border border-gray-300 rounded-lg font-medium text-base w-full mt-2 bg-white text-gray-700 active:bg-gray-100"
+            className="px-4 sm:px-6 py-3 border border-gray-300 rounded-lg font-medium text-base w-full bg-white text-gray-700 active:bg-gray-100"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {showManualEntry ? '隱藏手動輸入' : '手動輸入票券ID'}
@@ -347,17 +414,17 @@ export default function QRScanner({
       {showManualEntry && (
         <div className="w-full mt-4 bg-white p-4 rounded-lg border border-gray-300">
           <h3 className="text-sm font-medium mb-2">手動輸入票券ID</h3>
-          <form onSubmit={handleManualSubmit} className="flex flex-col md:flex-row gap-2">
+          <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
             <input
               type="text"
               value={manualTicketId}
               onChange={(e) => setManualTicketId(e.target.value)}
               placeholder="輸入票券ID或掃描得到的數字"
-              className="flex-grow px-3 py-2 border rounded"
+              className="w-full px-3 py-3 border rounded text-base"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 active:bg-green-800 text-base font-medium"
             >
               驗證
             </button>
@@ -376,14 +443,15 @@ export default function QRScanner({
         <div className="mt-4 text-center w-full p-3 bg-blue-50 rounded-lg border border-blue-200">
           <h3 className="font-medium text-blue-800">iOS掃描指南</h3>
           <p className="text-sm text-blue-700 mt-1">
-            如果iOS相機App只掃出數字（如1747419192075），請使用「手動輸入」功能輸入這些數字。
+            使用iOS相機掃描時，請訪問本系統的網址，然後用相機掃描票券QR碼。
+            掃描結果可能是數字、文字或網址，請使用「手動輸入」功能輸入這些內容。
           </p>
-          <div className="flex flex-col md:flex-row justify-center gap-2 mt-2">
+          <div className="flex flex-col gap-2 mt-2">
             <a 
               href={`https://support.apple.com/zh-hk/HT208843`}
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-sm text-white bg-blue-600 px-3 py-1 rounded"
+              className="text-sm text-white bg-blue-600 px-3 py-2 rounded-lg"
             >
               iOS掃描教學
             </a>
@@ -392,7 +460,7 @@ export default function QRScanner({
                 if (!scanning) startScanner();
                 setShowManualEntry(true);
               }}
-              className="text-sm bg-gray-100 border border-gray-300 px-3 py-1 rounded"
+              className="text-sm bg-gray-100 border border-gray-300 px-3 py-2 rounded-lg"
             >
               切換到手動輸入
             </button>

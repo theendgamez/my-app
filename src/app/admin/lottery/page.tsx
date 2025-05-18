@@ -115,7 +115,9 @@ export default function AdminLotteryPage() {
     <div>
       <Navbar />
       <div className="flex pt-16"> {/* Add pt-16 here to prevent navbar overlap */}
-        <Sidebar />
+        <Sidebar isOpen={false} toggleSidebar={function (): void {
+          throw new Error('Function not implemented.');
+        } } isMobile={false} />
         <div className="container mx-auto p-8 ml-64">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">抽籤活動管理</h1>

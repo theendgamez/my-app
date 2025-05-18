@@ -91,10 +91,10 @@ export interface Payment {
 
 export interface DynamicTicketData {
   ticketId: string;
-  timestamp: number;
+  timestamp: string | number;
   signature: string;
   nonce: string;
-  previousHash?: string;
+  previousHash?: string;  // Make previousHash optional
 }
 
 export interface Ticket {
@@ -117,11 +117,14 @@ export interface Ticket {
   formattedEventDate?: string;
   verificationInfo?: {
     verificationStatus: string;
-    lastVerified: string | null;
+    lastVerified: string;
+    usageTimestamp: string;
     verificationCount: number;
-    isTransferred: boolean;
-    originalOwner: string | null;
-    adminNotes: string | null;
+    verifiedBy: string;
+    verifierName: string;
+    isTransferred?: boolean;
+    originalOwner?: string | null;
+    adminNotes?: string | null;
   };
   lastVerified: string | null;
   verificationCount: number;
@@ -169,7 +172,7 @@ export interface Registration {
   platformFee: number;
   totalAmount: number;
   createdAt: string;
-  status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost';
+  status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'refunded';
   paymentId?: string;
   paidAt?: string;

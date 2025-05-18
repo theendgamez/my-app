@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     // 檢查時間戳（票券刷新時間不應過久，假設30分鐘內有效）
     const maxValidTime = 30 * 60 * 1000; // 30分鐘（毫秒）
-    const ticketTimestamp = ticket.dynamicData.timestamp;
+    const ticketTimestamp = Number(ticket.dynamicData.timestamp);
     const now = Date.now();
     
     if (now - ticketTimestamp > maxValidTime) {
@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 驗證簽名
-    const isValid = dynamicTicket.verifyTicketData(ticket.dynamicData, TICKET_SECRET_KEY);
+    const isValid = dynamicTicket.verifyTicketData(
+      { ...ticket.dynamicData, timestamp: Number(ticket.dynamicData.timestamp) },
+      TICKET_SECRET_KEY
+    );
     if (!isValid) {
       return NextResponse.json(
         { error: '票券驗證失敗，可能是偽造票券', ticketDetails: ticket },

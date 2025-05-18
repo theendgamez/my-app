@@ -1,48 +1,47 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { 
   FiHome, 
   FiPlus, 
   FiList, 
-  FiTag, 
   FiUsers, 
+  FiTag, 
   FiShoppingBag, 
+  FiDollarSign, 
   FiBarChart2, 
-  FiSettings,
-  FiDollarSign,
-  FiChevronDown,
-  FiChevronRight,
-  FiUser,
-  FiMenu,
-  FiX
+  FiSettings, 
+  FiChevronDown, 
+  FiChevronUp, 
+  FiX 
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
 
-type MenuSection = {
+interface MenuSection {
   title: string;
-  items: MenuItem[];
-  isOpen?: boolean;
-};
+  isOpen: boolean;
+  items: Array<{
+    name: string;
+    href: string;
+    icon: React.ReactNode;
+  }>;
+}
 
-type MenuItem = {
-  name: string;
-  icon: React.ReactNode;
-  href: string;
-  badge?: number;
-};
+interface SidebarProps {
+  isOpen: boolean;
+  toggleSidebar: () => void;
+  isMobile: boolean;
+}
 
-const Sidebar: React.FC = () => {
-  const pathname = usePathname();
-  const router = useRouter();
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) => {
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const router = useRouter();
   
   // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
   const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
@@ -57,7 +56,7 @@ const Sidebar: React.FC = () => {
     },
     {
       title: '活動管理',
-      isOpen: true,
+      isOpen: false,
       items: [
         { name: '建立活動', icon: <FiPlus size={18} />, href: '/admin/create-event' },
         { name: '活動列表', icon: <FiList size={18} />, href: '/admin/events' },
@@ -65,7 +64,7 @@ const Sidebar: React.FC = () => {
     },
     {
       title: '抽籤系統',
-      isOpen: true,
+      isOpen: false,
       items: [
         { name: '抽籤管理', icon: <RiBattery2Line size={18} />, href: '/admin/lottery' },
         { name: '執行抽籤', icon: <RiBattery2Line size={18} />, href: '/admin/lottery/draw' },
@@ -73,7 +72,7 @@ const Sidebar: React.FC = () => {
     },
     {
       title: '用戶與票券',
-      isOpen: true,
+      isOpen: false,
       items: [
         { name: '用戶管理', icon: <FiUsers size={18} />, href: '/admin/users' },
         { name: '票券管理', icon: <FiTag size={18} />, href: '/admin/tickets' },
@@ -81,8 +80,8 @@ const Sidebar: React.FC = () => {
         {
           name: '掃描票券',
           href: '/admin/tickets/scan',
-          icon: <svg className="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0118.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          icon: <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>,
         },
@@ -90,7 +89,7 @@ const Sidebar: React.FC = () => {
     },
     {
       title: '財務',
-      isOpen: true,
+      isOpen: false,
       items: [
         { name: '支付記錄', icon: <FiDollarSign size={18} />, href: '/admin/payments' },
         { name: '財務報告', icon: <FiBarChart2 size={18} />, href: '/admin/reports' },
@@ -98,164 +97,107 @@ const Sidebar: React.FC = () => {
     },
     {
       title: '系統設定',
-      isOpen: true,
+      isOpen: false,
       items: [
         { name: '系統設定', icon: <FiSettings size={18} />, href: '/admin/settings' },
       ]
     },
   ]);
 
-  // Track component mounting and check localStorage for admin status
+  // Use localStorage to check if admin on client-side
   useEffect(() => {
     setIsMounted(true);
-    
-    // Also check localStorage for admin status as fallback for Vercel
-    if (typeof window !== 'undefined') {
-      const userRole = localStorage.getItem('userRole');
-      // Only set localAdmin if user is authenticated
-      if (isAuthenticated) {
-        setLocalAdmin(userRole === 'admin');
-      } else {
-        setLocalAdmin(false);
-      }
-    }
-  }, [isAdmin, isAuthenticated]);
+    const role = localStorage.getItem('userRole');
+    setLocalAdmin(role === 'admin');
+  }, []);
 
-  // Handle redirection in useEffect, not during render
+  // Redirect if not admin
   useEffect(() => {
-    // Skip if not mounted yet or already redirected
-    if (!isMounted || hasRedirected) return;
-    
-    // If not authenticated or not admin, redirect
-    if (!authLoading && (!isAuthenticated || (!effectiveIsAdmin && isAuthenticated))) {
+    if (isMounted && !authLoading && !effectiveIsAdmin && !hasRedirected) {
+      router.push('/');
       setHasRedirected(true);
-      router.replace('/');
     }
-  }, [isMounted, authLoading, isAuthenticated, effectiveIsAdmin, router, hasRedirected]);
+  }, [isMounted, authLoading, effectiveIsAdmin, router, hasRedirected]);
 
-  // Toggle section collapse state
+  // Toggle section
   const toggleSection = (index: number) => {
-    setSections(prevSections => 
-      prevSections.map((section, i) => 
+    setSections(prev => 
+      prev.map((section, i) => 
         i === index ? { ...section, isOpen: !section.isOpen } : section
       )
     );
   };
 
-  // Toggle mobile sidebar
-  const toggleMobileSidebar = () => {
-    setIsMobileOpen(!isMobileOpen);
-  };
+  const sidebarClasses = `
+    ${isMobile ? 'fixed left-0 top-0 z-30' : 'sticky top-0'} 
+    transition-all duration-300 transform h-screen bg-[#1a1f36] text-white overflow-y-auto
+    ${isMobile ? (isOpen ? 'translate-x-0' : '-translate-x-full') : 'w-64'}
+  `;
 
-  // Close sidebar when route changes on mobile
-  useEffect(() => {
-    setIsMobileOpen(false);
-  }, [pathname]);
-  
-  // Don't render on server or if not mounted yet
-  if (!isMounted) {
-    return null; // Avoids hydration issues
-  }
-  
-  // If not admin or not authenticated, don't render the sidebar
-  if (!isAuthenticated || (!effectiveIsAdmin && !authLoading)) {
+  if (authLoading || !isAuthenticated) {
     return null;
   }
 
   return (
-    <>
-      {/* Mobile menu button */}
-      <button 
-        onClick={toggleMobileSidebar} 
-        className="md:hidden fixed z-50 bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg"
-        aria-label="Toggle menu"
-      >
-        {isMobileOpen ? <FiX size={24} /> : <FiMenu size={24} />}
-      </button>
-      
-      <div className={`
-        md:w-64 h-[calc(100vh-4rem)] fixed left-0 top-16 bg-gray-900 text-white flex flex-col z-20 overflow-hidden
-        transition-all duration-300 ease-in-out
-        ${isMobileOpen ? 'w-64 translate-x-0' : '-translate-x-full w-0 md:translate-x-0 md:w-64'}
-      `}>
-        {/* Show loading state if authentication is still loading */}
-        {authLoading && !localAdmin && (
-          <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
+    <div className={sidebarClasses}>
+      {/* Sidebar header with close button on mobile */}
+      <div className="flex items-center justify-between px-6 py-4 bg-[#151a30]">
+        <h2 className="text-xl font-bold text-white">票務系統</h2>
+        {isMobile && (
+          <button 
+            onClick={toggleSidebar} 
+            className="text-white focus:outline-none p-2"
+            aria-label="Close sidebar"
+          >
+            <FiX size={24} />
+          </button>
         )}
-        
-        <div className="flex-1 py-4 overflow-y-auto">
-          {sections.map((section, sectionIndex) => (
-            <div key={section.title} className="mb-4">
-              <button
-                onClick={() => toggleSection(sectionIndex)}
-                className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-800"
-              >
-                <span className="font-medium text-sm uppercase tracking-wider">{section.title}</span>
-                {section.isOpen ? (
-                  <FiChevronDown size={16} />
-                ) : (
-                  <FiChevronRight size={16} />
-                )}
-              </button>
-              
-              {section.isOpen && (
-                <div className="mt-1 space-y-1">
-                  {section.items.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`
-                          flex items-center pl-8 pr-4 py-2 text-sm
-                          ${isActive 
-                            ? 'bg-blue-800 text-white font-medium border-l-4 border-blue-500' 
-                            : 'text-gray-300 hover:bg-gray-800 hover:text-white'}
-                        `}
-                      >
-                        <span className="mr-3">{item.icon}</span>
-                        <span>{item.name}</span>
-                        {item.badge && (
-                          <span className="ml-auto bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        
-        {/* Admin info section */}
-        <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 mt-auto">
-          <div className="flex items-center space-x-3">
-            <div className="bg-blue-600 rounded-full p-2">
-              <FiUser size={18} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">
-                {effectiveIsAdmin ? '系統管理員' : '訪問受限'}
-              </p>
-              <p className="text-xs text-gray-400">管理面板</p>
-            </div>
+      </div>
+      
+      {/* Admin info */}
+      <div className="px-6 py-4 border-b border-gray-700">
+        <div className="flex items-center mb-3">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+            <span className="text-white text-lg font-semibold">A</span>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm font-medium text-white">系統管理員</p>
+            <p className="text-xs text-gray-400">管理面板</p>
           </div>
         </div>
       </div>
       
-      {/* Overlay to close sidebar on mobile */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
-          onClick={() => setIsMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-    </>
+      {/* Navigation menu */}
+      <nav className="p-4">
+        {sections.map((section, index) => (
+          <div key={section.title} className="mb-4">
+            <button
+              className="flex items-center justify-between w-full px-2 py-2 text-gray-300 hover:text-white focus:outline-none"
+              onClick={() => toggleSection(index)}
+            >
+              <span className="text-sm font-medium">{section.title}</span>
+              {section.isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+            </button>
+            
+            {section.isOpen && (
+              <div className="mt-2 space-y-1 pl-2">
+                {section.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center px-4 py-2 text-sm text-gray-300 rounded-md hover:bg-[#24294e] hover:text-white transition-colors"
+                    onClick={() => isMobile && toggleSidebar()}
+                  >
+                    <span className="mr-3 text-gray-400">{item.icon}</span>
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+    </div>
   );
 };
 

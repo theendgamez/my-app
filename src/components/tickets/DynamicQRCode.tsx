@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { refreshTicketQrCode } from '@/lib/blockchain';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { DynamicTicketData } from '@/types';
+import dynamicTicketUtils from '@/utils/dynamicTicket';
 
 interface DynamicQRCodeProps {
   ticketId: string;
@@ -63,23 +64,26 @@ export default function DynamicQRCode({
       const newDynamicData = await refreshTicketQrCode(ticket);
       setDynamicData(newDynamicData);
 
-      // 創建包含動態數據的QR碼內容
-      const qrContent = JSON.stringify({
-        ticketId,
-        timestamp: newDynamicData.timestamp,
-        signature: newDynamicData.signature,
-        nonce: newDynamicData.nonce
-      });
+      // 修正 timestamp 類型
+      const fixedDynamicData = {
+        ...newDynamicData,
+        timestamp: typeof newDynamicData.timestamp === 'string'
+          ? Number(newDynamicData.timestamp)
+          : newDynamicData.timestamp
+      };
+
+      // 使用工具函數創建票券QR碼URL
+      const qrUrl = dynamicTicketUtils.generatePublicTicketQRData(fixedDynamicData);
       
-      // 生成 URL 格式的 QR 碼，使 iOS 相機能夠直接識別
+      // 添加完整域名以兼容iOS相機
       const baseUrl = typeof window !== 'undefined' ? 
         `${window.location.protocol}//${window.location.host}` : 
         'https://yourappurl.com';
       
-      const qrUrl = `${baseUrl}/verify?data=${encodeURIComponent(Buffer.from(qrContent).toString('base64'))}`;
+      const fullQrUrl = `${baseUrl}${qrUrl}`;
       
       // 生成QR碼
-      const dataUrl = await QRCode.toDataURL(qrUrl, {
+      const dataUrl = await QRCode.toDataURL(fullQrUrl, {
         width: size,
         margin: 2,
         errorCorrectionLevel: 'H',
@@ -114,7 +118,8 @@ export default function DynamicQRCode({
           `${window.location.protocol}//${window.location.host}` : 
           'https://yourappurl.com';
         
-        const qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(ticketId)}`;
+        // 確保使用管理員驗證路徑
+        const qrUrl = `${baseUrl}/admin/ticket/verify?id=${encodeURIComponent(ticketId)}`;
         
         const dataUrl = await QRCode.toDataURL(qrUrl, {
           width: size,
@@ -170,25 +175,26 @@ export default function DynamicQRCode({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center bg-red-50 p-4 rounded-lg" style={{ width: size, height: size }}>
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="flex flex-col items-center justify-center bg-red-50 p-3 sm:p-4 rounded-lg" style={{ width: size, height: size }}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-10 sm:w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="mt-2 text-xs text-red-600 text-center">{error}</p>
+        <p className="mt-1 sm:mt-2 text-2xs sm:text-xs text-red-600 text-center">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center touch-manipulation">
       <div className="relative">
-        <div className="bg-white p-3 rounded-lg shadow-sm border">
+        <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm border">
           <Image 
             src={qrDataUrl}
             alt={`Ticket QR Code: ${ticketId}`}
             width={size}
             height={size}
             className="rounded"
+            priority={true}
           />
           
           {verifying && (
@@ -207,8 +213,8 @@ export default function DynamicQRCode({
         )}
       </div>
       
-      <div className="mt-2 text-center">
-        <p className="text-xs text-gray-500">
+      <div className="mt-2 text-center w-full">
+        <p className="text-xs text-gray-500 break-all px-2">
           {ticketId.substring(0, 8)}...
         </p>
         

@@ -18,11 +18,77 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-text-size-adjust: 100%; /* Prevent font size adjustment on orientation change */
 }
 
 /* Add padding to main content to prevent navbar overlap */
 main, .main-content, [class*="container"] {
   padding-top: 4rem; /* This is equivalent to pt-16 in Tailwind */
+}
+
+/* General responsiveness improvements */
+html {
+  touch-action: manipulation; /* Improve touch behavior */
+}
+
+/* Improved mobile form styling */
+input, select, textarea, button {
+  font-size: 16px !important; /* Prevent iOS zoom on focus */
+  max-width: 100%;
+}
+
+/* Mobile tap target sizing - ensure all clickable elements meet accessibility standards */
+button, [role="button"], a, .btn, input[type="button"], input[type="submit"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Better table responsiveness */
+@layer components {
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+
+  /* Mobile-specific utilities */
+  .mobile-compact {
+    padding: 0.5rem;
+  }
+  
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .mobile-touch-friendly button, 
+  .mobile-touch-friendly a {
+    padding: 0.75rem;
+  }
+  
+  .mobile-hidden {
+    display: none;
+  }
+  
+  .mobile-only {
+    display: block;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-hidden {
+    display: block;
+  }
+  
+  .mobile-only {
+    display: none;
+  }
+}
+
+/* Animation for QR scanner */
+@keyframes scan {
+  0% { top: 0; }
+  50% { top: calc(100% - 2px); }
+  100% { top: 0; }
 }
 
 @media print {
@@ -39,3 +105,11 @@ main, .main-content, [class*="container"] {
 }
 
 /* 移除 .form-control, .navbar, .a4-size 等自訂 class，改用 Tailwind 工具類於組件中 */
+
+/* Use Tailwind's responsive classes directly in your HTML instead of these custom classes:
+   <div class="p-2 md:p-4"> instead of <div class="mobile-compact">
+   <div class="flex flex-col md:flex-row"> instead of <div class="mobile-stack">
+   <button class="p-3 md:p-2"> instead of <div class="mobile-touch-friendly"><button>
+   <div class="hidden md:block"> instead of <div class="mobile-hidden">
+   <div class="block md:hidden"> instead of <div class="mobile-only">
+*/

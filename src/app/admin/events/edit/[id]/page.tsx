@@ -183,7 +183,9 @@ export default function EditEventPage() {
     <div>
       <Navbar />
       <div className="flex">
-        <Sidebar />
+        <Sidebar isOpen={false} toggleSidebar={function (): void {
+          throw new Error("Function not implemented.");
+        } } isMobile={false} />
         <div className="container mx-auto p-8 ml-64">
           <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
             <h1 className="text-2xl font-bold mb-6">編輯活動</h1>

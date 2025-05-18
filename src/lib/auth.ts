@@ -7,8 +7,8 @@ import { Users } from '@/types';
 // Configuration constants
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
-const ACCESS_TOKEN_EXPIRY = '24h'; // Increased from '15m' to '24h'
-const REFRESH_TOKEN_EXPIRY = '30d'; // Increased from '7d' to '30d'
+const ACCESS_TOKEN_EXPIRY = '12h'; // Increased from '15m' to '24h'
+const REFRESH_TOKEN_EXPIRY = '7d'; // Increased from '7d' to '30d'
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Types

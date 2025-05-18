@@ -141,7 +141,18 @@ export default function DynamicQRCode({
           {isRefreshing ? '刷新中...' : '手動刷新'}
         </button>
         
-        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {error && (
+          <div className="mt-3">
+            <p className={`text-sm ${error.includes('已被使用') ? 'text-yellow-600' : 'text-red-500'}`}>
+              {error}
+            </p>
+            {error.includes('已被使用') && (
+              <p className="text-xs mt-1 text-gray-500">
+                此票券已於先前被掃描並標記為已使用，如有疑問請聯繫工作人員。
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -111,8 +111,8 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex md:items-center md:space-x-4">
             {isAuthenticated && user ? (
               <div className="relative flex items-center space-x-4">
-                <Link href="/user/cart" className="text-white hover:text-gray-200 transition-colors">
-                  <div className="relative">
+                <Link href="/user/cart" className="text-white hover:text-gray-200 transition-colors flex items-center">
+                  <div className="flex items-center justify-center">
                     <FiShoppingCart className="h-6 w-6" />
                   </div>
                 </Link>
@@ -231,14 +231,14 @@ const Navbar: React.FC = () => {
             
             {isAuthenticated && user ? (
               <>
-                <Link 
+              <Link 
                   href="/user/cart"
-                  className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"
+                  className="flex items-center text-gray-100 hover:bg-blue-800 px-4 py-3 rounded"
                   onClick={() => setIsNavOpen(false)}
                 >
                   <FiShoppingCart className="mr-2 h-5 w-5" />
                   購物車
-                </Link>
+              </Link>
                 <Link 
                   href="/user/profile"
                   className="flex items-center text-gray-100 hover:bg-blue-800 px-3 py-2 rounded"

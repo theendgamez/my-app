@@ -96,7 +96,7 @@ export default function Home() {
       <div className="flex flex-1">
         {isAdmin && (
           <div className="w-64 min-h-[calc(100vh-64px)] fixed left-0 top-16">
-            <Sidebar />
+            <Sidebar isOpen={true} toggleSidebar={() => {}} isMobile={false} />
           </div>
         )}
         <main className={`flex-1 ${isAdmin ? 'ml-64' : ''}`}>

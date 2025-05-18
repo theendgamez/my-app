@@ -331,7 +331,9 @@ export default function AdminLotteryDrawPage() {
     <>
       <Navbar />
       <div className="flex">
-        <Sidebar />
+        <Sidebar isOpen={false} toggleSidebar={function (): void {
+          throw new Error('Function not implemented.');
+        } } isMobile={false} />
         <div className="flex-1">
           {/* Wrap the component using useSearchParams with Suspense */}
           <Suspense

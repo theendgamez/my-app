@@ -53,38 +53,47 @@ export function verifyTicketData(
   ticketData: DynamicTicketData,
   secretKey: string
 ): boolean {
-  // 從票券數據中提取必要信息
-  const { ticketId, timestamp, nonce, previousHash, signature } = ticketData;
+  // 重建簽名數據
+  const dataToSign = `${ticketData.ticketId}:${ticketData.timestamp}:${ticketData.nonce}:${ticketData.previousHash || ''}`;
+  const expectedSignature = createSignature(dataToSign, secretKey);
   
-  // 重建簽名數據，與生成時使用的格式相同
-  const dataToSign = `${ticketId}:${timestamp}:${nonce}:${previousHash || ''}`;
-  
-  // 使用相同的密鑰重新計算簽名
-  const calculatedSignature = createSignature(dataToSign, secretKey);
-  
-  // 比較原始簽名與重新計算的簽名
-  return calculatedSignature === signature;
+  // 檢查簽名是否匹配
+  return ticketData.signature === expectedSignature;
 }
 
 // 生成票券QR碼數據
 export function generateTicketQRData(ticketData: DynamicTicketData): string {
   // 將數據轉換為安全的字符串格式
   const qrData = JSON.stringify({
-    id: ticketData.ticketId,
-    ts: ticketData.timestamp,
-    sig: ticketData.signature.substring(0, 16), // 僅包含部分簽名以減小QR碼大小
-    n: ticketData.nonce.substring(0, 8)
+    ticketId: ticketData.ticketId,
+    timestamp: ticketData.timestamp,
+    signature: ticketData.signature,
+    nonce: ticketData.nonce
   });
   
-  // 將數據構造為URL格式，方便iOS相機掃描
-  // 確定基本URL，這里使用相對路徑，實際使用時會自動補全
-  const baseUrl = '/verify';
-  const urlParams = encodeURIComponent(Buffer.from(qrData).toString('base64'));
+  // 使用base64編碼數據參數
+  const base64Data = Buffer.from(qrData).toString('base64');
   
-  // 對於國際使用，可能需要完整URL
-  // const baseUrl = 'https://yourappurl.com/verify';
+  // 創建iOS相機可以直接解析的URL
+  // 基本URL不帶域名，iOS將添加當前域名
+  return `/scan?data=${encodeURIComponent(base64Data)}`;
+}
+
+// 生成用戶票券QR碼數據 - 供普通用戶使用
+export function generatePublicTicketQRData(ticketData: DynamicTicketData): string {
+  // 將數據轉換為安全的字符串格式
+  const qrData = JSON.stringify({
+    ticketId: ticketData.ticketId,
+    timestamp: ticketData.timestamp,
+    signature: ticketData.signature,
+    nonce: ticketData.nonce
+  });
   
-  return `${baseUrl}?data=${urlParams}`;
+  // 使用base64編碼數據參數
+  const base64Data = Buffer.from(qrData).toString('base64');
+  
+  // The route matches the Next.js file structure exactly
+  return `/admin/tickets/verify/${ticketData.ticketId}?data=${encodeURIComponent(base64Data)}`;
 }
 
 // 模擬區塊鏈記錄
@@ -99,10 +108,12 @@ export async function recordToBlockchain(ticketData: DynamicTicketData): Promise
   return blockchainRef;
 }
 
+// 更新導出的工具函數
 const dynamicTicketUtils = {
   generateDynamicTicketData,
   verifyTicketData,
   generateTicketQRData,
+  generatePublicTicketQRData,
   recordToBlockchain
 };
 

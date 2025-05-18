@@ -210,23 +210,23 @@ export default function AdminTicketsPage() {
       isLoading={loading}
       error={error}
     >
-      {/* Filter Controls */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
+      {/* Filter Controls - Improved for mobile */}
+      <div className="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center gap-2 sm:gap-4">
           <div className="flex-1">
             <input
               type="text"
               placeholder="搜索票券ID、活動名稱、用戶名稱..."
-              className="w-full p-2 border rounded-md"
+              className="w-full p-3 border rounded-md"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-2 border rounded-md"
+              className="p-3 border rounded-md flex-1 min-w-[120px]"
             >
               <option value="all">所有狀態</option>
               <option value="available">可用</option>
@@ -238,7 +238,7 @@ export default function AdminTicketsPage() {
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
-              className="p-2 border rounded-md"
+              className="p-3 border rounded-md flex-1 min-w-[120px]"
             >
               <option value="all">所有活動</option>
               {uniqueEvents.map(event => (
@@ -249,9 +249,10 @@ export default function AdminTicketsPage() {
         </div>
       </div>
 
-      {/* Tickets Table */}
+      {/* Tickets Table with Mobile-Optimized View */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -411,6 +412,78 @@ export default function AdminTicketsPage() {
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          {sortedTickets.length > 0 ? (
+            <div className="divide-y divide-gray-200">
+              {sortedTickets.map((ticket) => (
+                <div key={ticket.ticketId} className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{ticket.eventName}</h3>
+                      <p className="text-xs text-gray-500">{formatDate(ticket.eventDate)}</p>
+                    </div>
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(ticket.status)}`}>
+                      {translateStatus(ticket.status)}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm">
+                      <span className="text-gray-500">持票人:</span> {ticket.userRealName || '未提供姓名'}
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-500">區域/座位:</span> {ticket.zone} {ticket.seatNumber ? `/ ${ticket.seatNumber}` : ''}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      票券ID: {ticket.ticketId.substring(0, 8)}...
+                    </p>
+                  </div>
+                  
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <Link
+                      href={`/admin/tickets/${ticket.ticketId}`}
+                      className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded text-sm font-medium flex-1 text-center"
+                    >
+                      查看
+                    </Link>
+                    
+                    {ticket.status !== 'used' && (
+                      <button
+                        onClick={() => handleStatusChange(ticket.ticketId, 'used')}
+                        disabled={actionInProgress === ticket.ticketId}
+                        className={`px-3 py-2 bg-green-100 text-green-700 rounded text-sm font-medium flex-1 text-center ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
+                      >
+                        驗證使用
+                      </button>
+                    )}
+                    
+                    {ticket.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleStatusChange(ticket.ticketId, 'cancelled')}
+                        disabled={actionInProgress === ticket.ticketId}
+                        className={`px-3 py-2 bg-red-100 text-red-700 rounded text-sm font-medium flex-1 text-center ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
+                      >
+                        作廢
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-gray-500">
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <LoadingSpinner size="small" />
+                </div>
+              ) : (
+                '沒有找到匹配的票券'
+              )}
+            </div>
+          )}
         </div>
       </div>
     </AdminPage>

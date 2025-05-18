@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AdminProvider } from '@/context/AdminContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/navbar/Navbar';
@@ -11,6 +12,7 @@ interface AdminLayoutProps {
   children: React.ReactNode;
   title?: string;
   requiresAdmin?: boolean;
+  
 }
 
 export default function AdminLayout({ 
@@ -24,6 +26,8 @@ export default function AdminLayout({
   const [isMounted, setIsMounted] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Ensure component is mounted and refresh auth state
   useEffect(() => {
@@ -69,6 +73,29 @@ export default function AdminLayout({
     }
   }, [isMounted, loading, isAuthenticated, isAdmin, localAdmin, router, pathname, requiresAdmin, hasRedirected]);
 
+  // Handle screen resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    handleResize();
+    
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Clean up
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close sidebar on route change for mobile
+  useEffect(() => {
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  }, [pathname, isMobile]);
+
   // Don't render anything during SSR to avoid hydration issues
   if (!isMounted) return null;
 
@@ -101,17 +128,56 @@ export default function AdminLayout({
     );
   }
 
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   // Render admin layout with sidebar for authenticated admins
   return (
-    <div>
+    <AdminProvider>
       <Navbar />
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="container mx-auto p-8 ml-64 pt-16">
-          {title && <h1 className="text-2xl font-bold mb-6">{title}</h1>}
-          {children}
+      <div className="min-h-screen bg-gray-100 flex">
+        {/* Mobile sidebar backdrop */}
+        {isMobile && isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-20 transition-opacity"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        
+        {/* Sidebar - adjust positioning based on mobile state */}
+        <Sidebar 
+          isOpen={isMobile ? isSidebarOpen : true} 
+          toggleSidebar={toggleSidebar}
+          isMobile={isMobile}
+        />
+        
+        {/* Main content area */}
+        <div className={`flex-1 flex flex-col transition-all duration-200 ${isMobile ? 'ml-0' : 'ml-0 md:ml-64'}`}>
+          {/* Header for mobile */}
+          {isMobile && (
+            <header className="bg-white shadow-sm py-4 px-4 flex items-center sticky top-0 z-10">
+              <button
+                onClick={toggleSidebar}
+                className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none"
+                aria-label="Open sidebar"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="ml-4 text-lg font-semibold text-gray-800">票務系統管理</h1>
+            </header>
+          )}
+          
+          {/* Content */}
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-6">
+            {title && <h1 className="text-2xl font-bold mb-6">{title}</h1>}
+            {children}
+          </main>
         </div>
       </div>
-    </div>
+    </AdminProvider>
   );
 }
