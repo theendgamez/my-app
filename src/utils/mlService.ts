@@ -37,7 +37,6 @@ export async function batchAnalyzeUsers(users: BatchUser[]) {
   }
 }
 
-// 移除或更新 predictScalper，因為它與 /analyze-users 重疊
 export async function predictScalper(users: BatchUser[]) {
-  return batchAnalyzeUsers(users); // 重用 batchAnalyzeUsers
+  return batchAnalyzeUsers(users);
 }

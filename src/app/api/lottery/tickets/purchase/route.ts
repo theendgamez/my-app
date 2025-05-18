@@ -5,11 +5,47 @@ import { v4 as uuidv4 } from 'uuid';
 import { decryptData, isEncrypted } from '@/utils/encryption';
 import { Ticket } from '@/types';
 
-// Define purchase limit configuration with sensible defaults
+// Define purchase limit configuration with risk-based rules
 const purchaseLimitConfig = {
   maxTicketsPerEvent: 2,
-  maxTicketsPerUser: 5
+  maxTicketsPerUser: 5,
+  riskBasedLimits: {
+    veryHigh: 1,   // Very high risk users can only buy 1 ticket
+    high: 1,       // High risk users can only buy 1 ticket
+    medium: 2,     // Medium risk users limited to 2 tickets
+    low: 4         // Low risk users get higher limits
+  }
 };
+
+/**
+ * Determines the ticket limit based on user risk profile
+ * @param riskScore - User's risk score (0-1) or risk level string
+ * @param defaultLimit - Default limit to use if risk score is not available
+ * @returns Maximum number of tickets allowed
+ */
+function determineTicketLimit(riskScore?: number | string, defaultLimit: number = purchaseLimitConfig.maxTicketsPerEvent): number {
+  // Handle risk level as string input
+  if (typeof riskScore === 'string') {
+    switch (riskScore) {
+      case 'very-high': return purchaseLimitConfig.riskBasedLimits.veryHigh;
+      case 'high': return purchaseLimitConfig.riskBasedLimits.high;
+      case 'medium': return purchaseLimitConfig.riskBasedLimits.medium;
+      case 'low': return purchaseLimitConfig.riskBasedLimits.low;
+      default: return defaultLimit;
+    }
+  }
+  
+  // Handle numeric risk score
+  if (typeof riskScore === 'number') {
+    if (riskScore > 0.8) return purchaseLimitConfig.riskBasedLimits.veryHigh;
+    if (riskScore > 0.6) return purchaseLimitConfig.riskBasedLimits.high;
+    if (riskScore > 0.4) return purchaseLimitConfig.riskBasedLimits.medium;
+    return purchaseLimitConfig.riskBasedLimits.low;
+  }
+  
+  // Default case: use default limit
+  return defaultLimit;
+}
 
 /**
  * Checks if a user's purchase would exceed defined limits
@@ -17,8 +53,11 @@ const purchaseLimitConfig = {
  * @param eventId - Event identifier
  * @returns Object indicating if purchase is allowed with reason if denied
  */
-async function checkPurchaseLimits(userId: string, eventId: string): Promise<{allowed: boolean, reason?: string}> {
+async function checkPurchaseLimits(userId: string, eventId: string, quantity: number): Promise<{allowed: boolean, reason?: string}> {
   try {
+    // Get user profile with risk information
+    const userProfile = await db.users.findById(userId);
+    
     // Get all tickets owned by this user for this specific event
     const eventTickets = await db.tickets.findByEvent(eventId, '');
     const userEventTickets = eventTickets.filter(ticket => 
@@ -26,11 +65,18 @@ async function checkPurchaseLimits(userId: string, eventId: string): Promise<{al
       ['available', 'reserved', 'sold'].includes(ticket.status)
     );
     
+    // Determine the event limit based on user's risk score
+    const userRiskScore = userProfile?.riskScore;
+    const userRiskLevel = userProfile?.riskLevel;
+    const perEventLimit = determineTicketLimit(userRiskScore || userRiskLevel, purchaseLimitConfig.maxTicketsPerEvent);
+    
+    console.log(`User ${userId} risk assessment: score=${userRiskScore}, level=${userRiskLevel}, limit=${perEventLimit}`);
+    
     // Check if user has reached the per-event limit
-    if (userEventTickets.length >= purchaseLimitConfig.maxTicketsPerEvent) {
+    if (userEventTickets.length + quantity > perEventLimit) {
       return { 
         allowed: false, 
-        reason: `超過每活動購票限制 (${purchaseLimitConfig.maxTicketsPerEvent}張)` 
+        reason: `超過每活動購票限制 (${perEventLimit}張)，由於風險評估，您的購票數量已被限制` 
       };
     }
     
@@ -41,7 +87,7 @@ async function checkPurchaseLimits(userId: string, eventId: string): Promise<{al
     );
     
     // Check if user has reached the total tickets limit
-    if (activeUserTickets.length >= purchaseLimitConfig.maxTicketsPerUser) {
+    if (activeUserTickets.length + quantity > purchaseLimitConfig.maxTicketsPerUser) {
       return { 
         allowed: false, 
         reason: `超過用戶總票數限制 (${purchaseLimitConfig.maxTicketsPerUser}張)` 
@@ -101,8 +147,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '您已經購買了此活動的門票' }, { status: 400 });
     }
 
-    // 檢查購票限制
-    const limitCheck = await checkPurchaseLimits(user.userId, registration.eventId);
+    // 檢查購票限制 - updated to pass quantity
+    const limitCheck = await checkPurchaseLimits(user.userId, registration.eventId, quantity);
     if (!limitCheck.allowed) {
       return NextResponse.json({ 
         error: limitCheck.reason || '超過購票限制'

@@ -14,6 +14,8 @@ export interface Users {
   role: string;
   tokenVersion?: number;
   isDataEncrypted?: boolean;
+  riskScore?: number;
+  riskLevel?: 'low' | 'medium' | 'high' | 'very-high';
 }
 
 /**
