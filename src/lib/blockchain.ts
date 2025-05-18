@@ -32,7 +32,7 @@ export class TicketBlockchain {
     this.chain = [this.createGenesisBlock()];
     this.difficulty = 4; // 調整難度以控制挖礦速度
     this.pendingTransactions = [];
-    // 在實際應用中，這個密鑰應該安全存儲在環境變量中
+    // In actual use, this key should be stored in environment variables
     this.SECRET_KEY = process.env.BLOCKCHAIN_SECRET || 'your-secret-blockchain-key';
   }
 
@@ -327,11 +327,6 @@ export function verifyTicket(qrData: unknown): TicketVerificationResult {
       const usageRecord = history.find(tx => tx.action === 'use');
       
       if (usageRecord) {
-        console.warn('Ticket has already been used:', { 
-          ticketId,
-          usageTimestamp: usageRecord.timestamp,
-          usedAt: new Date(usageRecord.timestamp).toISOString()
-        });
         // Ticket has been used already
         return { 
           valid: true, 

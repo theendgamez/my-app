@@ -71,12 +71,11 @@ export function generateTicketQRData(ticketData: DynamicTicketData): string {
     nonce: ticketData.nonce
   });
   
-  // 使用base64編碼數據參數
-  const base64Data = Buffer.from(qrData).toString('base64');
+  // 將數據構造為URL格式，方便iOS相機掃描
+  const baseUrl = '/verify';
+  const urlParams = encodeURIComponent(Buffer.from(qrData).toString('base64'));
   
-  // 創建iOS相機可以直接解析的URL
-  // 基本URL不帶域名，iOS將添加當前域名
-  return `/scan?data=${encodeURIComponent(base64Data)}`;
+  return `${baseUrl}?data=${urlParams}`;
 }
 
 // 生成用戶票券QR碼數據 - 供普通用戶使用
