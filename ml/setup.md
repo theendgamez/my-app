@@ -42,3 +42,4 @@ For specific errors with tldextract, you can install it separately:
 ```bash
 pip install tldextract
 ```
+
