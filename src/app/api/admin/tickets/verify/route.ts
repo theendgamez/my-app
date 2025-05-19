@@ -3,7 +3,11 @@ import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
 import dynamicTicket from '@/utils/dynamicTicket';
 
-const TICKET_SECRET_KEY = process.env.TICKET_SECRET_KEY || 'your-secure-ticket-key';
+const TICKET_SECRET_KEY = process.env.TICKET_SECRET_KEY ?? '';
+
+if (!TICKET_SECRET_KEY) {
+  throw new Error('TICKET_SECRET_KEY is not defined in environment variables');
+}
 
 export async function POST(request: NextRequest) {
   try {

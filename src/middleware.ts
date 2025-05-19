@@ -82,9 +82,13 @@ export async function middleware(request: NextRequest) {
     
     if (accessToken) {
       // Use Edge-compatible verification
-      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-      const decoded = await verifyJWT(accessToken, JWT_SECRET);
-      isAdmin = decoded?.role === 'admin';
+      const JWT_SECRET = process.env.JWT_SECRET;
+      if (JWT_SECRET) {
+        const decoded = await verifyJWT(accessToken, JWT_SECRET);
+        isAdmin = decoded?.role === 'admin';
+      } else {
+        console.error('JWT_SECRET is not defined');
+      }
     }
 
     // Also check user ID header as fallback
