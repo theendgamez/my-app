@@ -56,7 +56,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60, // 24 hours in seconds
+    maxAge: 12 * 60 * 60, // 12 hours in seconds
     path: '/'
   });
   
@@ -64,7 +64,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
+    maxAge: 15 * 24 * 60 * 60, // 15 days in seconds
     path: '/'
   });
 
@@ -82,7 +82,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
     httpOnly: false, // Must be false so client JS can read it
     secure: IS_PRODUCTION,
     sameSite: 'strict',
-    maxAge: 30 * 24 * 60 * 60, // Match refresh token expiry
+    maxAge: 15 * 24 * 60 * 60, // Match refresh token expiry
     path: '/'
   });
 };
@@ -285,6 +285,6 @@ export class RateLimiter {
 }
 
 // Initialize rate limiters
-export const loginRateLimiter = new RateLimiter(10 * 60 * 1000, 5); // 5 attempts per 10 minutes
-export const verificationRateLimiter = new RateLimiter(5 * 60 * 1000, 5); // 5 attempts per 5 minutes
-export const registrationRateLimiter = new RateLimiter(60 * 60 * 1000, 5); // 5 attempts per hour
+export const loginRateLimiter = new RateLimiter(10 * 60 * 1000, 10); // 10 attempts per 10 minutes
+export const verificationRateLimiter = new RateLimiter(10 * 60 * 1000, 10); // 10 attempts per 5 minutes
+export const registrationRateLimiter = new RateLimiter(60 * 60 * 1000, 10); // 10 attempts per hour

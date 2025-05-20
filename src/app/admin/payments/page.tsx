@@ -5,6 +5,7 @@ import AdminPage from '@/components/admin/AdminPage';
 import { adminFetch } from '@/utils/adminApi';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Payment {
   paymentId: string;
@@ -152,13 +153,6 @@ export default function AdminPaymentsPage() {
       setSortField(field);
       setSortDirection('asc');
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('zh-HK', {
-      style: 'currency',
-      currency: 'HKD'
-    }).format(amount);
   };
 
   const getStatusBadgeClass = (status: string) => {

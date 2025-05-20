@@ -2,19 +2,19 @@
 
 import React, { ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import AdminLayout from './AdminLayout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Alert } from '../ui/Alert';
+import { Alert } from '@/components/ui/Alert';
+import Navbar from '@/components/navbar/Navbar';
+import Sidebar from '@/components/admin/Sidebar';
+import { useAuth } from '@/context/AuthContext';
 
 interface AdminPageProps {
   children: React.ReactNode;
   title: string;
   isLoading?: boolean;
   error?: string | null;
-  actionButton?: ReactNode;
   backLink?: string;
+  actionButton?: ReactNode;
 }
 
 export default function AdminPage({
@@ -26,11 +26,48 @@ export default function AdminPage({
   actionButton
 }: AdminPageProps) {
   const router = useRouter();
-  const { isAuthenticated, isAdmin } = useAuth();
-  const [errorMessage] = useState<string | null>(error);
-
-  // If not authenticated or not admin, redirect
-  if (!isAuthenticated) {
+  const { isAdmin, loading: authLoading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Check if page is being rendered on mobile
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  
+  // Handle sidebar toggle
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+  
+  // Effect to check window size on client side
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      // Close sidebar on mobile automatically
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initialize on mount
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Redirect non-admin users
+  React.useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.push('/');
+    }
+  }, [authLoading, isAdmin, router]);
+  
+  // If still loading auth state or redirecting
+  if (authLoading || (isLoading && !error)) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <LoadingSpinner size="large" />
@@ -38,58 +75,61 @@ export default function AdminPage({
     );
   }
 
-  // If not admin, redirect
-  if (isAuthenticated && !isAdmin) {
-    router.push('/');
-    return null;
-  }
-
   return (
-    <AdminLayout title={title}>
-      {/* Page header with back button and actions */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="flex items-center">
-          {backLink && (
-            <Link
-              href={backLink}
-              className="mr-3 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full inline-flex items-center justify-center transition-colors"
-              aria-label="Go back"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-              </svg>
-            </Link>
-          )}
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h1>
-        </div>
-
-        {/* Action button (optional) */}
-        {actionButton && (
-          <div className="flex justify-start sm:justify-end">
-            {actionButton}
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+      
+      <div className="flex min-h-screen pt-16"> {/* Add pt-16 to account for navbar height */}
+        {/* Sidebar */}
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          toggleSidebar={toggleSidebar} 
+          isMobile={isMobile} 
+        />
+        
+        {/* Main content */}
+        <div className={`flex-1 p-4 md:p-6 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'ml-0'}`}>
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center">
+              {isMobile && (
+                <button 
+                  onClick={toggleSidebar}
+                  className="mr-4 text-gray-500 hover:text-gray-700"
+                  aria-label="Toggle sidebar"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
+              
+              <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+            </div>
+            
+            <div className="flex items-center">
+              {backLink && (
+                <button
+                  onClick={() => router.push(backLink)}
+                  className="mr-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  返回
+                </button>
+              )}
+              
+              {actionButton}
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Error message */}
-      {errorMessage && (
-        <div className="mb-6">
-          <Alert type="error" message={errorMessage} />
-        </div>
-      )}
-
-      {/* Loading state */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12">
-          <LoadingSpinner size="large" />
-          <p className="mt-4 text-gray-600">載入中...</p>
-        </div>
-      ) : (
-        // Render children when not loading
-        <div className="bg-white rounded-lg shadow-md p-6">
+          
+          {error && (
+            <Alert type="error" message={error} className="mb-6" />
+          )}
+          
           {children}
         </div>
-      )}
-    </AdminLayout>
+      </div>
+    </div>
   );
 }

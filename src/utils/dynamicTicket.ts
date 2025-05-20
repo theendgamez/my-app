@@ -4,34 +4,26 @@
 
 import crypto from 'crypto';
 
-// 動態票券數據型別定義
+// 定義動態票券數據類型
 export interface DynamicTicketData {
   ticketId: string;
   timestamp: number;
   nonce: string;
-  signature: string;
+  signature?: string;
   previousHash?: string;
 }
 
 // 生成安全隨機數
-function generateNonce(length: number = 16): string {
+function generateNonce(length = 16) {
   return crypto.randomBytes(length).toString('hex');
 }
 
 // 創建數字簽名
-function createSignature(data: string, secretKey: string): string {
-  return crypto
-    .createHmac('sha256', secretKey)
-    .update(data)
-    .digest('hex');
+function createSignature(data: string, secretKey: string) {
+  return crypto.createHmac('sha256', secretKey).update(data).digest('hex');
 }
 
-// 生成動態票券數據
-export function generateDynamicTicketData(
-  ticketId: string, 
-  secretKey: string,
-  previousHash?: string
-): DynamicTicketData {
+export function generateDynamicTicketData(ticketId: string, secretKey: string, previousHash?: string): DynamicTicketData {
   const timestamp = Date.now();
   const nonce = generateNonce();
   
@@ -48,11 +40,7 @@ export function generateDynamicTicketData(
   };
 }
 
-// 驗證票券數據
-export function verifyTicketData(
-  ticketData: DynamicTicketData,
-  secretKey: string
-): boolean {
+export function verifyTicketData(ticketData: DynamicTicketData, secretKey: string): boolean {
   // 重建簽名數據
   const dataToSign = `${ticketData.ticketId}:${ticketData.timestamp}:${ticketData.nonce}:${ticketData.previousHash || ''}`;
   const expectedSignature = createSignature(dataToSign, secretKey);
@@ -97,14 +85,44 @@ export function generatePublicTicketQRData(ticketData: DynamicTicketData): strin
 
 // 模擬區塊鏈記錄
 export async function recordToBlockchain(ticketData: DynamicTicketData): Promise<string> {
-  // 實際應用中，這裡會調用區塊鏈服務API
-  // 在這個示例中，我們只是模擬一個區塊鏈參考ID
-  const blockchainRef = crypto
-    .createHash('sha256')
-    .update(`${ticketData.ticketId}:${ticketData.timestamp}:${Date.now()}`)
-    .digest('hex');
-  
-  return blockchainRef;
+  // Instead of just returning a hash, actually record it to the blockchain
+  try {
+    // Import the actual blockchain service
+    const { ticketBlockchain } = await import('@/lib/blockchain');
+    
+    // Add a verification transaction to the blockchain
+    const transaction = ticketBlockchain.addTransaction({
+      ticketId: ticketData.ticketId,
+      timestamp: Number(ticketData.timestamp),
+      action: 'verify',
+      eventId: 'system-generated' // We don't have eventId in DynamicTicketData, use placeholder
+    });
+    
+    // Process transactions immediately to ensure they're added to a block
+    ticketBlockchain.processPendingTransactions();
+    
+    // Record the blockchain sync in the audit log
+    try {
+      const db = (await import('@/lib/db')).default;
+      await db.ticketAudit.logBlockchainSync(
+        ticketData.ticketId,
+        transaction.signature
+      );
+    } catch (dbError) {
+      console.warn('Failed to log blockchain sync to audit log:', dbError);
+    }
+    
+    // Return the signature as the blockchain reference
+    return transaction.signature;
+  } catch (error) {
+    console.error('Error recording to blockchain:', error);
+    
+    // Fallback to the original method if there's an error
+    return crypto
+      .createHash('sha256')
+      .update(`${ticketData.ticketId}:${ticketData.timestamp}:${Date.now()}`)
+      .digest('hex');
+  }
 }
 
 // 更新導出的工具函數

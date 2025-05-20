@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { migrateTicketTransfers } from '@/utils/migrateTicketTransfers';
+import { migrateAllUserTicketTransfers, migrateTicketTransfer } from '@/utils/migrateTicketTransfers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,17 +12,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '無權執行此操作' }, { status: 403 });
     }
     
-    // Run migration
-    const result = await migrateTicketTransfers();
+    // Get options from request body
+    const { userId, ticketId } = await request.json();
     
-    if (result.success) {
+    // Handle different migration types based on provided parameters
+    if (userId) {
+      // Migrate all tickets for a user
+      const result = await migrateAllUserTicketTransfers(userId);
+      
       return NextResponse.json({
         success: true,
-        message: '票券轉讓記錄遷移成功',
-        migratedCount: result.migratedCount
+        message: `票券轉讓記錄遷移成功：已遷移 ${result.migratedCount} 筆記錄，失敗 ${result.failedCount} 筆`,
+        migratedCount: result.migratedCount,
+        failedCount: result.failedCount,
+        totalProcessed: result.totalTickets,
+        details: result.results
       });
+    } else if (ticketId) {
+      // Migrate a single ticket
+      const result = await migrateTicketTransfer(ticketId);
+      
+      if (result.success) {
+        return NextResponse.json({
+          success: true,
+          message: result.message
+        });
+      } else {
+        throw new Error(result.message);
+      }
     } else {
-      throw new Error(result.error);
+      return NextResponse.json({ error: '缺少必要參數：userId 或 ticketId' }, { status: 400 });
     }
   } catch (error) {
     console.error('Error in transfer migration API:', error);

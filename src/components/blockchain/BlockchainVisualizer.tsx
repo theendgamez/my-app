@@ -17,7 +17,8 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [, setIsRecorded] = useState(false);
+  const [isRecorded, setIsRecorded] = useState(false);
+  const [syncingData, setSyncingData] = useState(false);
 
   useEffect(() => {
     const fetchBlockchainHistory = async () => {
@@ -61,7 +62,34 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
     if (ticketId) {
       fetchBlockchainHistory();
     }
-  }, [ticketId]);
+  }, [ticketId, syncingData]);
+
+  // Add function to manually sync blockchain data if needed
+  const syncBlockchainData = async () => {
+    try {
+      setSyncingData(true);
+      const accessToken = localStorage.getItem('accessToken');
+      
+      const response = await fetch(`/api/tickets/${ticketId}/sync-blockchain`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('同步區塊鏈資料失敗');
+      }
+      
+      // Refresh data after sync
+      setTimeout(() => setSyncingData(false), 1000);
+    } catch (err) {
+      console.error('Error syncing blockchain data:', err);
+      setError(err instanceof Error ? err.message : '同步區塊鏈資料時出錯');
+      setSyncingData(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,14 +110,32 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
   // No blockchain records
   if (transactions.length === 0) {
     return (
-      <div className="bg-gray-50 border border-gray-200 p-4 rounded-md text-center">
+      <div className="bg-gray-50 border border-gray-200 p-4 rounded-md">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
-        <p className="text-gray-600 text-sm">此票券暫無區塊鏈交易記錄</p>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-gray-600 text-sm text-center">此票券暫無區塊鏈交易記錄</p>
+        <p className="text-xs text-gray-500 mt-2 text-center mb-3">
           所有後續的票券操作將自動記錄到區塊鏈上
         </p>
+        
+        {!isRecorded && (
+          <div className="mt-2 flex justify-center">
+            <button
+              onClick={syncBlockchainData}
+              disabled={syncingData}
+              className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {syncingData ? (
+                <>
+                  <LoadingSpinner size="small" /> 正在同步...
+                </>
+              ) : (
+                '手動同步至區塊鏈'
+              )}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -103,20 +149,22 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
             return (
               <div 
                 key={index} 
-                className="min-w-[180px] bg-white border rounded-md p-3 shadow-sm"
+                className="min-w-[180px] max-w-[240px] bg-white border rounded-md p-3 shadow-sm"
               >
                 <div className="flex items-center mb-2">
                   <div className={`w-2 h-2 rounded-full mr-2 ${
                     tx.action === 'create' ? 'bg-green-500' :
                     tx.action === 'transfer' ? 'bg-blue-500' :
                     tx.action === 'use' ? 'bg-purple-500' :
-                    tx.action === 'verify' ? 'bg-yellow-500' : 'bg-gray-500'
+                    tx.action === 'verify' ? 'bg-yellow-500' : 
+                    tx.action === 'blockchain_sync' ? 'bg-indigo-500' : 'bg-gray-500'
                   }`}></div>
                   <span className="text-xs font-medium">{
                     tx.action === 'create' ? '創建票券' :
                     tx.action === 'transfer' ? '轉讓票券' :
                     tx.action === 'use' ? '使用票券' :
                     tx.action === 'verify' ? '驗證票券' :
+                    tx.action === 'blockchain_sync' ? '區塊鏈同步' :
                     tx.action
                   }</span>
                 </div>
@@ -127,8 +175,8 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
                 
                 {tx.action === 'transfer' && (tx.fromUser || tx.toUser) && (
                   <div className="text-xs">
-                    {tx.fromUser && <div>從: {tx.fromUser}</div>}
-                    {tx.toUser && <div>至: {tx.toUser}</div>}
+                    {tx.fromUser && <div className="truncate">從: {tx.fromUser}</div>}
+                    {tx.toUser && <div className="truncate">至: {tx.toUser}</div>}
                   </div>
                 )}
                 

@@ -3,6 +3,11 @@ import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
 import dynamicTicket from '@/utils/dynamicTicket';
 
+// Define the DynamicTicketData interface
+
+
+// Define the Ticket interface to include dynamicData
+
 const TICKET_SECRET_KEY = process.env.TICKET_SECRET_KEY ?? '';
 
 if (!TICKET_SECRET_KEY) {
@@ -121,7 +126,12 @@ export async function POST(request: NextRequest) {
 
     // 驗證簽名
     const isValid = dynamicTicket.verifyTicketData(
-      { ...ticket.dynamicData, timestamp: Number(ticket.dynamicData.timestamp) },
+      {
+        ticketId: ticket.ticketId,
+        timestamp: Number(ticket.dynamicData.timestamp),
+        nonce: ticket.dynamicData.nonce,
+        signature: ticket.dynamicData.signature
+      },
       TICKET_SECRET_KEY
     );
     if (!isValid) {

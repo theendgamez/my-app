@@ -463,7 +463,7 @@ export default function AdminTicketVerifyPage() {
                     <p className="mb-1"><span className="font-medium">活動:</span> {ticket.eventName}</p>
                     <p className="mb-1"><span className="font-medium">使用時間:</span> {
                       formatDateTime(
-                        ticket.verificationInfo?.lastVerified || 
+                        ticket.verificationInfo?.lastVerified ||
                         ticket.verificationInfo?.usageTimestamp
                       )
                     }</p>
@@ -560,7 +560,7 @@ export default function AdminTicketVerifyPage() {
                 <div className="bg-purple-50 p-3 rounded-lg">
                   <p className="text-purple-800 font-medium">活動資訊</p>
                   <p className="font-bold break-words">{ticket.eventName}</p>
-                  <p className="text-sm">{ticket.formattedEventDate}</p>
+                  <p className="text-sm">{ticket.eventDate}</p>
                   <p className="text-sm break-words">{ticket.eventLocation}</p>
                 </div>
                 
@@ -577,7 +577,7 @@ export default function AdminTicketVerifyPage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-500">購買日期</p>
-                    <p className="font-medium">{ticket.formattedPurchaseDate}</p>
+                    <p className="font-medium">{ticket.purchaseDate}</p>
                   </div>
                   
                   {ticket.verificationInfo && (

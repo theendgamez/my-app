@@ -25,6 +25,30 @@ export default function AdminLotteryRegistrationDetailPage() {
   const [user, setUser] = useState<Users | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if screen is mobile
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false); // Close sidebar on mobile by default
+      }
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
+
+  // Function to toggle sidebar
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   // Check if user is admin, redirect if not
   useEffect(() => {
@@ -152,12 +176,14 @@ export default function AdminLotteryRegistrationDetailPage() {
     <div>
       <Navbar />
       <div className="flex pt-16">
-        <Sidebar isOpen={false} toggleSidebar={function (): void {
-          throw new Error('Function not implemented.');
-        } } isMobile={false} />
-        <div className="container mx-auto p-8 ml-64">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          toggleSidebar={toggleSidebar} 
+          isMobile={isMobile} 
+        />
+        <div className={`container mx-auto p-4 md:p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-0 md:ml-64' : 'ml-0'}`}>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-0">
               抽籤登記詳情
               {registration && (
                 <span className="text-sm text-gray-500 ml-2 font-normal">
@@ -165,11 +191,11 @@ export default function AdminLotteryRegistrationDetailPage() {
                 </span>
               )}
             </h1>
-            <div>
+            <div className="space-x-2">
               {event && (
                 <Link
                   href={`/admin/lottery/registrations/${event.eventId}`}
-                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 mr-2"
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
                 >
                   返回登記清單
                 </Link>

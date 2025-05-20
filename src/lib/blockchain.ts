@@ -87,8 +87,13 @@ export class TicketBlockchain {
 
   // 處理待處理的交易並創建新區塊
   public processPendingTransactions(): void {
-    if (this.pendingTransactions.length === 0) return;
+    if (this.pendingTransactions.length === 0) {
+      console.log('No pending transactions to process');
+      return;
+    }
 
+    console.log(`Processing ${this.pendingTransactions.length} pending transactions`);
+    
     const block = {
       index: this.chain.length,
       timestamp: Date.now(),
@@ -100,6 +105,10 @@ export class TicketBlockchain {
 
     const newBlock = this.mineBlock(block);
     this.chain.push(newBlock);
+    
+    // Log for debugging
+    console.log(`New block added to chain: Block #${newBlock.index} with ${this.pendingTransactions.length} transactions`);
+    
     this.pendingTransactions = [];
   }
 
@@ -139,7 +148,7 @@ export class TicketBlockchain {
 
     return {
       ticketId: ticket.ticketId,
-      timestamp: timestamp.toString(),
+      timestamp: timestamp,
       signature,
       nonce,
       previousHash: this.getLatestBlock().hash
@@ -265,7 +274,14 @@ export async function syncTicketTransferToBlockchain(
     // 確保時間戳是數字
     const ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
     
-    ticketBlockchain.syncTransferFromAudit(ticketId, fromUserId, toUserId, ts, eventId);
+    // Log for debugging
+    console.log(`Syncing ticket transfer to blockchain: ${ticketId} from ${fromUserId} to ${toUserId} at ${new Date(ts).toISOString()}`);
+    
+    const transaction = ticketBlockchain.syncTransferFromAudit(ticketId, fromUserId, toUserId, ts, eventId);
+    
+    // Check if transaction was added
+    console.log(`Transfer transaction created with signature: ${transaction.signature}`);
+    
     return true;
   } catch (error) {
     console.error('同步轉讓記錄失敗:', error);

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AdminPage from '@/components/admin/AdminPage';
 import { adminFetch } from '@/utils/adminApi';
 import { Payment } from '@/types';
+import { formatCurrency } from '@/utils/formatters';
 
 
 
@@ -64,12 +65,14 @@ export default function AdminReportsPage() {
           
           const thisMonthRevenue = payments
             .filter(p => p.status === 'completed' && 
+                   p.createdAt &&
                    new Date(p.createdAt).getMonth() === thisMonth &&
                    new Date(p.createdAt).getFullYear() === thisYear)
             .reduce((sum, p) => sum + (p.amount || 0), 0);
-            
+
           const lastMonthRevenue = payments
             .filter(p => p.status === 'completed' && 
+                   p.createdAt &&
                    new Date(p.createdAt).getMonth() === lastMonth &&
                    new Date(p.createdAt).getFullYear() === lastMonthYear)
             .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -86,9 +89,9 @@ export default function AdminReportsPage() {
           const paymentsByMonth = Array(6).fill(0).map((_, i) => {
             const monthIndex = (thisMonth - i + 12) % 12;
             const monthYear = thisMonth - i < 0 ? thisYear - 1 : thisYear;
-            
             const revenue = payments
               .filter(p => p.status === 'completed' && 
+                     p.createdAt &&
                      new Date(p.createdAt).getMonth() === monthIndex &&
                      new Date(p.createdAt).getFullYear() === monthYear)
               .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -122,13 +125,6 @@ export default function AdminReportsPage() {
 
     fetchReportData();
   }, []);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('zh-HK', {
-      style: 'currency',
-      currency: 'HKD'
-    }).format(amount);
-  };
 
   return (
     <AdminPage 

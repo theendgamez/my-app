@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -15,8 +15,7 @@ import {
   FiBarChart2, 
   FiSettings, 
   FiChevronDown, 
-  FiChevronUp, 
-  FiX 
+  FiChevronUp
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
 
@@ -42,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
   const [localAdmin, setLocalAdmin] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   
   // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
   const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
@@ -102,6 +102,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
         { name: '系統設定', icon: <FiSettings size={18} />, href: '/admin/settings' },
       ]
     },
+    {
+      title: '區塊鏈管理',
+      isOpen: false,
+      items: [
+        {
+          name: '區塊鏈瀏覽器',
+          href: '/admin/blockchain',
+          icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>,
+        },
+      ]
+    },
   ]);
 
   // Use localStorage to check if admin on client-side
@@ -128,76 +141,96 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
     );
   };
 
-  const sidebarClasses = `
-    ${isMobile ? 'fixed left-0 top-0 z-30' : 'sticky top-0'} 
-    transition-all duration-300 transform h-screen bg-[#1a1f36] text-white overflow-y-auto
-    ${isMobile ? (isOpen ? 'translate-x-0' : '-translate-x-full') : 'w-64'}
-  `;
+  // Responsive classes for sidebar
 
   if (authLoading || !isAuthenticated) {
     return null;
   }
+  
+  // Mobile sidebar should be a overlay when open
+  const mobileStyles = isMobile 
+    ? isOpen 
+      ? 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform translate-x-0' 
+      : 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform -translate-x-full'
+    : isOpen
+      ? 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform translate-x-0'
+      : 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform -translate-x-full md:translate-x-0';
 
   return (
-    <div className={sidebarClasses}>
-      {/* Sidebar header with close button on mobile */}
-      <div className="flex items-center justify-between px-6 py-4 bg-[#151a30]">
-        <h2 className="text-xl font-bold text-white">票務系統</h2>
+    <>
+      {/* Mobile overlay backdrop */}
+      {isMobile && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={toggleSidebar}
+        ></div>
+      )}
+      
+      {/* Sidebar */}
+      <aside className={mobileStyles}>
         {isMobile && (
-          <button 
-            onClick={toggleSidebar} 
-            className="text-white focus:outline-none p-2"
-            aria-label="Close sidebar"
-          >
-            <FiX size={24} />
-          </button>
-        )}
-      </div>
-      
-      {/* Admin info */}
-      <div className="px-6 py-4 border-b border-gray-700">
-        <div className="flex items-center mb-3">
-          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-            <span className="text-white text-lg font-semibold">A</span>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-white">系統管理員</p>
-            <p className="text-xs text-gray-400">管理面板</p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Navigation menu */}
-      <nav className="p-4">
-        {sections.map((section, index) => (
-          <div key={section.title} className="mb-4">
-            <button
-              className="flex items-center justify-between w-full px-2 py-2 text-gray-300 hover:text-white focus:outline-none"
-              onClick={() => toggleSection(index)}
+          <div className="p-4 border-b">
+            <button 
+              onClick={toggleSidebar}
+              className="text-gray-700 hover:text-gray-900"
             >
-              <span className="text-sm font-medium">{section.title}</span>
-              {section.isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            
-            {section.isOpen && (
-              <div className="mt-2 space-y-1 pl-2">
-                {section.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center px-4 py-2 text-sm text-gray-300 rounded-md hover:bg-[#24294e] hover:text-white transition-colors"
-                    onClick={() => isMobile && toggleSidebar()}
-                  >
-                    <span className="mr-3 text-gray-400">{item.icon}</span>
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
-        ))}
-      </nav>
-    </div>
+        )}
+        
+        <nav className="mt-4">
+          <ul className="space-y-1 px-2">
+            {sections.map((section, index) => (
+              <li key={section.title}>
+                {isOpen ? (
+                  <button
+                    className="flex items-center justify-between w-full px-2 py-2 text-gray-700 hover:text-gray-900 focus:outline-none"
+                    onClick={() => toggleSection(index)}
+                  >
+                    <span className="text-sm font-medium">{section.title}</span>
+                    {section.isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+                  </button>
+                ) : (
+                  <div className="px-2 py-2 text-gray-600 text-center text-xs">
+                    {section.title.charAt(0)}
+                  </div>
+                )}
+                
+                <div className={`mt-2 space-y-1 ${!isOpen ? 'pl-0' : 'pl-2'}`}>
+                  {(isOpen ? section.isOpen : true) && (
+                    section.items.map((item) => {
+                      const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                      
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center ${isOpen ? 'px-4 py-2 text-sm' : 'px-2 py-3 justify-center'} rounded-md transition-colors ${
+                            isActive 
+                              ? 'bg-blue-50 text-blue-700 font-medium' 
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          }`}
+                          title={!isOpen ? item.name : undefined}
+                          onClick={() => isMobile && toggleSidebar()}
+                        >
+                          <span className={`${isActive ? 'text-blue-600' : 'text-gray-500'} ${isOpen ? 'mr-3' : ''}`}>
+                            {item.icon}
+                          </span>
+                          {isOpen && <span>{item.name}</span>}
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+    </>
   );
 };
 

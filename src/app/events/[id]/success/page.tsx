@@ -115,13 +115,13 @@ export default function SuccessPage() {
     fetchPaymentDetails();
   }, [paymentId, isAuthenticated, authLoading, router, eventId, user, fetchAttempted]);
 
-  const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', month: 'long', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    };
-    return new Date(dateString).toLocaleDateString('zh-HK', options);
+
+  const formatShortDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours() >= 12 ? '下午' : '上午'}${date.getHours() % 12 || 12}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
+
+  const isFreePayment = payment && (payment.totalAmount === 0 || payment.totalAmount === null);
 
   if (loading || authLoading) {
     return (
@@ -177,31 +177,71 @@ export default function SuccessPage() {
           ) : payment ? (
             <>
               <div className="p-6 border-b">
-                <h2 className="text-lg font-semibold mb-4">付款詳情</h2>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-lg font-semibold">訂單詳情</h2>
+                  <button 
+                    onClick={() => router.push('/user/order')}
+                    className="text-blue-500 hover:text-blue-600 flex items-center text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    返回票券列表
+                  </button>
+                </div>
+                
+                <h3 className="text-xl font-medium mb-2">{payment.eventName}</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">付款編號:</span>
+                    <span className="text-gray-600">訂單編號：</span>
                     <span className="font-medium">{payment.paymentId}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">活動:</span>
-                    <span className="font-medium">{payment.eventName}</span>
+                    <span className="text-gray-600">購買時間：</span>
+                    <span className="font-medium">{payment.createdAt ? formatShortDate(payment.createdAt) : '—'}</span>
+                  </div>
+                  
+                  {tickets.length > 0 && tickets[0].eventDate && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">活動時間：</span>
+                        <span className="font-medium">{formatShortDate(tickets[0].eventDate)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">活動地點：</span>
+                        <span className="font-medium">{tickets[0].eventLocation || '—'}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-b">
+                <h2 className="text-lg font-semibold mb-4">付款詳情</h2>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">付款方式：</span>
+                    <span className="font-medium">{isFreePayment ? '免費票券' : '信用卡'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">區域:</span>
+                    <span className="text-gray-600">付款狀態：</span>
+                    <span className="text-green-600 font-medium">已完成</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">區域：</span>
                     <span className="font-medium">{payment.zone}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">數量:</span>
+                    <span className="text-gray-600">數量：</span>
                     <span className="font-medium">{payment.payQuantity} 張</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">付款日期:</span>
-                    <span className="font-medium">{formatDate(payment.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                    <span>總金額:</span>
-                    <span>HKD {typeof payment.totalAmount === 'number' ? payment.totalAmount.toLocaleString('zh-HK') : payment.totalAmount}</span>
+                  <div className="flex justify-between text-lg font-bold pt-3 border-t">
+                    <span>總金額</span>
+                    {isFreePayment ? (
+                      <span className="text-green-600">免費票券</span>
+                    ) : (
+                      <span>HKD {payment.totalAmount.toLocaleString('zh-HK')}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -218,24 +258,36 @@ export default function SuccessPage() {
                         </div>
                         <div className="flex justify-between mb-1">
                           <span className="text-gray-600">座位:</span>
-                          <span className="font-medium">{ticket.seatNumber}</span>
+                          <span className="font-medium">{ticket.seatNumber || '—'}</span>
                         </div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-gray-600">區域:</span>
+                          <span className="font-medium">{ticket.zone || '—'}</span>
+                        </div>
+                        {ticket.price && (
+                          <div className="flex justify-between mb-1">
+                            <span className="text-gray-600">票價:</span>
+                            <span className="font-medium">
+                              {parseInt(ticket.price) === 0 ? '免費' : `HKD ${parseInt(ticket.price).toLocaleString('zh-HK')}`}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="flex space-x-4">
+              <div className="p-6 flex space-x-4">
                 <button
                   onClick={() => router.push('/')}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded transition-colors"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 px-4 rounded transition-colors"
                 >
                   返回首頁
                 </button>
                 <button
                   onClick={() => router.push('/user/order')}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded transition-colors"
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded transition-colors"
                 >
                   我的票券
                 </button>

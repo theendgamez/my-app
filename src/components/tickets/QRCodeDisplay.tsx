@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import Image from 'next/image';
-import QRCode from 'qrcode';
 
 interface QRCodeDisplayProps {
   qrCode?: string;
@@ -8,83 +8,52 @@ interface QRCodeDisplayProps {
   size?: number;
 }
 
-export default function QRCodeDisplay({ qrCode, ticketId, size = 150 }: QRCodeDisplayProps) {
-  const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
-  
-  // Generate QR code on component mount
-  React.useEffect(() => {
-    async function generateQR() {
-      try {
-        // If qrCode starts with data:image or http, it's already an image
-        if (qrCode?.startsWith('data:image/') || qrCode?.startsWith('http')) {
-          setQrDataUrl(qrCode);
-          return;
-        }
-        
-        // Otherwise, generate a QR code from the string value
-        // Format as URL so iOS camera can recognize it
-        const baseUrl = typeof window !== 'undefined' ? 
-          `${window.location.protocol}//${window.location.host}` : 
-          'https://yourappurl.com';
-          
-        if (qrCode) {
-          // If qrCode is JSON data, encode it
-          let qrUrl = "";
-          try {
-            // Try to parse as JSON
-            JSON.parse(qrCode);
-            qrUrl = `${baseUrl}/verify?data=${encodeURIComponent(qrCode)}`;
-          } catch {
-            // Not JSON, treat as string ID
-            qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(qrCode)}`;
-          }
-          
-          const dataUrl = await QRCode.toDataURL(qrUrl);
-          setQrDataUrl(dataUrl);
-        } else if (ticketId) {
-          // Fallback to ticketId if no qrCode is provided
-          const qrUrl = `${baseUrl}/verify?id=${encodeURIComponent(ticketId)}`;
-          const dataUrl = await QRCode.toDataURL(qrUrl);
-          setQrDataUrl(dataUrl);
-        }
-      } catch (err) {
-        console.error('Error generating QR code:', err);
+const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
+  qrCode,
+  ticketId,
+  size = 180,
+}) => {
+  const [qrValue, setQrValue] = useState<string>('');
+  const [isDataUrl, setIsDataUrl] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (qrCode) {
+      if (qrCode.startsWith('data:image/')) {
+        setIsDataUrl(true);
+        setQrValue(qrCode);
+      } else {
+        setIsDataUrl(false);
+        setQrValue(qrCode);
       }
+    } else {
+      // Default to ticketId if no QR code provided
+      setIsDataUrl(false);
+      setQrValue(ticketId);
     }
-    
-    generateQR();
   }, [qrCode, ticketId]);
-  
-  // Show placeholder while loading or if generation fails
-  if (!qrDataUrl) {
+
+  if (isDataUrl) {
     return (
-      <div className="flex flex-col items-center">
-        <div className="bg-gray-100 p-3 rounded-lg shadow-sm border flex items-center justify-center" style={{ width: size, height: size }}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">
-          {ticketId.substring(0, 8)}...
-        </p>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="flex flex-col items-center">
-      <div className="bg-white p-3 rounded-lg shadow-sm border">
-        <Image 
-          src={qrDataUrl}
-          alt={`Ticket QR Code: ${ticketId}`}
+      <div style={{ width: size, height: size }}>
+        <Image
+          src={qrValue}
+          alt="Ticket QR Code"
           width={size}
           height={size}
           className="rounded"
         />
       </div>
-      <p className="text-xs text-gray-500 mt-2 text-center">
-        {ticketId.substring(0, 8)}...
-      </p>
-    </div>
+    );
+  }
+
+  return (
+    <QRCodeSVG
+      value={qrValue}
+      size={size}
+      level="H"
+      includeMargin={true}
+    />
   );
-}
+};
+
+export default QRCodeDisplay;

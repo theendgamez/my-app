@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import DynamicQRCode from '@/components/tickets/DynamicQRCode';
 import TicketHistory from '@/components/tickets/TicketHistory';
 import BlockchainVisualizer from '@/components/blockchain/BlockchainVisualizer';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 
 interface OrderDetails {
   paymentId: string;
@@ -24,8 +25,8 @@ interface OrderDetails {
 
 export default function OrderDetailPage() {
   const router = useRouter();
-  const params = useParams();
-  const paymentId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const paymentId = params.id;
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
@@ -51,8 +52,8 @@ export default function OrderDetailPage() {
         try {
           // First, try direct ticket lookup which also handles transferred tickets
           const ticketRes = await fetch(`/api/tickets/${paymentId}`, {
-            headers: {
-              'Content-Type': 'application/json',
+          headers: {
+            'Content-Type': 'application/json',
               ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
               'x-user-id': user?.userId || ''
             },
@@ -61,7 +62,7 @@ export default function OrderDetailPage() {
           
           if (ticketRes.ok) {
             const ticket = await ticketRes.json();
-            
+        
             // Create a minimal order details object from the ticket info
             setOrderDetails({
               paymentId: ticket.paymentId || paymentId,
@@ -69,7 +70,8 @@ export default function OrderDetailPage() {
               eventDate: ticket.eventDate || '',
               eventLocation: ticket.eventLocation || '',
               purchaseDate: ticket.purchaseDate || '',
-              totalAmount: 0, // Amount unknown for transferred tickets
+              totalAmount: ticket.price || 0,
+              paymentMethod: ticket.paymentMethod || '信用卡',
               tickets: [ticket]
             });
             setLoading(false);
@@ -156,7 +158,7 @@ export default function OrderDetailPage() {
                   eventDate: matchingTicket.eventDate || '',
                   eventLocation: matchingTicket.eventLocation || '',
                   purchaseDate: matchingTicket.purchaseDate || '',
-                  totalAmount: 0,
+                  totalAmount: matchingTicket.totalAmount || 0,
                   tickets: [matchingTicket]
                 });
                 setLoading(false);
@@ -187,7 +189,10 @@ export default function OrderDetailPage() {
                   (data.event && data.event.eventDate) || 
                   (data.tickets && data.tickets[0] && data.tickets[0].eventDate) || 
                   null,
-        tickets: Array.isArray(data.tickets) ? data.tickets : []
+        tickets: Array.isArray(data.tickets) ? data.tickets : [],
+        // Make sure totalAmount is properly carried through
+        totalAmount: data.totalAmount || data.amount || 0,
+        paymentMethod: data.paymentMethod || '信用卡'
       };
       
       if (!processedData.eventDate && data.eventId) {
@@ -241,7 +246,7 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [paymentId, user]); // Removed 'router' from dependency array
+  }, [paymentId, user]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -253,33 +258,6 @@ export default function OrderDetailPage() {
       fetchOrderDetails();
     }
   }, [isAuthenticated, authLoading, user, paymentId, router, fetchOrderDetails]);
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '未知日期';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return '日期格式有誤';
-      }
-      
-      return date.toLocaleString('zh-HK', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error('Date formatting error:', error);
-      return '日期處理錯誤';
-    }
-  };
-  
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined) return 'HKD 0';
-    return `HKD ${amount.toLocaleString('en-HK')}`;
-  };
 
   return (
     <>
@@ -315,35 +293,35 @@ export default function OrderDetailPage() {
                 </div>
               </div>
             ) : orderDetails ? (
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-blue-50 p-6 border-b border-blue-100">
-                  <h2 className="text-xl font-semibold text-blue-800 mb-3">{orderDetails.eventName}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+              <>
+                <h2 className="text-xl font-medium mb-4">{orderDetails.eventName}</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">訂單編號：</span> 
+                      {orderDetails.paymentId}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">購買時間：</span> 
+                      {formatDate(orderDetails.purchaseDate)}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">活動時間：</span> 
+                      {formatDate(orderDetails.eventDate)}
+                    </p>
+                    {orderDetails.eventLocation && (
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">訂單編號：</span> 
-                        {orderDetails.paymentId}
+                        <span className="font-medium">活動地點：</span> 
+                        {orderDetails.eventLocation}
                       </p>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">購買時間：</span> 
-                        {formatDate(orderDetails.purchaseDate)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">活動時間：</span> 
-                        {formatDate(orderDetails.eventDate)}
-                      </p>
-                      {orderDetails.eventLocation && (
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">活動地點：</span> 
-                          {orderDetails.eventLocation}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
-                
+                      
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="font-semibold text-lg mb-3">付款詳情</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -359,7 +337,12 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-500">總金額</p>
-                      <p className="font-semibold text-lg">{formatCurrency(orderDetails.totalAmount)}</p>
+                      <p className="font-semibold text-lg">
+                        {/* Only show "免費票券" when we're absolutely sure this is a free ticket */}
+                        {orderDetails.totalAmount > 0 
+                          ? formatCurrency(orderDetails.totalAmount) 
+                          : formatCurrency(0, '免費票券')}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -367,7 +350,7 @@ export default function OrderDetailPage() {
                 <div className="p-6">
                   <h3 className="font-semibold text-lg mb-3">票券清單</h3>
                   <p className="text-sm text-gray-500 mb-3">共 {orderDetails?.tickets?.length || 0} 張票券</p>
-                  
+                    
                   {orderDetails?.tickets?.length ? (
                     <div className="space-y-4">
                       {orderDetails.tickets.map((ticket) => (
@@ -411,7 +394,7 @@ export default function OrderDetailPage() {
                                 <button 
                                   onClick={() => fetchOrderDetails()}
                                   className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
-                                >
+                                  >
                                   重新獲取QR碼
                                 </button>
                               </div>
@@ -419,14 +402,14 @@ export default function OrderDetailPage() {
                           </div>
 
                           <div className="p-4 bg-gray-50 flex justify-end">
-                            <Link
-                              href={`/user/tickets/transfer?ticketId=${ticket.ticketId}`}
+                                  <Link 
+                                    href={`/user/tickets/transfer?ticketId=${ticket.ticketId}`}
                               className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors text-sm"
-                            >
+                                  >
                               轉贈給好友
-                            </Link>
-                          </div>
-
+                                  </Link>
+                                </div>
+                                
                           <div className="mt-4">
                             <div className="flex items-center mb-2">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -438,7 +421,7 @@ export default function OrderDetailPage() {
                               此票券使用區塊鏈技術記錄所有交易，確保票券真實性和防止偽造。
                               {ticket.transferredAt && (
                                 <span className="block mt-1 text-blue-600">
-                                  此票券於 {new Date(ticket.transferredAt).toLocaleString()} 被轉讓
+                                  此票券於 {formatDate(ticket.transferredAt)} 被轉讓
                                 </span>
                               )}
                             </p>
@@ -515,14 +498,10 @@ export default function OrderDetailPage() {
                     >
                       列印票券
                     </button>
-                    <button 
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      下載電子票券
-                    </button>
+                    {/* Add more action buttons here if needed */}
                   </div>
                 </div>
-              </div>
+              </>
             ) : (
               <div className="bg-white p-6 rounded-lg shadow-md text-center py-12">
                 <p className="text-lg text-gray-600 mb-4">找不到訂單詳情</p>

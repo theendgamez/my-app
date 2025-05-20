@@ -5,6 +5,7 @@ import { useParams} from 'next/navigation';
 import Link from 'next/link';
 import AdminPage from '@/components/admin/AdminPage';
 import { adminFetch } from '@/utils/adminApi';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 
 interface Payment {
   paymentId: string;
@@ -68,23 +69,6 @@ export default function PaymentDetailPage() {
     }
   }, [paymentId]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('zh-HK', {
-      style: 'currency',
-      currency: 'HKD'
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-HK', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -204,7 +188,7 @@ export default function PaymentDetailPage() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">金額</dt>
                   <dd className="mt-1 text-sm text-gray-900 font-semibold">
-                    {formatCurrency(payment.amount)}
+                    {formatCurrency(payment.amount, '免費票券')}
                   </dd>
                 </div>
                 <div>

@@ -32,6 +32,19 @@ const CreateEventPage = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [isDrawMode, setIsDrawMode] = useState(false);
+  // Initialize with a default value that works on server-side and client-side
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Update the sidebar state after component mounts (client-side only)
+  useEffect(() => {
+    // Set sidebar state based on window width only on the client side
+    setIsSidebarOpen(window.innerWidth >= 768);
+  }, []);
+
+  // Toggle sidebar function
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   // Update the authentication check effect
   useEffect(() => {
@@ -156,15 +169,27 @@ const CreateEventPage = () => {
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-100">
       <Navbar />
       <div className="flex">
-        <Sidebar isOpen={false} toggleSidebar={function (): void {
-          throw new Error("Function not implemented.");
-        } } isMobile={false} />
-        <div className="container mx-auto p-8 ml-64">
-          <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
-            <h1 className="text-2xl font-bold mb-6">創建新活動</h1>
+        <Sidebar
+          isOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+          isMobile={false}
+        />
+        <div className={`flex-1 p-4 md:p-6 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'ml-0'}`}>
+          <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-6 rounded-lg">
+            <div className="flex items-center mb-6">
+              <button
+                onClick={toggleSidebar}
+                className="mr-4 p-2 text-gray-600 hover:text-gray-900 focus:outline-none md:hidden"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="text-2xl font-bold text-gray-800">創建新活動</h1>
+            </div>
             
             {success && (
               <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">

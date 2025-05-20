@@ -74,68 +74,95 @@ export interface Events {
 
 // Payment and ticket related types
 export interface Payment {
-  paymentId: string;
-  eventId: string;
-  eventName: string;
-  userId: string;
-  zone: string;
-  payQuantity: number;
   totalAmount: number;
-  createdAt: string;
-  status: 'completed' | 'pending' | 'failed' | 'refunded';
-  cardDetails: {
+  paymentId?: string;
+  userId?: string;
+  eventId?: string;
+  eventName?: string;
+  amount?: number;
+  paymentMethod?: string;
+  status?: string;
+  createdAt?: string;
+  cardDetails?: {
     lastFourDigits: string;
   };
-  amount: number;
-  paymentMethod: string;
-  relatedTo: 'lottery_registration' | 'ticket_purchase';
+  payQuantity?: number;
+  zone?: string;
+  relatedTo?: string;
 }
 
-export interface DynamicTicketData {
-  ticketId: string;
-  timestamp: string | number;
-  signature: string;
-  nonce: string;
-  previousHash?: string;  // Make previousHash optional
-}
-
+/**
+ * Comprehensive Ticket interface
+ */
 export interface Ticket {
   ticketId: string;
   eventId: string;
   eventName: string;
-  zone: string;
-  status: 'available' | 'reserved' | 'sold' | 'used' | 'cancelled';
-  userId: string;
-  userRealName?: string;
-  paymentId?: string;
-  purchaseDate?: string;
-  eventDate?: string;
+  eventDate: string;
   eventLocation?: string;
+  userId: string;
+  userRealName: string;
+  zone?: string;
   seatNumber?: string;
+  price?: string;
+  status: 'active' | 'available' | 'sold' | 'used' | 'cancelled' | 'reserved';
+  purchaseDate?: string;
+  paymentId: string;
   qrCode?: string;
   lastRefreshed: string;
   nextRefresh: string;
-  formattedPurchaseDate?: string;
-  formattedEventDate?: string;
-  verificationInfo?: {
-    verificationStatus: string;
-    lastVerified: string;
-    usageTimestamp: string;
-    verificationCount: number;
-    verifiedBy: string;
-    verifierName: string;
-    isTransferred?: boolean;
-    originalOwner?: string | null;
-    adminNotes?: string | null;
-  };
   lastVerified: string | null;
   verificationCount: number;
-  transferredFrom: string | null;
-  adminNotes: string | null;
   transferredAt: string | null;
-  dynamicData?: DynamicTicketData;
-  price: string;
-  transferredTo ?: string | null;
+  transferredFrom: string | null;
+  adminNotes?: string;
+  bookingToken?: string;
+  dynamicData?: {
+    ticketId: string;
+    timestamp: string | number;
+    nonce: string;
+    signature?: string;
+    previousHash?: string;
+  };
+  verificationInfo?: {
+    verificationStatus: string;
+    verifiedBy: string;
+    verifierName: string;
+    verificationCount: number;
+    lastVerified: string;
+    isTransferred?: boolean;
+    originalOwner?: string | null;
+    usageTimestamp?: string;
+    adminNotes?: string | null;
+  };
+}
+
+// For blockchain transaction data
+export interface TicketTransaction {
+  ticketId: string;
+  timestamp: number;
+  action: 'verify' | 'use' | 'transfer' | 'issue';
+  eventId: string;
+  signature?: string;
+  fromUserId?: string;
+  toUserId?: string;
+}
+
+// For ticket verification results
+export interface TicketVerificationResult {
+  valid: boolean;
+  used: boolean;
+  usageTime?: number;
+  message?: string;
+}
+
+// For dynamic ticket data
+export interface DynamicTicketData {
+  ticketId: string;
+  timestamp: number;
+  nonce: string;
+  signature?: string;
+  previousHash?: string;
 }
 
 // Booking related types

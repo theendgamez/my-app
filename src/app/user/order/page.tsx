@@ -26,13 +26,13 @@ export default function UserOrderPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Group tickets by event
-  const ticketsByEvent = tickets.reduce((acc, ticket) => {
-    const eventId = ticket.eventId;
-    if (!acc[eventId]) {
-      acc[eventId] = [];
+  // Group tickets by payment ID
+  const ticketsByPayment = tickets.reduce((acc, ticket) => {
+    const paymentId = ticket.paymentId || 'no-payment-id'; // Fallback for tickets without payment ID
+    if (!acc[paymentId]) {
+      acc[paymentId] = [];
     }
-    acc[eventId].push(ticket);
+    acc[paymentId].push(ticket);
     return acc;
   }, {} as Record<string, Ticket[]>);
 
@@ -50,18 +50,18 @@ export default function UserOrderPage() {
 
       const accessToken = localStorage.getItem('accessToken');
       const userId = user.userId;
-      
+
       console.log(`Fetching tickets for user: ${userId}`);
-      
+
       // Be explicit about constructing the headers to ensure userId is included
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       if (userId) {
         headers['x-user-id'] = userId;
       }
@@ -77,7 +77,7 @@ export default function UserOrderPage() {
           router.push(`/login?redirect=${encodeURIComponent("/user/order")}&auth_error=true`);
           return;
         }
-        
+
         const errorText = await response.text();
         throw new Error(`Failed to fetch tickets: ${response.status} ${response.statusText} - ${errorText}`);
       }
@@ -113,7 +113,7 @@ export default function UserOrderPage() {
   // Format date function
   const formatDate = (dateString?: string) => {
     if (!dateString) return '未知日期';
-    
+
     try {
       const date = new Date(dateString);
       return date.toLocaleString('zh-HK', {
@@ -139,7 +139,7 @@ export default function UserOrderPage() {
         </div>
       );
     }
-    
+
     // Handle other status types
     switch (ticket.status) {
       case "sold":
@@ -159,7 +159,7 @@ export default function UserOrderPage() {
       // Find registration token if available
       return (
         <div className="flex flex-col space-y-2">
-          <Link 
+          <Link
             href={`/events/${ticket.eventId}/lottery/payment?ticketId=${ticket.ticketId}`}
             className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
           >
@@ -168,10 +168,10 @@ export default function UserOrderPage() {
         </div>
       );
     }
-    
+
     // Regular view details link for other tickets
     return (
-      <Link 
+      <Link
         href={`/user/order/${ticket.paymentId || ticket.ticketId}`}
         className="text-blue-600 hover:text-blue-800"
       >
@@ -193,15 +193,15 @@ export default function UserOrderPage() {
         ) : error ? (
           <div className="p-4 border border-red-200 bg-red-50 text-red-600 rounded-lg">
             <p>{error}</p>
-            <button 
-              onClick={fetchTickets} 
+            <button
+              onClick={fetchTickets}
               className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
               disabled={!user?.userId}
             >
               重試
             </button>
           </div>
-        ) : Object.keys(ticketsByEvent).length === 0 ? (
+        ) : Object.keys(ticketsByPayment).length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-lg">
             <p className="text-lg text-gray-600 mb-4">您還沒有任何票券</p>
             <Link href="/events" className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">
@@ -210,12 +210,17 @@ export default function UserOrderPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {Object.entries(ticketsByEvent).map(([eventId, eventTickets]) => (
-              <div key={eventId} className="bg-white rounded-lg shadow-md overflow-hidden">
+            {Object.entries(ticketsByPayment).map(([paymentId, paymentTickets]) => (
+              <div key={paymentId} className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="bg-blue-50 p-4 border-b border-blue-100">
-                  <h2 className="text-xl font-semibold">{eventTickets[0].eventName}</h2>
+                  <h2 className="text-xl font-semibold">
+                    購買編號: {paymentId === 'no-payment-id' ? '未分配' : paymentId.substring(0, 8) + '...'}
+                  </h2>
                   <p className="text-sm text-gray-600">
-                    活動時間: {formatDate(eventTickets[0].eventDate)}
+                    購買時間: {formatDate(paymentTickets[0].purchaseDate)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    活動: {paymentTickets[0].eventName}
                   </p>
                 </div>
 
@@ -241,7 +246,7 @@ export default function UserOrderPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {eventTickets.map((ticket) => (
+                      {paymentTickets.map((ticket) => (
                         <tr key={ticket.ticketId} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {ticket.ticketId.substring(0, 8)}...

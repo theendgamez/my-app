@@ -7,7 +7,7 @@ import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
-import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
+import QRCodeDisplay from '@/components/tickets/DynamicQRCode';
 import TicketHistory from '@/components/tickets/TicketHistory';
 import { Ticket } from '@/types';
 // Define proper ticket type
@@ -106,7 +106,7 @@ export default function AdminTicketDetailPage() {
               <div className="flex-shrink-0">
                 <div className="bg-white p-2 border rounded-lg shadow-sm">
                   <QRCodeDisplay 
-                    qrCode={ticket.qrCode} 
+                    initialQrData={ticket.qrCode} 
                     ticketId={ticket.ticketId}
                     size={200}
                   />
