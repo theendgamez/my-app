@@ -22,6 +22,60 @@ export interface TicketTransaction {
   signature: string;
 }
 
+// Blockchain stats interface for admin dashboard
+export interface BlockchainStats {
+  totalBlocks: number;
+  totalTransactions: number;
+  lastBlockTimestamp: number | null;
+  isValid: boolean;
+}
+
+// Helper for browser storage
+const isServer = typeof window === 'undefined';
+
+// Storage interface for blockchain data
+interface BlockchainStorage {
+  saveData: (data: { chain: Block[], pendingTransactions: TicketTransaction[] }) => Promise<void>;
+  loadData: () => Promise<{ chain: Block[], pendingTransactions: TicketTransaction[] } | null>;
+}
+
+// Browser storage implementation using localStorage
+const browserStorage: BlockchainStorage = {
+  saveData: async (data) => {
+    try {
+      localStorage.setItem('blockchain', JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving blockchain to localStorage:', error);
+    }
+  },
+
+  loadData: async () => {
+    try {
+      const data = localStorage.getItem('blockchain');
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error loading blockchain from localStorage:', error);
+      return null;
+    }
+  }
+};
+
+// Simple memory storage fallback for SSR
+const memoryStorage: { data: { chain: Block[], pendingTransactions: TicketTransaction[] } | null } = { 
+  data: null 
+};
+
+// Select appropriate storage implementation
+const storage: BlockchainStorage = isServer ? {
+  // Server-side storage (memory only in this implementation)
+  saveData: async (data) => {
+    memoryStorage.data = data;
+  },
+  loadData: async () => {
+    return memoryStorage.data;
+  }
+} : browserStorage;
+
 export class TicketBlockchain {
   private chain: Block[];
   private difficulty: number;
@@ -29,11 +83,34 @@ export class TicketBlockchain {
   private readonly SECRET_KEY: string;
 
   constructor() {
-    this.chain = [this.createGenesisBlock()];
     this.difficulty = 4; // 調整難度以控制挖礦速度
     this.pendingTransactions = [];
     // In actual use, this key should be stored in environment variables
-    this.SECRET_KEY = process.env.BLOCKCHAIN_SECRET || 'your-secret-blockchain-key';
+    this.SECRET_KEY = process.env.NEXT_PUBLIC_BLOCKCHAIN_SECRET || 'your-secret-blockchain-key';
+    
+    // Initialize with empty chain, will be loaded later
+    this.chain = [];
+    
+    // Immediately attempt to load saved data
+    this.initializeChain();
+  }
+
+  private async initializeChain(): Promise<void> {
+    try {
+      const savedData = await storage.loadData();
+      if (savedData && savedData.chain && savedData.chain.length > 0) {
+        this.chain = savedData.chain;
+        this.pendingTransactions = savedData.pendingTransactions || [];
+        console.log(`Loaded blockchain with ${this.chain.length} blocks`);
+      } else {
+        console.log('No existing blockchain found, creating genesis block');
+        this.chain = [this.createGenesisBlock()];
+        this.saveChain();
+      }
+    } catch (error) {
+      console.error('Error initializing blockchain:', error);
+      this.chain = [this.createGenesisBlock()];
+    }
   }
 
   private createGenesisBlock(): Block {
@@ -71,6 +148,19 @@ export class TicketBlockchain {
     return { ...block, hash, nonce };
   }
 
+  // Storage methods for persistence
+  private async saveChain(): Promise<void> {
+    try {
+      await storage.saveData({
+        chain: this.chain,
+        pendingTransactions: this.pendingTransactions
+      });
+      console.log(`Blockchain saved with ${this.chain.length} blocks`);
+    } catch (error) {
+      console.error('Error saving blockchain:', error);
+    }
+  }
+
   // 添加新交易到待處理列表
   public addTransaction(transaction: Omit<TicketTransaction, 'signature'>): TicketTransaction {
     // 為交易生成簽名
@@ -82,6 +172,10 @@ export class TicketBlockchain {
 
     const signedTransaction = { ...transaction, signature };
     this.pendingTransactions.push(signedTransaction);
+    
+    // Save the updated pending transactions
+    this.saveChain();
+    
     return signedTransaction;
   }
 
@@ -110,6 +204,9 @@ export class TicketBlockchain {
     console.log(`New block added to chain: Block #${newBlock.index} with ${this.pendingTransactions.length} transactions`);
     
     this.pendingTransactions = [];
+    
+    // Save the updated chain
+    this.saveChain();
   }
 
   // 驗證整個鏈的完整性
@@ -239,10 +336,37 @@ export class TicketBlockchain {
     
     return transaction;
   }
+
+  // Get blockchain statistics for admin dashboard
+  public getStats(): BlockchainStats {
+    const totalBlocks = this.chain.length;
+    
+    let totalTransactions = 0;
+    for (const block of this.chain) {
+      if (Array.isArray(block.data)) {
+        totalTransactions += block.data.length;
+      }
+    }
+    
+    const lastBlock = this.chain.length > 0 ? this.chain[this.chain.length - 1] : null;
+    const lastBlockTimestamp = lastBlock ? lastBlock.timestamp : null;
+    
+    return {
+      totalBlocks,
+      totalTransactions,
+      lastBlockTimestamp,
+      isValid: this.isChainValid()
+    };
+  }
 }
 
 // 創建全局實例
 export const ticketBlockchain = new TicketBlockchain();
+
+// Export blockchain stats for admin page and other functions
+export function getBlockchainStats(): BlockchainStats {
+  return ticketBlockchain.getStats();
+}
 
 // 為前端導出一些有用的功能
 export async function refreshTicketQrCode(ticket: Ticket): Promise<DynamicTicketData> {
@@ -325,7 +449,7 @@ export function verifyTicket(qrData: unknown): TicketVerificationResult {
 
     if (isDynamicTicketData(qrData)) {
       // For dynamic tickets, perform a more thorough validation
-      const { ticketId } = qrData;
+      const { ticketId, timestamp, signature, nonce } = qrData;
       
       // Check if ticket has been used already by looking for a 'use' transaction
       const history = ticketBlockchain.getTicketHistory(ticketId);
@@ -352,19 +476,59 @@ export function verifyTicket(qrData: unknown): TicketVerificationResult {
         };
       }
       
-      // Check if timestamp is within acceptable range (30 minutes)
-      const ticketTime = typeof qrData.timestamp === 'string' ? parseInt(qrData.timestamp, 10) : qrData.timestamp;
-      const currentTime = Date.now();
-      const maxValidTime = 30 * 60 * 1000; // 30 minutes
+      // CRITICAL FIX: Enforce strict timestamp validation for QR code expiration
+      if (timestamp !== undefined) {
+        const ticketTime = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
+        const currentTime = Date.now();
+        const maxValidTime = 5 * 60 * 1000; // 5 minutes strict limit
+        
+        // Check if timestamp is valid
+        if (isNaN(ticketTime)) {
+          console.warn('Invalid timestamp in QR code:', timestamp);
+          return { 
+            valid: false, 
+            used: false,
+            message: 'QR碼時間戳無效'
+          };
+        }
+        
+        // Check if QR code has expired
+        const timeDiff = currentTime - ticketTime;
+        if (timeDiff > maxValidTime) {
+          console.warn('QR code expired:', { 
+            ticketTime: new Date(ticketTime).toISOString(), 
+            currentTime: new Date(currentTime).toISOString(), 
+            diff: Math.floor(timeDiff / 1000) + ' seconds',
+            maxAllowed: Math.floor(maxValidTime / 1000) + ' seconds'
+          });
+          return { 
+            valid: false, 
+            used: false,
+            message: `QR碼已過期 (${Math.floor(timeDiff / 60000)} 分鐘前生成，超過5分鐘有效期限)`
+          };
+        }
+        
+        // Check for future timestamps (clock synchronization issues)
+        if (ticketTime > currentTime + 60000) { // Allow 1 minute clock drift
+          console.warn('Future timestamp detected:', { ticketTime, currentTime });
+          return { 
+            valid: false, 
+            used: false,
+            message: 'QR碼時間戳異常 (未來時間)'
+          };
+        }
+      }
       
-      if (isNaN(ticketTime) || currentTime - ticketTime > maxValidTime) {
-        console.warn('Ticket timestamp validation failed:', { ticketTime, currentTime, diff: currentTime - ticketTime });
-        // Expired but still a valid format
-        return { 
-          valid: true, 
-          used: false,
-          message: 'Ticket timestamp validation failed but accepting anyway'
-        };
+      // Verify the signature if present
+      if (signature && nonce) {
+        const isValidSignature = ticketBlockchain.verifyTicketData(qrData);
+        if (!isValidSignature) {
+          return {
+            valid: false,
+            used: false,
+            message: 'QR碼簽名驗證失敗，可能是偽造的'
+          };
+        }
       }
       
       // All checks passed
@@ -381,9 +545,9 @@ export function verifyTicket(qrData: unknown): TicketVerificationResult {
     console.error('Error verifying ticket:', error);
     // Instead of reporting as invalid, handle the error gracefully
     return { 
-      valid: true, // Assume valid on verification failure
+      valid: false, // Changed from true to false for security
       used: false,
-      message: `Error during verification: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `驗證過程中發生錯誤: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }

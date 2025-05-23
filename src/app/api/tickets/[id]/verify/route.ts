@@ -152,6 +152,23 @@ export async function POST(
       verificationResult = verifyTicket(qrData);
       console.log(`Blockchain verification for ticket [${ticketId}]:`, verificationResult);
       
+      // CRITICAL: Check verification result validity - reject expired QR codes
+      if (!verificationResult.valid) {
+        return NextResponse.json({
+          verified: false,
+          status: ticket.status,
+          message: verificationResult.message || '票券驗證失敗',
+          expired: verificationResult.message?.includes('過期') || verificationResult.message?.includes('expired'),
+          details: {
+            ticketId: ticketIdFromQR,
+            eventName: ticket.eventName,
+            userName: ticket.userRealName || '未提供姓名',
+            zone: ticket.zone,
+            verificationMessage: verificationResult.message
+          }
+        });
+      }
+      
       // Check if the ticket has already been used according to blockchain
       if (verificationResult.used) {
         return NextResponse.json({

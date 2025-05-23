@@ -41,12 +41,52 @@ export function generateDynamicTicketData(ticketId: string, secretKey: string, p
 }
 
 export function verifyTicketData(ticketData: DynamicTicketData, secretKey: string): boolean {
+  // Check timestamp expiration first (critical security check)
+  const currentTime = Date.now();
+  const ticketTime = typeof ticketData.timestamp === 'string' 
+    ? parseInt(ticketData.timestamp, 10) 
+    : ticketData.timestamp;
+  
+  // Strict 5-minute expiration check
+  const maxValidTime = 5 * 60 * 1000; // 5 minutes
+  const timeDiff = currentTime - ticketTime;
+  
+  if (isNaN(ticketTime)) {
+    console.warn('Invalid timestamp in ticket data:', ticketData.timestamp);
+    return false;
+  }
+  
+  if (timeDiff > maxValidTime) {
+    console.warn('Ticket data expired:', {
+      ticketTime: new Date(ticketTime).toISOString(),
+      currentTime: new Date(currentTime).toISOString(),
+      diffMinutes: Math.floor(timeDiff / 60000),
+      maxAllowedMinutes: Math.floor(maxValidTime / 60000)
+    });
+    return false;
+  }
+  
+  // Check for future timestamps (possible clock sync issues)
+  if (ticketTime > currentTime + 60000) { // Allow 1 minute clock drift
+    console.warn('Future timestamp detected in ticket data:', {
+      ticketTime: new Date(ticketTime).toISOString(),
+      currentTime: new Date(currentTime).toISOString()
+    });
+    return false;
+  }
+  
   // 重建簽名數據
   const dataToSign = `${ticketData.ticketId}:${ticketData.timestamp}:${ticketData.nonce}:${ticketData.previousHash || ''}`;
   const expectedSignature = createSignature(dataToSign, secretKey);
   
   // 檢查簽名是否匹配
-  return ticketData.signature === expectedSignature;
+  const signatureValid = ticketData.signature === expectedSignature;
+  
+  if (!signatureValid) {
+    console.warn('Signature verification failed for ticket:', ticketData.ticketId);
+  }
+  
+  return signatureValid;
 }
 
 // 生成票券QR碼數據
@@ -68,12 +108,24 @@ export function generateTicketQRData(ticketData: DynamicTicketData): string {
 
 // 生成用戶票券QR碼數據 - 供普通用戶使用
 export function generatePublicTicketQRData(ticketData: DynamicTicketData): string {
+  // Validate that the ticket data is not already expired
+  const currentTime = Date.now();
+  const ticketTime = typeof ticketData.timestamp === 'string' 
+    ? parseInt(ticketData.timestamp, 10) 
+    : ticketData.timestamp;
+  
+  const maxValidTime = 5 * 60 * 1000; // 5 minutes
+  if (currentTime - ticketTime > maxValidTime) {
+    throw new Error('Cannot generate QR data for expired ticket');
+  }
+  
   // 將數據轉換為安全的字符串格式
   const qrData = JSON.stringify({
     ticketId: ticketData.ticketId,
     timestamp: ticketData.timestamp,
     signature: ticketData.signature,
-    nonce: ticketData.nonce
+    nonce: ticketData.nonce,
+    expiresAt: ticketTime + maxValidTime // Add explicit expiration time
   });
   
   // 使用base64編碼數據參數

@@ -288,9 +288,20 @@ export interface LotteryHistory {
 }
 
 export interface UserPurchase {
+  purchaseId: string;
+  ticketId: string;
   userId: string;
   eventId: string;
   purchaseDate: string;
   quantity: number;
   paymentId: string;
+  status: 'pending' | 'completed' | 'refunded';
+  totalAmount: number;
+  eventName?: string;
+  zoneName?: string;
+  userRealName?: string;
+  paymentMethod?: string;
+  cardDetails?: {
+    lastFourDigits: string;
+  };
 }

@@ -274,7 +274,18 @@ export async function POST(request: NextRequest) {
       eventId: registration.eventId,
       purchaseDate: new Date().toISOString(),
       quantity,
-      paymentId
+      paymentId,
+      purchaseId: uuidv4(),
+      ticketId: tickets.map(ticket => ticket.ticketId).join(','),
+      status: 'completed',
+      totalAmount,
+      eventName: event.eventName,
+      zoneName: registration.zoneName,
+      userRealName: userRealName,
+      paymentMethod,
+      cardDetails: {
+        lastFourDigits: cardDetails?.lastFourDigits || 'XXXX'
+      }
     });
 
     return NextResponse.json({
