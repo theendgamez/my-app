@@ -22,11 +22,9 @@ interface TicketHistoryProps {
 
 export default function TicketHistory({ ticketId, isAdminView = false, emptyMessage = "無可用的交易歷史記錄" }: TicketHistoryProps) {
   const [history, setHistory] = useState<TicketTransaction[]>([]);
-  const [ticketDetails, setTicketDetails] = useState<Ticket | null>(null);
+  const [, setTicketDetails] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [syncingBlockchain, setSyncingBlockchain] = useState(false);
-  const [syncSuccess, setSyncSuccess] = useState(false);
 
   // Fetch ticket details first to check if it has transfer information
   useEffect(() => {
@@ -87,48 +85,7 @@ export default function TicketHistory({ ticketId, isAdminView = false, emptyMess
     if (ticketId) {
       fetchTicketHistory();
     }
-  }, [ticketId, syncSuccess]);
-
-  // Sync missing blockchain records if needed
-  const syncBlockchainRecords = async () => {
-    if (!ticketId || !ticketDetails?.transferredAt) return;
-    
-    try {
-      setSyncingBlockchain(true);
-      setError(null);
-      
-      const accessToken = localStorage.getItem('accessToken');
-      
-      const response = await fetch(`/api/tickets/${ticketId}/sync-blockchain`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || '同步區塊鏈記錄失敗');
-      }
-      
-      if (result.synced) {
-        setSyncSuccess(true);
-        // Wait a moment and then refresh history
-        setTimeout(() => {
-          setHistory([]); // Clear current history to trigger reload
-        }, 500);
-      } else {
-        setError(result.message || '沒有可同步的交易');
-      }
-    } catch (err) {
-      console.error('Error syncing blockchain records:', err);
-      setError(err instanceof Error ? err.message : '同步記錄時出錯');
-    } finally {
-      setSyncingBlockchain(false);
-    }
-  };
+  }, [ticketId]);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString('zh-HK', {
@@ -171,55 +128,6 @@ export default function TicketHistory({ ticketId, isAdminView = false, emptyMess
     return (
       <div className="bg-red-50 border border-red-100 text-red-700 p-3 rounded-md text-sm">
         {error}
-      </div>
-    );
-  }
-
-  // Show transfer information if no blockchain history but ticket has transfer data
-  if (history.length === 0 && ticketDetails?.transferredAt) {
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
-        <div className="flex items-center mb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-600 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-          </svg>
-          <span className="text-sm font-medium text-yellow-700">票券已轉贈，但尚未記錄到區塊鏈</span>
-        </div>
-        <p className="text-sm text-yellow-600">
-          系統檢測到此票券於 {ticketDetails.transferredAt ? new Date(ticketDetails.transferredAt).toLocaleString() : '未知時間'} 被轉讓。
-          {!syncingBlockchain && !syncSuccess ? '點擊下方按鈕同步到區塊鏈。' : ''}
-        </p>
-        
-        {syncSuccess ? (
-          <div className="mt-3 bg-green-50 border border-green-100 p-3 rounded text-green-700 text-sm">
-            <p className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              同步成功！正在重新載入交易歷史...
-            </p>
-          </div>
-        ) : (
-          <button
-            onClick={syncBlockchainRecords}
-            disabled={syncingBlockchain}
-            className={`mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm flex items-center ${
-              syncingBlockchain ? 'opacity-70 cursor-not-allowed' : ''
-            }`}
-          >
-            {syncingBlockchain ? (
-              <>
-                <LoadingSpinner size="small" /> 正在同步到區塊鏈...
-              </>
-            ) : (
-              <>同步到區塊鏈</>
-            )}
-          </button>
-        )}
-        
-        <p className="text-xs text-yellow-500 mt-2">
-          在轉讓功能的最新版本中，所有交易將即時記錄到區塊鏈。
-        </p>
       </div>
     );
   }

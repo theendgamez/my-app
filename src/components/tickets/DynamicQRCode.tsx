@@ -175,11 +175,19 @@ export default function DynamicQRCode({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center bg-red-50 p-3 sm:p-4 rounded-lg" style={{ width: size, height: size }}>
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-10 sm:w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p className="mt-1 sm:mt-2 text-2xs sm:text-xs text-red-600 text-center">{error}</p>
+      <div className="flex flex-col items-center justify-center" style={{ width: size, height: size }}>
+        <div className="text-red-500 mb-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-sm text-gray-700 text-center">{error}</p>
+        <button 
+          onClick={() => refreshQRCode()}
+          className="mt-2 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          重試
+        </button>
       </div>
     );
   }

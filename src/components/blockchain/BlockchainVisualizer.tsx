@@ -17,26 +17,12 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isRecorded, setIsRecorded] = useState(false);
-  const [syncingData, setSyncingData] = useState(false);
 
   useEffect(() => {
     const fetchBlockchainHistory = async () => {
       try {
         setLoading(true);
         const accessToken = localStorage.getItem('accessToken');
-        
-        // First check if ticket is on blockchain
-        const recordedResponse = await fetch(`/api/tickets/${ticketId}/blockchain/status`, {
-          headers: {
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-          }
-        });
-        
-        if (recordedResponse.ok) {
-          const data = await recordedResponse.json();
-          setIsRecorded(data.isRecorded);
-        }
         
         // Get blockchain history
         const response = await fetch(`/api/tickets/${ticketId}/blockchain/history`, {
@@ -62,34 +48,7 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
     if (ticketId) {
       fetchBlockchainHistory();
     }
-  }, [ticketId, syncingData]);
-
-  // Add function to manually sync blockchain data if needed
-  const syncBlockchainData = async () => {
-    try {
-      setSyncingData(true);
-      const accessToken = localStorage.getItem('accessToken');
-      
-      const response = await fetch(`/api/tickets/${ticketId}/sync-blockchain`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('同步區塊鏈資料失敗');
-      }
-      
-      // Refresh data after sync
-      setTimeout(() => setSyncingData(false), 1000);
-    } catch (err) {
-      console.error('Error syncing blockchain data:', err);
-      setError(err instanceof Error ? err.message : '同步區塊鏈資料時出錯');
-      setSyncingData(false);
-    }
-  };
+  }, [ticketId]);
 
   if (loading) {
     return (
@@ -115,27 +74,9 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
         <p className="text-gray-600 text-sm text-center">此票券暫無區塊鏈交易記錄</p>
-        <p className="text-xs text-gray-500 mt-2 text-center mb-3">
+        <p className="text-xs text-gray-500 mt-2 text-center">
           所有後續的票券操作將自動記錄到區塊鏈上
         </p>
-        
-        {!isRecorded && (
-          <div className="mt-2 flex justify-center">
-            <button
-              onClick={syncBlockchainData}
-              disabled={syncingData}
-              className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {syncingData ? (
-                <>
-                  <LoadingSpinner size="small" /> 正在同步...
-                </>
-              ) : (
-                '手動同步至區塊鏈'
-              )}
-            </button>
-          </div>
-        )}
       </div>
     );
   }

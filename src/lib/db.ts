@@ -1899,16 +1899,8 @@ export const db: DbHandler = {
       return executeDbCommand(async () => {
         const logs = await db.ticketAudit.findByTicket(ticketId);
         return logs.some(log => {
-          if (log.action !== 'blockchain_sync') return false;
-          let details: unknown = log.details;
-          if (typeof details === 'string') {
-            try {
-              details = JSON.parse(details);
-            } catch {
-              return false;
-            }
-          }
-          return typeof details === 'object' && details !== null && 'blockchainRef' in details;
+          // Check for blockchain_sync action or transfer action (both indicate blockchain recording)
+          return log.action === 'blockchain_sync' || log.action === 'transfer';
         });
       });
     }

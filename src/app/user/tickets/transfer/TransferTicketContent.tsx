@@ -39,7 +39,7 @@ export default function TransferTicketContent() {
 
   // Fetch user tickets
   const fetchTickets = useCallback(async () => {
-    if (!user) return;
+    if (!user) return; // Early return if user is null
     
     try {
       setLoading(true);
@@ -91,6 +91,29 @@ export default function TransferTicketContent() {
       setLoading(false);
     }
   }, [user, ticketId]);
+
+  // Add function to calculate next transfer time
+  const getNextTransferTime = (transferredAt: string) => {
+    const lastTransferDate = new Date(transferredAt);
+    const nextAvailableDate = new Date(lastTransferDate.getTime() + (7 * 24 * 60 * 60 * 1000)); // Add 7 days
+    return nextAvailableDate.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Add function to calculate remaining days
+  const getRemainingDays = (transferredAt: string) => {
+    const lastTransferDate = new Date(transferredAt);
+    const now = new Date();
+    const nextAvailableDate = new Date(lastTransferDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+    const diffMs = nextAvailableDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
 
   // Fetch user friends
   const fetchFriends = useCallback(async () => {
@@ -298,6 +321,37 @@ export default function TransferTicketContent() {
           )}
         </>
       )}
+      
+      {/* Add cooldown information section */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+        <h3 className="font-semibold text-blue-800 mb-2">轉讓規則說明</h3>
+        <div className="text-blue-700 space-y-2">
+          <p>• 每張票券轉讓後需要等待 7 天才能再次轉讓</p>
+          <p>• 轉讓後票券擁有權將立即轉移給接收者</p>
+          <p>• 請確認接收者資訊正確，轉讓完成後無法撤銷</p>
+          
+          {/* Show next transfer times for recently transferred tickets */}
+          {tickets.some(ticket => ticket.transferredAt && getRemainingDays(ticket.transferredAt) > 0) && (
+            <div className="mt-4 p-3 bg-white rounded border">
+              <h4 className="font-medium text-blue-800 mb-2">冷卻期票券</h4>
+              {tickets
+                .filter(ticket => ticket.transferredAt && getRemainingDays(ticket.transferredAt) > 0)
+                .map(ticket => (
+                  <div key={ticket.ticketId} className="text-sm space-y-1 mb-2 last:mb-0">
+                    <p className="font-medium">{ticket.eventName}</p>
+                    <p className="text-blue-600">
+                      下次可轉讓時間：{getNextTransferTime(ticket.transferredAt!)}
+                    </p>
+                    <p className="text-blue-500">
+                      剩餘 {getRemainingDays(ticket.transferredAt!)} 天
+                    </p>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

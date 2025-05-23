@@ -267,13 +267,12 @@ export interface TicketAuditLog {
     details?: string;
   }
 
-export interface UserPurchase {
- userId: string;
- eventId: string;
- purchaseDate: string;
- quantity: number;
- paymentId: string;
- purchaseId?: string; // Optional as it might be generated
+// Add transfer cooldown interface
+export interface TransferCooldown {
+  canTransfer: boolean;
+  nextAvailableTime?: string;
+  remainingDays?: number;
+  lastTransferTime?: string;
 }
 
 /**
@@ -288,3 +287,10 @@ export interface LotteryHistory {
  drawDate: string;
 }
 
+export interface UserPurchase {
+  userId: string;
+  eventId: string;
+  purchaseDate: string;
+  quantity: number;
+  paymentId: string;
+}

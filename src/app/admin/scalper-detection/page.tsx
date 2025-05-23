@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import AdminPage from '@/components/admin/AdminPage';
-import { useScalperDetection } from '@/hooks/useScalperDetection';
+import { useEnhancedScalperDetection } from '@/hooks/useEnhancedScalperDetection';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function ScalperDetectionPage() {
-  const { detectScalper, prediction, loading, error } = useScalperDetection();
+  const { analyzeEnhanced: detectScalper, prediction, loading, error } = useEnhancedScalperDetection();
   const [formData, setFormData] = useState({
     domain_frequency: 0,
     is_mainstream: 0,
@@ -183,7 +183,7 @@ export default function ScalperDetectionPage() {
                 <p className="text-sm text-gray-500 mb-1">黃牛可能性:</p>
                 <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full ${prediction.is_scalper ? 'bg-red-500' : 'bg-green-500'}`}
+                    className={`h-full ${prediction.isScalper ? 'bg-red-500' : 'bg-green-500'}`}
                     style={{ width: `${prediction.probability * 100}%` }}
                   ></div>
                 </div>
@@ -195,7 +195,7 @@ export default function ScalperDetectionPage() {
               <div>
                 <p className="text-sm text-gray-500 mb-1">AI判定:</p>
                 <p className="font-medium">
-                  {prediction.is_scalper 
+                  {prediction.isScalper 
                     ? '⚠️ 此用戶很可能是黃牛' 
                     : '✅ 此用戶可能是正常用戶'}
                 </p>

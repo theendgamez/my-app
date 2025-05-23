@@ -426,6 +426,7 @@ export default function OrderDetailPage() {
                               )}
                             </p>
                           
+                            <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
                               onClick={() => {
@@ -441,6 +442,17 @@ export default function OrderDetailPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                               </svg>
                             </button>
+                              
+                              <button
+                                onClick={() => setShowBlockchain(!showBlockchain)}
+                                className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                              >
+                                查看區塊鏈視圖
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
 
                           {showHistory && selectedTicket === ticket.ticketId && (
@@ -456,28 +468,14 @@ export default function OrderDetailPage() {
                                 isAdminView={false} 
                                 emptyMessage="此票券尚無交易歷史記錄。初始交易將在首次使用時記錄。" 
                               />
-                              
-                              {/* 顯示"查看區塊鏈"按鈕 */}
-                              <div className="mt-4 flex justify-end">
-                                <button
-                                  onClick={() => setShowBlockchain(!showBlockchain)}
-                                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-                                >
-                                  {showBlockchain ? '隱藏區塊鏈視圖' : '查看區塊鏈視圖'}
-                                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${
-                                    showBlockchain ? 'rotate-180' : ''
-                                  }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </button>
                               </div>
+                          )}
                               
                               {/* 區塊鏈可視化 */}
                               {showBlockchain && (
-                                <div className="mt-4">
+                            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">區塊鏈視圖</h4>
                                   <BlockchainVisualizer ticketId={ticket.ticketId} />
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
