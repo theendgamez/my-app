@@ -2,114 +2,582 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CSS Custom Properties for Ticketing System Theme */
 :root {
-  --background: #ffffff;
-  --foreground: #000000;
+  /* Primary Colors - Professional Blue */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+
+  /* Secondary Colors - Elegant Purple */
+  --secondary-50: #faf5ff;
+  --secondary-100: #f3e8ff;
+  --secondary-200: #e9d5ff;
+  --secondary-300: #d8b4fe;
+  --secondary-400: #c084fc;
+  --secondary-500: #a855f7;
+  --secondary-600: #9333ea;
+  --secondary-700: #7c3aed;
+  --secondary-800: #6b21a8;
+  --secondary-900: #581c87;
+
+  /* Status Colors */
+  --success-50: #f0fdf4;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --warning-50: #fffbeb;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --error-50: #fef2f2;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+
+  /* Neutral Colors */
+  --neutral-50: #f9fafb;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-300: #d1d5db;
+  --neutral-400: #9ca3af;
+  --neutral-500: #6b7280;
+  --neutral-600: #4b5563;
+  --neutral-700: #374151;
+  --neutral-800: #1f2937;
+  --neutral-900: #111827;
+
+  /* Typography */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--secondary-600) 0%, var(--secondary-700) 100%);
+  --gradient-hero: linear-gradient(135deg, var(--primary-600) 0%, var(--secondary-600) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #fcfdff;
-    --foreground: #000000;
-  }
+/* Base Styles */
+html {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-text-size-adjust: 100%; /* Prevent font size adjustment on orientation change */
+  color: var(--neutral-700);
+  background: var(--neutral-50);
+  line-height: 1.6;
+  font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Add padding to main content to prevent navbar overlap */
-main, .main-content, [class*="container"] {
-  padding-top: 4rem; /* This is equivalent to pt-16 in Tailwind */
-}
-
-/* General responsiveness improvements */
-html {
-  touch-action: manipulation; /* Improve touch behavior */
-}
-
-/* Improved mobile form styling */
-input, select, textarea, button {
-  font-size: 16px !important; /* Prevent iOS zoom on focus */
-  max-width: 100%;
-}
-
-/* Mobile tap target sizing - ensure all clickable elements meet accessibility standards */
-button, [role="button"], a, .btn, input[type="button"], input[type="submit"] {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-/* Better table responsiveness */
+/* Component Base Layer */
 @layer components {
-  .table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  /* Button Components */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border border-transparent;
+    @apply transition-all duration-200 ease-in-out;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    min-height: 44px; /* Touch-friendly */
   }
 
-  /* Mobile-specific utilities */
-  .mobile-compact {
-    padding: 0.5rem;
+  .btn-primary {
+    @apply btn bg-blue-600 text-white;
+    @apply hover:bg-blue-700 focus:ring-blue-500;
+    @apply shadow-md hover:shadow-lg;
   }
-  
-  .mobile-stack {
-    display: flex;
-    flex-direction: column;
+
+  .btn-secondary {
+    @apply btn bg-white text-gray-700 border-gray-300;
+    @apply hover:bg-gray-50 focus:ring-gray-500;
+    @apply shadow-sm hover:shadow-md;
   }
-  
-  .mobile-touch-friendly button, 
-  .mobile-touch-friendly a {
-    padding: 0.75rem;
+
+  .btn-success {
+    @apply btn bg-green-600 text-white;
+    @apply hover:bg-green-700 focus:ring-green-500;
+    @apply shadow-md hover:shadow-lg;
   }
-  
-  .mobile-hidden {
-    display: none;
+
+  .btn-warning {
+    @apply btn bg-yellow-500 text-white;
+    @apply hover:bg-yellow-600 focus:ring-yellow-500;
+    @apply shadow-md hover:shadow-lg;
   }
-  
-  .mobile-only {
-    display: block;
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white;
+    @apply hover:bg-red-700 focus:ring-red-500;
+    @apply shadow-md hover:shadow-lg;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-gray-600;
+    @apply hover:bg-gray-100 focus:ring-gray-500;
+  }
+
+  /* Card Components */
+  .card {
+    @apply bg-white rounded-xl shadow-md border border-gray-200;
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-lg hover:-translate-y-1;
+  }
+
+  .card-interactive {
+    @apply card-hover cursor-pointer;
+    @apply hover:border-blue-300;
+  }
+
+  /* Event Card Specific */
+  .event-card {
+    @apply card-interactive overflow-hidden;
+    @apply bg-gradient-to-br from-white to-gray-50;
+  }
+
+  .event-card-image {
+    @apply w-full h-48 object-cover;
+    @apply transition-transform duration-300;
+  }
+
+  .event-card:hover .event-card-image {
+    @apply scale-105;
+  }
+
+  /* Ticket Card */
+  .ticket-card {
+    @apply card border-2 border-dashed border-gray-300;
+    @apply bg-gradient-to-r from-blue-50 to-purple-50;
+    position: relative;
+  }
+
+  .ticket-card::before,
+  .ticket-card::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: var(--neutral-50);
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .ticket-card::before {
+    left: -10px;
+  }
+
+  .ticket-card::after {
+    right: -10px;
+  }
+
+  /* Form Components - Fixed circular dependency */
+  .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply text-gray-700 placeholder-gray-400;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply transition-all duration-200;
+    font-size: 16px; /* Prevent iOS zoom */
+  }
+
+  .form-input-error {
+    @apply w-full px-4 py-3 border border-red-300 rounded-lg;
+    @apply text-gray-700 placeholder-gray-400;
+    @apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent;
+    @apply transition-all duration-200;
+    font-size: 16px;
+  }
+
+  .form-textarea {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply text-gray-700 placeholder-gray-400;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply transition-all duration-200 resize-none;
+    min-height: 120px;
+    font-size: 16px;
+  }
+
+  .form-select {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply text-gray-700 cursor-pointer;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply transition-all duration-200;
+    font-size: 16px;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply px-3 py-2 text-gray-700 rounded-md text-sm font-medium;
+    @apply transition-colors duration-200;
+    @apply hover:text-blue-600 hover:bg-blue-50;
+  }
+
+  .nav-link-active {
+    @apply nav-link text-blue-600 bg-blue-100;
+  }
+
+  /* Badge Components */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-error {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-secondary {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+
+  /* Status Indicators */
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full mr-2;
+  }
+
+  .status-available {
+    @apply status-dot bg-green-400;
+  }
+
+  .status-sold-out {
+    @apply status-dot bg-red-400;
+  }
+
+  .status-pending {
+    @apply status-dot bg-yellow-400;
+  }
+
+  /* Loading States */
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Responsive Utilities */
+  .container-responsive {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+
+  /* Print Styles */
+  .print-only {
+    @apply hidden;
+  }
+
+  .print-hidden {
+    @apply block;
+  }
+
+  /* Edit Sidebar */
+  .edit-sidebar {
+    @apply fixed top-0 right-0 h-full w-full max-w-lg;
+    @apply bg-white shadow-2xl z-50;
+    @apply transform transition-transform duration-300 ease-in-out;
+    @apply flex flex-col;
+  }
+
+  .edit-sidebar.open {
+    @apply translate-x-0;
+  }
+
+  .edit-sidebar.closed {
+    @apply translate-x-full;
+  }
+
+  .edit-sidebar-header {
+    @apply flex items-center justify-between p-6;
+    @apply border-b border-gray-200 bg-gray-50;
+    @apply sticky top-0 z-10;
+  }
+
+  .edit-sidebar-content {
+    @apply flex-1 overflow-y-auto p-6;
+    @apply bg-white;
+  }
+
+  .edit-sidebar-footer {
+    @apply border-t border-gray-200 p-6 bg-gray-50;
+    @apply sticky bottom-0;
+  }
+
+  /* Form elements in sidebar - Remove circular references */
+  .edit-sidebar .form-group {
+    @apply mb-6;
+  }
+
+  .edit-sidebar .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+  }
+
+  .edit-sidebar .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply transition-all duration-200;
+  }
+
+  .edit-sidebar .form-textarea {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply transition-all duration-200 resize-none;
+    min-height: 120px;
+  }
+
+  .edit-sidebar .form-select {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply transition-all duration-200 cursor-pointer;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 640px) {
+    .edit-sidebar {
+      @apply max-w-full;
+    }
+  }
+
+  /* Smooth scrolling for sidebar content */
+  .edit-sidebar-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175) transparent;
+  }
+
+  .edit-sidebar-content::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .edit-sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .edit-sidebar-content::-webkit-scrollbar-thumb {
+    background-color: rgb(156 163 175);
+    border-radius: 3px;
+  }
+
+  .edit-sidebar-content::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
+
+  /* Form Groups */
+  .form-group {
+    @apply mb-6;
+  }
+
+  /* Mobile responsive adjustments */
+  @media (max-width: 640px) {
+    .form-input,
+    .form-textarea,
+    .form-select {
+      @apply text-base;
+    }
   }
 }
 
-@media (min-width: 768px) {
-  .mobile-hidden {
-    display: block;
-  }
-  
-  .mobile-only {
-    display: none;
-  }
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-/* Animation for QR scanner */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 @keyframes scan {
   0% { top: 0; }
   50% { top: calc(100% - 2px); }
   100% { top: 0; }
 }
 
+/* Utility Classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* QR Scanner Animation */
+.qr-scanner-line {
+  animation: scan 2s linear infinite;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .mobile-compact {
+    @apply p-4;
+  }
+
+  .mobile-stack {
+    @apply flex flex-col space-y-4;
+  }
+
+  .mobile-hidden {
+    @apply hidden;
+  }
+
+  .mobile-full-width {
+    @apply w-full;
+  }
+
+  /* Ensure touch targets are large enough */
+  .btn {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-hidden {
+    @apply block;
+  }
+
+  .desktop-hidden {
+    @apply hidden;
+  }
+}
+
+/* Print Styles */
 @media print {
   @page {
     size: A4;
     margin: 20mm;
   }
+
   body {
     background: white;
+    font-size: 12pt;
+    line-height: 1.4;
   }
-  .print\:shadow-none {
-    box-shadow: none !important;
+
+  .print-hidden {
+    @apply hidden;
+  }
+
+  .print-only {
+    @apply block;
+  }
+
+  .ticket-card {
+    break-inside: avoid;
+    border: 2px solid #000;
+    background: white;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ccc;
   }
 }
 
-/* 移除 .form-control, .navbar, .a4-size 等自訂 class，改用 Tailwind 工具類於組件中 */
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --primary-600: #0056b3;
+    --neutral-700: #000000;
+    --neutral-200: #cccccc;
+  }
 
-/* Use Tailwind's responsive classes directly in your HTML instead of these custom classes:
-   <div class="p-2 md:p-4"> instead of <div class="mobile-compact">
-   <div class="flex flex-col md:flex-row"> instead of <div class="mobile-stack">
-   <button class="p-3 md:p-2"> instead of <div class="mobile-touch-friendly"><button>
-   <div class="hidden md:block"> instead of <div class="mobile-hidden">
-   <div class="block md:hidden"> instead of <div class="mobile-only">
-*/
+  .btn-primary {
+    @apply border-2 border-black;
+  }
+
+  .card {
+    @apply border-2 border-gray-800;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus Styles for Accessibility */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--neutral-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-500);
+}

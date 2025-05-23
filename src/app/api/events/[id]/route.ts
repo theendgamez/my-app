@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { CacheManager } from '@/lib/cache';
 
 // GET event by ID - public access
 export async function GET(
@@ -14,11 +15,20 @@ export async function GET(
       return NextResponse.json({ error: '必須提供活動ID' }, { status: 400 });
     }
 
+    // Check cache first
+    const cachedEvent = await CacheManager.getEventDetails(id);
+    if (cachedEvent) {
+      return NextResponse.json(cachedEvent);
+    }
+
     const event = await db.events.findById(id);
     
     if (!event) {
       return NextResponse.json({ error: '找不到活動' }, { status: 404 });
     }
+
+    // Cache the event details
+    await CacheManager.cacheEventDetails(id, event);
 
     return NextResponse.json(event);
   } catch (error) {
@@ -65,6 +75,9 @@ export async function DELETE(
     // Delete the event
     await db.events.delete(id);
 
+    // Invalidate cache
+    await CacheManager.invalidateEventCache(id);
+
     return NextResponse.json(
       { message: '活動已成功刪除' },
       { status: 200 }
@@ -109,6 +122,9 @@ export async function PATCH(
     
     // Update the event
     const updatedEvent = await db.events.update(id, updateData);
+
+    // Invalidate cache
+    await CacheManager.invalidateEventCache(id);
 
     return NextResponse.json(updatedEvent);
   } catch (error) {

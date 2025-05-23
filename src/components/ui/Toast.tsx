@@ -46,23 +46,33 @@ const Toast: React.FC<ToastProps> = ({
   };
 
   const styles = {
-    success: 'bg-green-100 border-green-500 text-green-800',
-    info: 'bg-blue-100 border-blue-500 text-blue-800',
-    error: 'bg-red-100 border-red-500 text-red-800',
-    warning: 'bg-yellow-100 border-yellow-500 text-yellow-800',
+    success: 'bg-white border-l-4 border-success-500 text-success-800 shadow-lg',
+    info: 'bg-white border-l-4 border-primary-500 text-primary-800 shadow-lg',
+    error: 'bg-white border-l-4 border-error-500 text-error-800 shadow-lg',
+    warning: 'bg-white border-l-4 border-warning-500 text-warning-800 shadow-lg',
   };
 
   return (
-    <div className={`fixed bottom-4 right-4 z-50 flex items-center p-4 mb-4 max-w-xs border-l-4 rounded-lg shadow-md ${styles[type]}`}>
+    <div className={`
+      relative max-w-sm p-4 rounded-lg backdrop-blur-sm
+      transform transition-all duration-300 ease-in-out
+      ${styles[type]}
+      animate-fade-in
+    `}>
       <div className="flex items-center">
-        <div className="inline-flex items-center justify-center mr-2">
+        <div className="flex-shrink-0 mr-3">
           {icons[type]}
         </div>
-        <div>{message}</div>
+        <div className="flex-1">
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+        <button 
+          onClick={handleClose} 
+          className="ml-4 -mr-1 p-1 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <FiX className="w-4 h-4" />
+        </button>
       </div>
-      <button onClick={handleClose} className="ml-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 hover:bg-opacity-20 hover:bg-gray-400">
-        <FiX className="w-4 h-4" />
-      </button>
     </div>
   );
 };

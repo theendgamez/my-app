@@ -3,8 +3,7 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import Navbar from '@/components/navbar/Navbar';
-import Sidebar from "@/components/admin/Sidebar";
+import AdminPage from '@/components/admin/AdminPage';
 import { useAuth } from '@/context/AuthContext';
 import type { Zone, Events } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -180,265 +179,332 @@ export default function EditEventPage() {
   }
 
   return (
-    <div>
-      <Navbar />
-      <div className="flex">
-        <Sidebar isOpen={false} toggleSidebar={function (): void {
-          throw new Error("Function not implemented.");
-        } } isMobile={false} />
-        <div className="container mx-auto p-8 ml-64">
-          <div className="max-w-[210mm] mx-auto bg-white shadow-lg p-[20mm] min-h-[297mm] print:shadow-none">
-            <h1 className="text-2xl font-bold mb-6">編輯活動</h1>
+    <AdminPage title="編輯活動">
+      <div className="container-responsive">
+        <div className="max-w-4xl mx-auto">
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">編輯活動</h1>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="btn-secondary"
+              >
+                返回列表
+              </button>
+            </div>
             
             {success && (
-              <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                {success}
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium">{success}</p>
+                  </div>
+                </div>
               </div>
             )}
             
             {error && (
-              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                {error}
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium">{error}</p>
+                  </div>
+                </div>
               </div>
             )}
             
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               {/* Hidden field for isDrawMode */}
               <input type="hidden" {...register("isDrawMode")} />
               
-              {/* Event Name */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">活動名稱:</label>
-                <input
-                  {...register("eventName", { required: "活動名稱是必填的" })}
-                  type="text"
-                  className="w-full p-2 border rounded-md"
-                />
-                {errors.eventName && <p className="text-red-500 text-sm mt-1">{errors.eventName.message}</p>}
-              </div>
-
-              {/* Location */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">地點:</label>
-                <input
-                  {...register("location", { required: "地點是必填的" })}
-                  type="text"
-                  className="w-full p-2 border rounded-md"
-                />
-                {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location.message}</p>}
-              </div>
-
-              {/* Event Date */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">活動日期:</label>
-                <input
-                  {...register("eventDate", { required: "活動日期是必填的" })}
-                  type="datetime-local"
-                  className="w-full p-2 border rounded-md"
-                />
-                {errors.eventDate && <p className="text-red-500 text-sm mt-1">{errors.eventDate.message}</p>}
-              </div>
-
-              {/* Description */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">活動描述:</label>
-                <textarea
-                  {...register("description", {
-                    required: "活動描述是必填的",
-                    minLength: { value: 20, message: "描述至少需要20個字符" },
-                    maxLength: { value: 1000, message: "描述不能超過1000個字符" }
-                  })}
-                  rows={6}
-                  className="w-full p-2 border rounded-md resize-y"
-                />
-                {errors.description && (
-                  <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>
-                )}
-              </div>
-
-              {/* Category */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">活動類別:</label>
-                <input
-                  {...register("category")}
-                  type="text"
-                  className="w-full p-2 border rounded-md"
-                />
-              </div>
-
-              {/* Event Status */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">活動狀態:</label>
-                <select
-                  {...register("status")}
-                  className="w-full p-2 border rounded-md"
-                >
-                  <option value="Prepare">準備中</option>
-                  <option value="OnSale">售票中</option>
-                  <option value="SoldOut">售罄</option>
-                </select>
-              </div>
-
-              {/* Draw Mode (disabled in edit mode) */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">售票模式:</label>
-                <div className="flex space-x-4">
-                  <div className={`px-4 py-2 rounded-md ${!isDrawMode
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700'
-                    }`}>
-                    直接售票
+              {/* Basic Information Section */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">基本資訊</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Event Name */}
+                  <div className="form-group">
+                    <label className="form-label">活動名稱 <span className="text-red-500">*</span></label>
+                    <input
+                      {...register("eventName", { required: "活動名稱是必填的" })}
+                      type="text"
+                      className="form-input"
+                      placeholder="請輸入活動名稱"
+                    />
+                    {errors.eventName && <p className="form-error">{errors.eventName.message}</p>}
                   </div>
-                  <div className={`px-4 py-2 rounded-md ${isDrawMode
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700'
-                    }`}>
-                    抽籤模式
+
+                  {/* Location */}
+                  <div className="form-group">
+                    <label className="form-label">活動地點 <span className="text-red-500">*</span></label>
+                    <input
+                      {...register("location", { required: "地點是必填的" })}
+                      type="text"
+                      className="form-input"
+                      placeholder="請輸入活動地點"
+                    />
+                    {errors.location && <p className="form-error">{errors.location.message}</p>}
+                  </div>
+
+                  {/* Event Date */}
+                  <div className="form-group">
+                    <label className="form-label">活動日期 <span className="text-red-500">*</span></label>
+                    <input
+                      {...register("eventDate", { required: "活動日期是必填的" })}
+                      type="datetime-local"
+                      className="form-input"
+                    />
+                    {errors.eventDate && <p className="form-error">{errors.eventDate.message}</p>}
+                  </div>
+
+                  {/* Category */}
+                  <div className="form-group">
+                    <label className="form-label">活動類別</label>
+                    <input
+                      {...register("category")}
+                      type="text"
+                      className="form-input"
+                      placeholder="請輸入活動類別"
+                    />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+
+                {/* Description */}
+                <div className="form-group mt-6">
+                  <label className="form-label">活動描述 <span className="text-red-500">*</span></label>
+                  <textarea
+                    {...register("description", {
+                      required: "活動描述是必填的",
+                      minLength: { value: 20, message: "描述至少需要20個字符" },
+                      maxLength: { value: 1000, message: "描述不能超過1000個字符" }
+                    })}
+                    rows={6}
+                    className="form-textarea"
+                    placeholder="請詳細描述活動內容..."
+                  />
+                  {errors.description && (
+                    <p className="form-error">{errors.description.message}</p>
+                  )}
+                </div>
+
+                {/* Event Status */}
+                <div className="form-group">
+                  <label className="form-label">活動狀態</label>
+                  <select
+                    {...register("status")}
+                    className="form-select"
+                  >
+                    <option value="Prepare">準備中</option>
+                    <option value="OnSale">售票中</option>
+                    <option value="SoldOut">售罄</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Ticket Sales Mode Section */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">售票模式</h3>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className={`
+                    flex-1 p-4 rounded-lg border-2 text-center cursor-not-allowed
+                    ${!isDrawMode
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-500'
+                    }
+                  `}>
+                    <div className="font-medium">直接售票</div>
+                    <div className="text-sm mt-1">立即開放購買</div>
+                  </div>
+                  <div className={`
+                    flex-1 p-4 rounded-lg border-2 text-center cursor-not-allowed
+                    ${isDrawMode
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-500'
+                    }
+                  `}>
+                    <div className="font-medium">抽籤模式</div>
+                    <div className="text-sm mt-1">報名後進行抽籤</div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mt-3">
+                  <svg className="inline w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
                   售票模式無法在編輯時更改
                 </p>
               </div>
 
-              {/* Registration Period */}
-              {isDrawMode ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
+              {/* Date Settings Section */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">日期設定</h3>
+                {isDrawMode ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">報名開始日期:</label>
+                      <label className="form-label">報名開始日期 <span className="text-red-500">*</span></label>
                       <input
                         {...register("registerDate", { required: "報名開始日期是必填的" })}
                         type="datetime-local"
-                        className="w-full p-2 border rounded-md"
+                        className="form-input"
                       />
-                      {errors.registerDate && <p className="text-red-500 text-sm mt-1">{errors.registerDate.message}</p>}
+                      {errors.registerDate && <p className="form-error">{errors.registerDate.message}</p>}
                     </div>
                     <div className="form-group">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">報名結束日期:</label>
+                      <label className="form-label">報名結束日期 <span className="text-red-500">*</span></label>
                       <input
                         {...register("endregisterDate", { required: "報名結束日期是必填的" })}
                         type="datetime-local"
-                        className="w-full p-2 border rounded-md"
+                        className="form-input"
                       />
-                      {errors.endregisterDate && <p className="text-red-500 text-sm mt-1">{errors.endregisterDate.message}</p>}
+                      {errors.endregisterDate && <p className="form-error">{errors.endregisterDate.message}</p>}
+                    </div>
+                    <div className="form-group md:col-span-2">
+                      <label className="form-label">抽籤日期 <span className="text-red-500">*</span></label>
+                      <input
+                        {...register("drawDate", { required: "抽籤日期是必填的" })}
+                        type="datetime-local"
+                        className="form-input"
+                      />
+                      {errors.drawDate && <p className="form-error">{errors.drawDate.message}</p>}
                     </div>
                   </div>
-
+                ) : (
                   <div className="form-group">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">抽籤日期:</label>
+                    <label className="form-label">開售日期 <span className="text-red-500">*</span></label>
                     <input
-                      {...register("drawDate", { required: "抽籤日期是必填的" })}
+                      {...register("onSaleDate", { required: "開售日期是必填的" })}
                       type="datetime-local"
-                      className="w-full p-2 border rounded-md"
+                      className="form-input"
                     />
-                    {errors.drawDate && <p className="text-red-500 text-sm mt-1">{errors.drawDate.message}</p>}
                   </div>
-                </>
-              ) : (
-                <div className="form-group">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">開售日期:</label>
-                  <input
-                    {...register("onSaleDate", { required: "開售日期是必填的" })}
-                    type="datetime-local"
-                    className="w-full p-2 border rounded-md"
-                  />
-                </div>
-              )}
-
-              {/* Zone Fields - Improved UI */}
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">區域設定:</label>
-                {fields.length === 0 && (
-                  <p className="text-sm text-gray-500 mb-2">尚未添加任何區域，請點擊下方按鈕添加區域。</p>
                 )}
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex flex-wrap gap-2 p-3 mb-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="w-full md:w-auto flex-1">
-                      <label className="text-xs text-gray-500">區域名稱</label>
-                      <input
-                        {...register(`zones.${index}.name`, { required: "區域名稱是必填的" })}
-                        placeholder="如：A區、VIP區"
-                        className="w-full p-2 border rounded-md"
-                      />
-                      {errors.zones?.[index]?.name && (
-                        <p className="text-red-500 text-xs">{errors.zones[index].name?.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="w-full md:w-auto flex-1">
-                      <label className="text-xs text-gray-500">票價</label>
-                      <input
-                        {...register(`zones.${index}.price`, { required: "票價是必填的" })}
-                        placeholder="票價"
-                        type="number"
-                        className="w-full p-2 border rounded-md"
-                      />
-                      {errors.zones?.[index]?.price && (
-                        <p className="text-red-500 text-xs">{errors.zones[index].price?.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="w-full md:w-auto flex-1">
-                      <label className="text-xs text-gray-500">座位數量</label>
-                      <input
-                        {...register(`zones.${index}.zoneQuantity`, { 
-                          required: "座位數量是必填的",
-                          valueAsNumber: true 
-                        })}
-                        placeholder="座位數量"
-                        type="number"
-                        className="w-full p-2 border rounded-md"
-                      />
-                      {errors.zones?.[index]?.zoneQuantity && (
-                        <p className="text-red-500 text-xs">{errors.zones[index].zoneQuantity?.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="w-full flex justify-end">
-                      <button 
-                        type="button" 
-                        onClick={() => remove(index)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        移除區域
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                
-                <button 
-                  type="button" 
-                  onClick={() => append({ name: "", price: "", zoneQuantity: 0, max: "" })}
-                  className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
-                >
-                  + 添加新區域
-                </button>
               </div>
 
-              <div className="flex justify-end mt-8">
+              {/* Zone Settings Section */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">區域設定</h3>
+                  <button 
+                    type="button" 
+                    onClick={() => append({ name: "", price: "", zoneQuantity: 0, max: "" })}
+                    className="btn-primary"
+                  >
+                    + 添加區域
+                  </button>
+                </div>
+                
+                {fields.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A9.971 9.971 0 0124 24c4.004 0 7.625 2.356 9.287 6.286" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p className="mt-2">尚未添加任何區域</p>
+                    <p className="text-sm">請點擊上方按鈕添加票價區域</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {fields.map((field, index) => (
+                      <div key={field.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="form-group">
+                            <label className="form-label">區域名稱 <span className="text-red-500">*</span></label>
+                            <input
+                              {...register(`zones.${index}.name`, { required: "區域名稱是必填的" })}
+                              placeholder="如：A區、VIP區"
+                              className="form-input"
+                            />
+                            {errors.zones?.[index]?.name && (
+                              <p className="form-error">{errors.zones[index].name?.message}</p>
+                            )}
+                          </div>
+                          
+                          <div className="form-group">
+                            <label className="form-label">票價 (HKD$) <span className="text-red-500">*</span></label>
+                            <input
+                              {...register(`zones.${index}.price`, { required: "票價是必填的" })}
+                              placeholder="1000"
+                              type="number"
+                              className="form-input"
+                            />
+                            {errors.zones?.[index]?.price && (
+                              <p className="form-error">{errors.zones[index].price?.message}</p>
+                            )}
+                          </div>
+                          
+                          <div className="form-group">
+                            <label className="form-label">座位數量 <span className="text-red-500">*</span></label>
+                            <input
+                              {...register(`zones.${index}.zoneQuantity`, { 
+                                required: "座位數量是必填的",
+                                valueAsNumber: true 
+                              })}
+                              placeholder="100"
+                              type="number"
+                              className="form-input"
+                            />
+                            {errors.zones?.[index]?.zoneQuantity && (
+                              <p className="form-error">{errors.zones[index].zoneQuantity?.message}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-end mt-4">
+                          <button 
+                            type="button" 
+                            onClick={() => remove(index)}
+                            className="btn-danger"
+                          >
+                            移除區域
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="mr-4 px-6 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded"
+                  className="btn-secondary order-2 sm:order-1"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`px-6 py-2 ${isSubmitting
-                    ? "bg-gray-400"
-                    : "bg-blue-500 hover:bg-blue-600"
-                    } text-white rounded transition-colors`}
+                  className="btn-primary order-1 sm:order-2 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? "更新中..." : "更新活動"}
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSpinner size="small" color="white" />
+                      更新中...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      更新活動
+                    </>
+                  )}
                 </button>
               </div>
             </form>
           </div>
         </div>
       </div>
-    </div>
+    </AdminPage>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { CacheManager } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check cache first
+    const cachedStats = await CacheManager.getDashboardStats();
+    if (cachedStats) {
+      return NextResponse.json(cachedStats);
+    }
+
     // Get total events count
     const allEvents = await db.events.findMany();
     const totalEvents = allEvents.length;
@@ -71,26 +78,48 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching registrations:', error);
     }
 
-    // Get payments info
+    // Get payments info and calculate revenue in one query
     let pendingPayments = 0;
     let completedPayments = 0;
+    let totalRevenue = 0;
     try {
       const payments = await db.payments.findMany();
       pendingPayments = payments.filter(p => p.status === 'pending').length;
       completedPayments = payments.filter(p => p.status === 'completed').length;
+      totalRevenue = payments
+        .filter(p => p.status === 'completed')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
     } catch (error) {
       console.error('Error fetching payments:', error);
     }
 
-    // Return dashboard data
-    return NextResponse.json({
+    // Get active tickets
+    let activeTickets = 0;
+    try {
+      if (db.tickets && typeof db.tickets.findMany === 'function') {
+        const tickets = await db.tickets.findMany();
+        activeTickets = tickets.filter(t => t.status === 'active').length;
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+    }
+
+    const dashboardStats = {
       totalEvents,
       activeEvents,
       totalUsers,
       totalRegistrations,
       pendingPayments,
-      completedPayments
-    });
+      completedPayments,
+      totalRevenue,
+      activeTickets
+    };
+
+    // Cache the stats
+    await CacheManager.cacheDashboardStats(dashboardStats);
+
+    // Return dashboard data
+    return NextResponse.json(dashboardStats);
   } catch (error) {
     console.error('Error in dashboard API:', error);
     return NextResponse.json(

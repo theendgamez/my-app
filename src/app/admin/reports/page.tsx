@@ -6,7 +6,14 @@ import { adminFetch } from '@/utils/adminApi';
 import { Payment } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 
-
+// Define a response type instead of using 'any'
+interface PaymentResponse {
+  success?: boolean;
+  data?: {
+    payments?: Payment[];
+  } | Payment[];
+  payments?: Payment[];
+}
 
 interface ReportStats {
   totalRevenue: number;
@@ -46,31 +53,65 @@ export default function AdminReportsPage() {
         setLoading(true);
         setError(null);
         
-        // Fetch all payments
-        const data = await adminFetch<{ payments: Payment[] }>('/api/admin/payments');
+        // Get the current date info (needed for both branches)
+        const today = new Date();
+        const thisMonth = today.getMonth();
+        const thisYear = today.getFullYear();
+        const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+        const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
         
-        if (data && Array.isArray(data.payments)) {
-          // Calculate basic report statistics from payment data
-          const payments = data.payments;
-          const today = new Date();
-          const thisMonth = today.getMonth();
-          const thisYear = today.getFullYear();
-          const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
-          const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+        // Fetch all payments with proper typing
+        const response = await adminFetch<PaymentResponse>('/api/admin/payments');
+        
+        // Log the actual response structure for debugging
+        console.log("Payment API response structure:", JSON.stringify(response).substring(0, 200) + "...");
+        
+        // More flexible payment data extraction
+        let paymentsData: Payment[] = [];
+        
+        if (response && 'success' in response && response.success && response.data) {
+          // New ApiResponseBuilder format
+          if (
+            typeof response.data === 'object' &&
+            !Array.isArray(response.data) &&
+            response.data !== null &&
+            'payments' in response.data &&
+            Array.isArray((response.data as { payments?: Payment[] }).payments)
+          ) {
+            paymentsData = (response.data as { payments: Payment[] }).payments;
+          } else if (Array.isArray(response.data)) {
+            // Sometimes data might be the array directly
+            paymentsData = response.data;
+          }
+        } else if (response && 'payments' in response && Array.isArray(response.payments)) {
+          // Old format fallback
+          paymentsData = response.payments;
+        } else if (Array.isArray(response)) {
+          // Direct array response
+          paymentsData = response;
+        } else {
+          // If we still can't parse it, set dummy data and show an error
+          console.error('Unexpected payment data format:', response);
+          setError('無法解析付款數據格式。請聯繫技術支持。');
+          paymentsData = [];
+        }
+        
+        if (paymentsData.length > 0) {
+          // Calculate stats as before
           
           // Calculate revenue metrics
-          const totalRevenue = payments
+          const totalRevenue = paymentsData
             .filter(p => p.status === 'completed')
             .reduce((sum, p) => sum + (p.amount || 0), 0);
           
-          const thisMonthRevenue = payments
+          const thisMonthRevenue = paymentsData
             .filter(p => p.status === 'completed' && 
                    p.createdAt &&
                    new Date(p.createdAt).getMonth() === thisMonth &&
                    new Date(p.createdAt).getFullYear() === thisYear)
             .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-          const lastMonthRevenue = payments
+          const lastMonthRevenue = paymentsData
             .filter(p => p.status === 'completed' && 
                    p.createdAt &&
                    new Date(p.createdAt).getMonth() === lastMonth &&
@@ -79,17 +120,17 @@ export default function AdminReportsPage() {
             
           // Count payments by status
           const paymentsByStatus = {
-            completed: payments.filter(p => p.status === 'completed').length,
-            pending: payments.filter(p => p.status === 'pending').length,
-            failed: payments.filter(p => p.status === 'failed').length,
-            refunded: payments.filter(p => p.status === 'refunded').length
+            completed: paymentsData.filter(p => p.status === 'completed').length,
+            pending: paymentsData.filter(p => p.status === 'pending').length,
+            failed: paymentsData.filter(p => p.status === 'failed').length,
+            refunded: paymentsData.filter(p => p.status === 'refunded').length
           };
           
           // Generate monthly payment data for the last 6 months
           const paymentsByMonth = Array(6).fill(0).map((_, i) => {
             const monthIndex = (thisMonth - i + 12) % 12;
             const monthYear = thisMonth - i < 0 ? thisYear - 1 : thisYear;
-            const revenue = payments
+            const revenue = paymentsData
               .filter(p => p.status === 'completed' && 
                      p.createdAt &&
                      new Date(p.createdAt).getMonth() === monthIndex &&
@@ -113,7 +154,30 @@ export default function AdminReportsPage() {
             paymentsByMonth
           });
         } else {
-          throw new Error('獲取到的支付數據格式不正確');
+          // No data available, set default stats
+          // Use the monthNames array here as well
+          const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', 
+                            '七月', '八月', '九月', '十月', '十一月', '十二月'];
+                            
+          setStats({
+            totalRevenue: 0,
+            thisMonthRevenue: 0,
+            lastMonthRevenue: 0,
+            paymentsByStatus: {
+              completed: 0,
+              pending: 0,
+              failed: 0,
+              refunded: 0
+            },
+            paymentsByMonth: Array(6).fill(0).map((_, i) => {
+              const monthIndex = (thisMonth - i + 12) % 12;
+              const monthYear = thisMonth - i < 0 ? thisYear - 1 : thisYear;
+              return {
+                month: `${monthNames[monthIndex]} ${monthYear}`,
+                revenue: 0
+              };
+            }).reverse()
+          });
         }
       } catch (err) {
         console.error('Error fetching report data:', err);

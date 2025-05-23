@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { CacheManager } from '@/lib/cache';
 
 export async function GET(
   request: NextRequest,
@@ -54,9 +55,19 @@ export async function GET(
       }, { status: 401 });
     }
 
+    // Check cache first
+    const cachedTickets = await CacheManager.getUserTickets(userId);
+    if (cachedTickets) {
+      console.log(`[Tickets API] Returned ${cachedTickets.length} cached tickets for user ${userId}`);
+      return NextResponse.json(cachedTickets);
+    }
+
     // Get tickets for the user
     const tickets = await db.tickets.findByUser(userId);
     console.log(`[Tickets API] Found ${tickets.length} tickets for user ${userId}`);
+    
+    // Cache the tickets
+    await CacheManager.cacheUserTickets(userId, tickets);
     
     return NextResponse.json(tickets);
   } catch (error) {

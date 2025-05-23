@@ -34,7 +34,7 @@ interface SidebarProps {
   toggleSidebar: () => void;
   isMobile: boolean;
 }
-
+// ...other imports
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) => {
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);

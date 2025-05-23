@@ -40,6 +40,7 @@ export async function adminFetch<T>(
   }
   
   try {
+    console.log(`Fetching ${apiUrl}...`);
     const response = await fetch(apiUrl, {
       ...fetchOptions,
       headers,
@@ -77,7 +78,16 @@ export async function adminFetch<T>(
     
     // Return successful response
     const text = await response.text();
-    return text ? JSON.parse(text) : {} as T;
+    try {
+      return text ? JSON.parse(text) : {} as T;
+    } catch (e) {
+      console.error('Error parsing JSON response:', e);
+      console.log('Raw response:', text.substring(0, 200) + '...');
+      return { 
+        error: 'Invalid JSON response', 
+        rawResponse: text.substring(0, 100) + '...' 
+      } as unknown as T;
+    }
   } catch (error) {
     console.error('API call error:', error);
     return { 

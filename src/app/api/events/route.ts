@@ -5,6 +5,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { Events } from '@/types';
 import path from 'path';
 import { ApiResponseBuilder } from '@/lib/apiResponse';
+import { CacheManager } from '@/lib/cache';
 
 export async function GET(request: Request) {
   try {
@@ -14,6 +15,14 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const category = searchParams.get('category');
     const status = searchParams.get('status');
+    
+    // Check cache first for simple event listings (no filters)
+    if (!searchParams.get('page') && !searchParams.get('limit') && !category && !status) {
+      const cachedEvents = await CacheManager.getEventListings();
+      if (cachedEvents) {
+        return NextResponse.json(cachedEvents);
+      }
+    }
     
     // Build filter
     const filter: Partial<Events> = {};
@@ -28,6 +37,11 @@ export async function GET(request: Request) {
       limit,
       { eventDate: 'asc' } // Sort by event date
     );
+    
+    // Cache simple event listings
+    if (!searchParams.get('page') && !searchParams.get('limit') && !category && !status) {
+      await CacheManager.cacheEventListings(result.data as Events[]);
+    }
     
     // For backward compatibility, return just the events array if no pagination params
     if (!searchParams.get('page') && !searchParams.get('limit')) {
@@ -125,6 +139,10 @@ export async function POST(request: Request) {
     };
 
     await db.events.create(eventData);
+    
+    // Invalidate events cache after creating new event
+    await CacheManager.invalidateEventCache();
+    
     return NextResponse.json({ message: '活動建立成功', event: eventData }, { status: 201 });
 
   } catch (error) {

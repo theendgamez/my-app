@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { decryptData, isEncrypted } from '@/utils/encryption';
 import { rateLimitConfigs, InputValidator } from '@/lib/security';
+import { CacheManager } from '@/lib/cache';
 
 export async function POST(request: NextRequest) {
   // Get client IP for rate limiting
@@ -128,59 +129,76 @@ export async function POST(request: NextRequest) {
       });
 
       // Update event zone remaining tickets
-      if (zoneDetails.zoneQuantity !== undefined) {
-        // BUGFIX: Get the current event to have the most up-to-date zone quantity
-        const currentEvent = await db.events.findById(booking.eventId);
-        if (!currentEvent) {
-          return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
+      try {
+        if (zoneDetails.zoneQuantity !== undefined) {
+          // BUGFIX: Get the current event to have the most up-to-date zone quantity
+          const currentEvent = await db.events.findById(booking.eventId);
+          if (!currentEvent) {
+            return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
+          }
+          
+          // Find the current zone details with up-to-date quantity
+          const currentZoneDetails = currentEvent.zones?.find(z => z.name === booking.zone);
+          if (!currentZoneDetails) {
+            return NextResponse.json({ error: '找不到相關座位區域' }, { status: 404 });
+          }
+          
+          // Calculate the new remaining quantity
+          const currentQuantity = Number(currentZoneDetails.zoneQuantity || 0);
+          const newQuantity = Math.max(0, currentQuantity - booking.quantity);
+          
+          // Update with the new calculated quantity
+          await db.events.updateZoneRemaining(
+            booking.eventId,
+            booking.zone,
+            newQuantity
+          );
+          
+          console.log(`Zone quantity updated: ${booking.zone} in event ${booking.eventId}: ${currentQuantity} -> ${newQuantity}`);
+          
+          // Invalidate event cache after quantity update
+          await CacheManager.invalidateEventCache(booking.eventId);
         }
-        
-        // Find the current zone details with up-to-date quantity
-        const currentZoneDetails = currentEvent.zones?.find(z => z.name === booking.zone);
-        if (!currentZoneDetails) {
-          return NextResponse.json({ error: '找不到相關座位區域' }, { status: 404 });
-        }
-        
-        // Calculate the new remaining quantity
-        const currentQuantity = Number(currentZoneDetails.zoneQuantity || 0);
-        const newQuantity = Math.max(0, currentQuantity - booking.quantity);
-        
-        // Update with the new calculated quantity
-        await db.events.updateZoneRemaining(
-          booking.eventId,
-          booking.zone,
-          newQuantity
-        );
-        
-        console.log(`Zone quantity updated: ${booking.zone} in event ${booking.eventId}: ${currentQuantity} -> ${newQuantity}`);
-      }
 
-      // Generate tickets for the booking
-      for (let i = 0; i < booking.quantity; i++) {
-        const ticketId = uuidv4();
-        await db.tickets.create({
-          ticketId,
-          eventId: booking.eventId,
-          eventName: event.eventName,
-          eventDate: event.eventDate,
-          eventLocation: event.location || '',
-          userId,
-          userRealName: userRealName,
-          qrCode: ticketId,
-          zone: booking.zone,
-          seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
-          price: String(ticketPrice),
-          purchaseDate: now,
-          status: 'sold',
-          paymentId,
-          lastRefreshed: '',
-          nextRefresh: '',
-          lastVerified: null,
-          verificationCount: 0,
-          transferredAt: null,
-          transferredFrom: null,
-          adminNotes: ''
-        });
+        // Generate tickets for the booking
+        for (let i = 0; i < booking.quantity; i++) {
+          const ticketId = uuidv4();
+          await db.tickets.create({
+            ticketId,
+            eventId: booking.eventId,
+            eventName: event.eventName,
+            eventDate: event.eventDate,
+            eventLocation: event.location || '',
+            userId,
+            userRealName: userRealName,
+            qrCode: ticketId,
+            zone: booking.zone,
+            seatNumber: `${booking.zone}-${Math.floor(Math.random() * 1000) + 1}`,
+            price: String(ticketPrice),
+            purchaseDate: now,
+            status: 'sold',
+            paymentId,
+            lastRefreshed: '',
+            nextRefresh: '',
+            lastVerified: null,
+            verificationCount: 0,
+            transferredAt: null,
+            transferredFrom: null,
+            adminNotes: ''
+          });
+        }
+
+        // Invalidate user tickets cache after creating new tickets
+        await CacheManager.invalidateUserCache(booking.userId);
+        
+        // Invalidate dashboard cache as stats have changed
+        await CacheManager.invalidateAdminCache();
+      } catch (error) {
+        console.error('Error updating event zone or generating tickets:', error);
+        return NextResponse.json(
+          { error: '處理訂單時出錯', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
       }
 
       // Return successful payment response
