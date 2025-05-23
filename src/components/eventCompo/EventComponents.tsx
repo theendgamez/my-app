@@ -81,6 +81,24 @@ interface EventsProps {
 }
 
 export default function Events({ events }: EventsProps) {
+  // Add safety check to ensure events is an array
+  if (!Array.isArray(events)) {
+    console.error('Events prop is not an array:', events);
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-600">無法顯示活動列表：數據格式錯誤</p>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-600">目前沒有活動</p>
+      </div>
+    );
+  }
+
   return (
     <EventList>
       {events.map((evt) => (

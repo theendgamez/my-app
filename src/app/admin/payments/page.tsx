@@ -29,6 +29,34 @@ interface PaymentStats {
   totalAmount: number;
 }
 
+interface ApiResponseMeta {
+  timestamp: string;
+  requestId: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+// Define fallback response type for backward compatibility
+interface LegacyPaymentsResponse {
+  payments: Payment[];
+}
+  
+interface EventPaymentGroup {
+  eventId: string;
+  eventName: string;
+  totalPayments: number;
+  totalAmount: number;
+  completedPayments: number;
+  pendingPayments: number;
+  failedPayments: number;
+  refundedPayments: number;
+  payments: Payment[];
+}
+
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
@@ -46,6 +74,9 @@ export default function AdminPaymentsPage() {
     failed: 0,
     totalAmount: 0
   });
+  const [groupedPayments, setGroupedPayments] = useState<EventPaymentGroup[]>([]);
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
 
   // Fetch payments data
   useEffect(() => {
@@ -54,25 +85,38 @@ export default function AdminPaymentsPage() {
         setLoading(true);
         setError(null);
         
-        const data = await adminFetch<{ payments: Payment[] }>('/api/admin/payments');
+        const response = await adminFetch<{ 
+          success: boolean; 
+          data: { payments: Payment[] }; 
+          meta?: ApiResponseMeta 
+        } | LegacyPaymentsResponse>('/api/admin/payments');
         
-        if (data && Array.isArray(data.payments)) {
-          setPayments(data.payments);
-          setFilteredPayments(data.payments);
-          
-          // Calculate stats
-          const statsData: PaymentStats = {
-            total: data.payments.length,
-            completed: data.payments.filter(p => p.status === 'completed').length,
-            pending: data.payments.filter(p => p.status === 'pending').length,
-            failed: data.payments.filter(p => p.status === 'failed').length,
-            totalAmount: data.payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
-          };
-          
-          setStats(statsData);
+        // Handle the new ApiResponseBuilder format
+        let paymentsData: Payment[] = [];
+        
+        if (response && 'success' in response && response.success && response.data && Array.isArray(response.data.payments)) {
+          // New ApiResponseBuilder format
+          paymentsData = response.data.payments;
+        } else if (response && 'payments' in response && Array.isArray(response.payments)) {
+          // Old format fallback
+          paymentsData = response.payments;
         } else {
           throw new Error('獲取到的付款數據格式不正確');
         }
+        
+        setPayments(paymentsData);
+        setFilteredPayments(paymentsData);
+        
+        // Calculate stats
+        const statsData: PaymentStats = {
+          total: paymentsData.length,
+          completed: paymentsData.filter(p => p.status === 'completed').length,
+          pending: paymentsData.filter(p => p.status === 'pending').length,
+          failed: paymentsData.filter(p => p.status === 'failed').length,
+          totalAmount: paymentsData.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+        };
+        
+        setStats(statsData);
       } catch (err) {
         console.error('Error fetching payments:', err);
         setError(err instanceof Error ? err.message : '獲取付款記錄時發生錯誤');
@@ -83,6 +127,53 @@ export default function AdminPaymentsPage() {
 
     fetchPayments();
   }, []);
+
+  // Group payments by event
+  useEffect(() => {
+    if (payments.length > 0) {
+      const grouped = payments.reduce((acc, payment) => {
+        const eventId = payment.eventId || 'unknown';
+        const eventName = payment.eventName || '未知活動';
+        
+        if (!acc[eventId]) {
+          acc[eventId] = {
+            eventId,
+            eventName,
+            totalPayments: 0,
+            totalAmount: 0,
+            completedPayments: 0,
+            pendingPayments: 0,
+            failedPayments: 0,
+            refundedPayments: 0,
+            payments: []
+          };
+        }
+        
+        acc[eventId].payments.push(payment);
+        acc[eventId].totalPayments += 1;
+        acc[eventId].totalAmount += payment.amount || 0;
+        
+        switch (payment.status) {
+          case 'completed':
+            acc[eventId].completedPayments += 1;
+            break;
+          case 'pending':
+            acc[eventId].pendingPayments += 1;
+            break;
+          case 'failed':
+            acc[eventId].failedPayments += 1;
+            break;
+          case 'refunded':
+            acc[eventId].refundedPayments += 1;
+            break;
+        }
+        
+        return acc;
+      }, {} as Record<string, EventPaymentGroup>);
+      
+      setGroupedPayments(Object.values(grouped));
+    }
+  }, [payments]);
 
   // Filter and sort payments
   useEffect(() => {
@@ -155,6 +246,16 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const toggleEventExpansion = (eventId: string) => {
+    const newExpanded = new Set(expandedEvents);
+    if (newExpanded.has(eventId)) {
+      newExpanded.delete(eventId);
+    } else {
+      newExpanded.add(eventId);
+    }
+    setExpandedEvents(newExpanded);
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'completed':
@@ -219,6 +320,29 @@ export default function AdminPaymentsPage() {
             />
           </div>
           <div className="flex gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-md p-1">
+              <button
+                onClick={() => setViewMode('grouped')}
+                className={`px-3 py-1 rounded text-sm ${
+                  viewMode === 'grouped' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                按活動分組
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 rounded text-sm ${
+                  viewMode === 'list' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                列表檢視
+              </button>
+            </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -244,135 +368,280 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* Payments Table */}
-      <div className="bg-white shadow overflow-hidden rounded-lg">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('paymentId')}
-                >
-                  支付ID
-                  {sortField === 'paymentId' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('userName')}
-                >
-                  用戶
-                  {sortField === 'userName' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('eventName')}
-                >
-                  活動
-                  {sortField === 'eventName' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('amount')}
-                >
-                  金額
-                  {sortField === 'amount' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('status')}
-                >
-                  狀態
-                  {sortField === 'status' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('createdAt')}
-                >
-                  建立時間
-                  {sortField === 'createdAt' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPayments.length > 0 ? (
-                filteredPayments.map((payment) => (
-                  <tr key={payment.paymentId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{payment.paymentId?.substring(0, 8) || 'N/A'}...</div>
-                      <div className="text-xs text-gray-500">訂單: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{payment.userName || '未知用戶'}</div>
-                      <div className="text-xs text-gray-500">{payment.userId ? payment.userId.substring(0, 8) + '...' : 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{payment.eventName || '未知活動'}</div>
-                      <div className="text-xs text-gray-500">{payment.eventId ? payment.eventId.substring(0, 8) + '...' : 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(payment.status)}`}>
-                        {payment.status === 'completed' && '已完成'}
-                        {payment.status === 'pending' && '處理中'}
-                        {payment.status === 'failed' && '失敗'}
-                        {payment.status === 'refunded' && '已退款'}
-                        {!['completed', 'pending', 'failed', 'refunded'].includes(payment.status) && payment.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(payment.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link
-                        href={`/admin/payments/${payment.paymentId}`}
-                        className="text-indigo-600 hover:text-indigo-900 mr-2"
+      {/* Payments Display */}
+      {viewMode === 'grouped' ? (
+        /* Grouped View */
+        <div className="space-y-4">
+          {groupedPayments.length > 0 ? (
+            groupedPayments.map((eventGroup) => (
+              <div key={eventGroup.eventId} className="bg-white rounded-lg shadow overflow-hidden">
+                {/* Event Header */}
+                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {eventGroup.eventName}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        活動ID: {eventGroup.eventId.substring(0, 8)}...
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleEventExpansion(eventGroup.eventId)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      <span>查看詳情</span>
+                      <svg 
+                        className={`w-4 h-4 transition-transform ${
+                          expandedEvents.has(eventGroup.eventId) ? 'rotate-180' : ''
+                        }`}
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
                       >
-                        查看詳情
-                      </Link>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Event Statistics */}
+                <div className="px-6 py-4 bg-blue-50 border-b border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600">{eventGroup.totalPayments}</div>
+                      <div className="text-sm text-gray-600">總交易數</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">{eventGroup.completedPayments}</div>
+                      <div className="text-sm text-gray-600">已完成</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-600">{eventGroup.pendingPayments}</div>
+                      <div className="text-sm text-gray-600">處理中</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">{eventGroup.failedPayments}</div>
+                      <div className="text-sm text-gray-600">失敗</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-purple-600">{formatCurrency(eventGroup.totalAmount)}</div>
+                      <div className="text-sm text-gray-600">總收入</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expandable Payment Details */}
+                {expandedEvents.has(eventGroup.eventId) && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            支付ID
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            用戶
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            金額
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            狀態
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            創建時間
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            操作
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {eventGroup.payments.map((payment) => (
+                          <tr key={payment.paymentId} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {payment.paymentId?.substring(0, 8) || 'N/A'}...
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                訂單: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : 'N/A'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{payment.userName || '未知用戶'}</div>
+                              <div className="text-xs text-gray-500">
+                                {payment.userId ? payment.userId.substring(0, 8) + '...' : 'N/A'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(payment.status)}`}>
+                                {payment.status === 'completed' && '已完成'}
+                                {payment.status === 'pending' && '處理中'}
+                                {payment.status === 'failed' && '失敗'}
+                                {payment.status === 'refunded' && '已退款'}
+                                {!['completed', 'pending', 'failed', 'refunded'].includes(payment.status) && payment.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(payment.createdAt)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <Link
+                                href={`/admin/payments/${payment.paymentId}`}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                詳情
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="bg-white p-6 rounded-lg shadow text-center">
+              <p className="text-gray-500">沒有找到支付記錄</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Original List View */
+        <div className="bg-white shadow overflow-hidden rounded-lg">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('paymentId')}
+                  >
+                    支付ID
+                    {sortField === 'paymentId' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('userName')}
+                  >
+                    用戶
+                    {sortField === 'userName' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('eventName')}
+                  >
+                    活動
+                    {sortField === 'eventName' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('amount')}
+                  >
+                    金額
+                    {sortField === 'amount' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('status')}
+                  >
+                    狀態
+                    {sortField === 'status' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    建立時間
+                    {sortField === 'createdAt' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredPayments.length > 0 ? (
+                  filteredPayments.map((payment) => (
+                    <tr key={payment.paymentId} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{payment.paymentId?.substring(0, 8) || 'N/A'}...</div>
+                        <div className="text-xs text-gray-500">訂單: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{payment.userName || '未知用戶'}</div>
+                        <div className="text-xs text-gray-500">{payment.userId ? payment.userId.substring(0, 8) + '...' : 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{payment.eventName || '未知活動'}</div>
+                        <div className="text-xs text-gray-500">{payment.eventId ? payment.eventId.substring(0, 8) + '...' : 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(payment.status)}`}>
+                          {payment.status === 'completed' && '已完成'}
+                          {payment.status === 'pending' && '處理中'}
+                          {payment.status === 'failed' && '失敗'}
+                          {payment.status === 'refunded' && '已退款'}
+                          {!['completed', 'pending', 'failed', 'refunded'].includes(payment.status) && payment.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(payment.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <Link
+                          href={`/admin/payments/${payment.paymentId}`}
+                          className="text-indigo-600 hover:text-indigo-900 mr-2"
+                        >
+                          查看詳情
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500 text-sm">
+                      {loading ? (
+                        <div className="flex justify-center py-4">
+                          <LoadingSpinner size="medium" />
+                        </div>
+                      ) : (
+                        '沒有找到支付記錄'
+                      )}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 text-sm">
-                    {loading ? (
-                      <div className="flex justify-center py-4">
-                        <LoadingSpinner size="medium" />
-                      </div>
-                    ) : (
-                      '沒有找到支付記錄'
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </AdminPage>
   );
 }

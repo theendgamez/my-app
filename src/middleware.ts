@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 // Import jose instead of using crypto-dependent verification
 import { jwtVerify } from 'jose';
+import { rateLimitConfigs, securityHeaders } from '@/lib/security';
 
 // Define admin and protected routes patterns
 const adminRoutePattern = /^\/admin(?:\/|$)/;
@@ -60,6 +61,32 @@ export async function middleware(request: NextRequest) {
   // Clone the response at the start to prepare for modifications
   const response = NextResponse.next();
   
+  // Add security headers to all responses
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  // Get client IP for rate limiting
+  const clientIP = request.headers.get('x-forwarded-for') || 
+                   request.headers.get('x-real-ip') || 
+                   'unknown';
+  
+  // Apply rate limiting to API routes
+  if (pathname.startsWith('/api/')) {
+    const rateLimit = rateLimitConfigs.api.check(`api:${clientIP}`);
+    if (!rateLimit.allowed) {
+      return new NextResponse(rateLimit.message, { status: 429 });
+    }
+    
+    // Apply stricter rate limiting to auth endpoints
+    if (pathname.startsWith('/api/auth/')) {
+      const authRateLimit = rateLimitConfigs.auth.check(`auth:${clientIP}`);
+      if (!authRateLimit.allowed) {
+        return new NextResponse(authRateLimit.message, { status: 429 });
+      }
+    }
+  }
+
   // Security checks for all routes
   if (pathTraversalPattern.test(pathname)) {
     return new NextResponse('Bad Request', { status: 400 });

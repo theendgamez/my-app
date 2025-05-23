@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { DatabaseOptimizer } from '@/lib/dbOptimization';
 
 interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -38,16 +38,22 @@ export async function GET(): Promise<NextResponse> {
     uptime: process.uptime()
   };
   
-  // Test database connectivity
+  // Test database connectivity with optimized query
   try {
     const dbStartTime = Date.now();
-    // Simple DB operation to check health
-    await db.users.findMany();
+    // Use a more efficient health check with limited results
+    const healthCheckResult = await DatabaseOptimizer.findWithPagination(
+      'users',
+      {},
+      1,
+      1 // Just get 1 record to test connectivity
+    );
     databaseResponseTime = Date.now() - dbStartTime;
     
     healthCheck.components.database = {
       status: 'up',
-      responseTimeMs: databaseResponseTime
+      responseTimeMs: databaseResponseTime,
+      details: `${healthCheckResult.total} total records available`
     };
     
     // Add warning if response time is high

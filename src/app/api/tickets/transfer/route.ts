@@ -3,18 +3,27 @@ import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { ticketBlockchain } from '@/lib/blockchain';
 import { decryptData, isEncrypted } from '@/utils/encryption';
+import { ApiResponseBuilder } from '@/lib/apiResponse';
 
 export async function POST(request: NextRequest) {
+  const responseBuilder = new ApiResponseBuilder();
+  
   try {
     const { ticketId, friendId } = await request.json();
     
     // Validate required fields
     if (!ticketId) {
-      return NextResponse.json({ error: '缺少票券ID' }, { status: 400 });
+      return NextResponse.json(
+        responseBuilder.error('MISSING_TICKET_ID', '缺少票券ID'),
+        { status: 400 }
+      );
     }
     
     if (!friendId) {
-      return NextResponse.json({ error: '缺少接收者ID' }, { status: 400 });
+      return NextResponse.json(
+        responseBuilder.error('MISSING_RECIPIENT_ID', '缺少接收者ID'),
+        { status: 400 }
+      );
     }
     
     // Get authenticated user
@@ -22,7 +31,10 @@ export async function POST(request: NextRequest) {
     const userIdHeader = request.headers.get('x-user-id');
     
     if (!user && !userIdHeader) {
-      return NextResponse.json({ error: '請先登入' }, { status: 401 });
+      return NextResponse.json(
+        responseBuilder.error('AUTHENTICATION_REQUIRED', '請先登入'),
+        { status: 401 }
+      );
     }
     
     const userId = user?.userId || userIdHeader;
@@ -31,7 +43,10 @@ export async function POST(request: NextRequest) {
     const ticket = await db.tickets.findById(ticketId);
     
     if (!ticket) {
-      return NextResponse.json({ error: '無法找到票券' }, { status: 404 });
+      return NextResponse.json(
+        responseBuilder.error('TICKET_NOT_FOUND', '無法找到票券'),
+        { status: 404 }
+      );
     }
     
     // Check ownership
@@ -99,15 +114,18 @@ export async function POST(request: NextRequest) {
       details: `Transferred from ${originalOwnerDetails?.realName || originalOwnerDetails?.userName || originalOwner} to ${recipient.realName || recipient.userName}`
     });
     
-    return NextResponse.json({
-      success: true,
-      message: '票券轉讓成功',
-      ticket: transferredTicket
-    });
+    return NextResponse.json(
+      responseBuilder.success({
+        message: '票券轉讓成功',
+        ticket: transferredTicket
+      })
+    );
   } catch (error) {
     console.error('Error transferring ticket:', error);
     return NextResponse.json(
-      { error: '票券轉讓時出錯', details: error instanceof Error ? error.message : 'Unknown error' },
+      responseBuilder.error('TRANSFER_ERROR', '票券轉讓時出錯', {
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       { status: 500 }
     );
   }

@@ -68,20 +68,28 @@ export default function Home() {
     // Fetch events
     const fetchEvents = async () => {
       try {
+        setLoading(true);
         const response = await fetch('/api/events');
+        
         if (response.ok) {
-          try {
-            // Check if the response has content before parsing
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : [];
-            setEvents(data || []);
-          } catch (parseError) {
-            console.error('Failed to parse events data:', parseError);
+          const data = await response.json();
+          
+          // Handle both array response and object response
+          if (Array.isArray(data)) {
+            setEvents(data);
+          } else if (data.events && Array.isArray(data.events)) {
+            setEvents(data.events);
+          } else {
+            console.error('Invalid events data format:', data);
             setEvents([]);
           }
+        } else {
+          console.error('Failed to fetch events:', response.status);
+          setEvents([]);
         }
       } catch (error) {
-        console.error('Failed to fetch events:', error);
+        console.error('Error fetching events:', error);
+        setEvents([]);
       } finally {
         setLoading(false);
       }

@@ -20,21 +20,24 @@ export default function AdminEventsPage() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      // Fix: Use '/api/events' endpoint instead of '/api/admin/events'
-      // The API might not have the /admin prefix in the path
-      const data = await adminFetch<Events[]>('/api/events');
+      const data = await adminFetch<Events[] | { events: Events[] }>('/api/events');
       
       // Check if the response is an error object
       if ('error' in data && 'status' in data) {
         throw new Error(`API Error: ${data.error}`);
       }
       
-      // Check if the data is an array before setting it
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid data format: expected an array of events');
+      // Handle both array response and object response
+      let eventsArray: Events[];
+      if (Array.isArray(data)) {
+        eventsArray = data;
+      } else if ('events' in data && Array.isArray(data.events)) {
+        eventsArray = data.events;
+      } else {
+        throw new Error('Invalid data format: expected an array of events or events object');
       }
       
-      setEvents(data);
+      setEvents(eventsArray);
     } catch (err) {
       console.error('Error fetching events:', err);
       setError(err instanceof Error ? err.message : '獲取活動數據時出錯');

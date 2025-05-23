@@ -9,7 +9,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Ticket} from '@/types';
 
 
-
 export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,12 +42,26 @@ export default function AdminTicketsPage() {
         }
         
         const data = await response.json();
-        setTickets(data.tickets || []);
+        
+        // Handle both new ApiResponseBuilder format and legacy format
+        let ticketsData: Ticket[] = [];
+        
+        if (data && data.success && data.data && Array.isArray(data.data.tickets)) {
+          // New ApiResponseBuilder format
+          ticketsData = data.data.tickets;
+        } else if (data && Array.isArray(data.tickets)) {
+          // Legacy format
+          ticketsData = data.tickets;
+        } else {
+          throw new Error('Invalid tickets data format received');
+        }
+        
+        setTickets(ticketsData);
         
         // Extract unique events for filter dropdown
         const events = [
           ...new Map(
-            data.tickets.map((ticket: Ticket) => [
+            ticketsData.map((ticket: Ticket) => [
               ticket.eventId, 
               { id: ticket.eventId, name: ticket.eventName }
             ])

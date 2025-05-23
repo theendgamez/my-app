@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
-import { encryptData, decryptData, isEncrypted } from '@/utils/encryption';
+import { decryptData, isEncrypted, encryptData } from '@/utils/encryption';
+import { ApiResponseBuilder } from '@/lib/apiResponse';
 
 // GET user by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const responseBuilder = new ApiResponseBuilder();
+  
   try {
     // Get current user from token
     const currentUser = await getCurrentUser(request);
@@ -21,7 +24,7 @@ export async function GET(
 
     if (!hasAccess) {
       return NextResponse.json(
-        { error: "Unauthorized access" },
+        responseBuilder.error('UNAUTHORIZED', 'Unauthorized access'),
         { status: 403 }
       );
     }
@@ -31,25 +34,26 @@ export async function GET(
 
     if (!user) {
       return NextResponse.json(
-        { error: "User not found" },
+        responseBuilder.error('USER_NOT_FOUND', 'User not found'),
         { status: 404 }
       );
     }
 
     // Decrypt sensitive fields if they appear to be encrypted
     if (user.isDataEncrypted || (user.phoneNumber && isEncrypted(user.phoneNumber))) {
-      return NextResponse.json({
+      const userData = {
         ...user,
         phoneNumber: user.phoneNumber ? decryptData(user.phoneNumber) : '',
         realName: user.realName ? decryptData(user.realName) : ''
-      });
+      };
+      return NextResponse.json(responseBuilder.success(userData));
     }
 
     // Return user data
-    return NextResponse.json(user);
+    return NextResponse.json(responseBuilder.success(user));
   } catch {
     return NextResponse.json(
-      { error: "Failed to retrieve user data" },
+      responseBuilder.error('FETCH_USER_ERROR', 'Failed to retrieve user data'),
       { status: 500 }
     );
   }

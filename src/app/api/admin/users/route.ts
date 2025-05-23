@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { DatabaseOptimizer } from '@/lib/dbOptimization';
 import { getCurrentUser } from '@/lib/auth';
 import { decryptData, isEncrypted, encryptData } from '@/utils/encryption';
+
+// Define a proper filter type for users
+interface UserFilter {
+  role?: string;
+  isActive?: boolean;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,42 +27,51 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
+    const role = searchParams.get('role');
+    const isActive = searchParams.get('isActive');
     
-    // Fetch users from database
-    const allUsers = await db.users.findMany();
-    // Apply search filter
-    const filteredUsers = search
-      ? allUsers.filter(user =>
-          user.realName?.toLowerCase().includes(search.toLowerCase()) ||
-          user.email?.toLowerCase().includes(search.toLowerCase())
-        )
-      : allUsers;
-    // Apply pagination
-    const start = (page - 1) * limit;
-    const users = filteredUsers.slice(start, start + limit);
+    // Build filter with proper typing
+    const filter: UserFilter = {};
+    if (role) filter.role = role;
+    if (isActive !== null) filter.isActive = isActive === 'true';
+    
+    // Use optimized pagination
+    const result = await DatabaseOptimizer.findWithPagination(
+      'users',
+      filter,
+      page,
+      limit,
+      { createdAt: 'desc' }
+    );
+    
+    // Apply search filter on paginated results
+    let filteredUsers = result.data;
+    if (search) {
+      filteredUsers = result.data.filter(user =>
+        user.realName?.toLowerCase().includes(search.toLowerCase()) ||
+        user.email?.toLowerCase().includes(search.toLowerCase()) ||
+        user.userName?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
     
     // Decrypt sensitive user data
-    const decryptedUsers = users.map((user): typeof user => {
-      // Create a new object to avoid modifying the original
+    const decryptedUsers = filteredUsers.map((user): typeof user => {
       const decryptedUser = { ...user };
       
-      // Decrypt phone number if it's encrypted
       if (user.phoneNumber && (user.isDataEncrypted || isEncrypted(user.phoneNumber))) {
         decryptedUser.phoneNumber = decryptData(user.phoneNumber);
       }
       return decryptedUser;
     });
 
-    // Get total count for pagination
-    const totalUsers = filteredUsers.length;
-    
     return NextResponse.json({
       users: decryptedUsers,
       pagination: {
-        total: totalUsers,
+        total: result.total,
         page,
         limit,
-        totalPages: Math.ceil(totalUsers / limit)
+        totalPages: Math.ceil(result.total / limit),
+        hasMore: result.hasMore
       }
     });
     
@@ -68,7 +84,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Handle user updates from admin panel
+// Handle batch user updates from admin panel
 export async function PATCH(request: NextRequest) {
   try {
     // Verify admin authentication
@@ -81,35 +97,57 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { userId, updates } = await request.json();
+    const { updates, isBatch } = await request.json();
     
-    if (!userId) {
-      return NextResponse.json(
-        { error: "User ID is required" },
-        { status: 400 }
-      );
+    if (isBatch && Array.isArray(updates)) {
+      // Handle batch updates
+      const batchUpdates = updates.map(update => ({
+        id: update.userId,
+        data: {
+          ...update.data,
+          phoneNumber: update.data.phoneNumber ? encryptData(update.data.phoneNumber) : undefined,
+          realName: update.data.realName ? encryptData(update.data.realName) : undefined,
+          isDataEncrypted: true
+        }
+      }));
+      
+      const result = await DatabaseOptimizer.batchUpdate('users', batchUpdates);
+      
+      return NextResponse.json({
+        success: true,
+        message: `Batch update completed: ${result.successful} successful, ${result.failed} failed`,
+        details: result
+      });
+    } else {
+      // Handle single update
+      const { userId, updates: singleUpdate } = await request.json();
+      
+      if (!userId) {
+        return NextResponse.json(
+          { error: "User ID is required" },
+          { status: 400 }
+        );
+      }
+      
+      const updatesToSave = { ...singleUpdate };
+      
+      if (singleUpdate.phoneNumber !== undefined) {
+        updatesToSave.phoneNumber = encryptData(singleUpdate.phoneNumber);
+        updatesToSave.isDataEncrypted = true;
+      }
+      
+      if (singleUpdate.realName !== undefined) {
+        updatesToSave.realName = encryptData(singleUpdate.realName);
+        updatesToSave.isDataEncrypted = true;
+      }
+      
+      await db.users.update(userId, updatesToSave);
+      
+      return NextResponse.json({
+        success: true,
+        message: "User updated successfully"
+      });
     }
-    
-    // Encrypt sensitive fields before updating
-    const updatesToSave = { ...updates };
-    
-    if (updates.phoneNumber !== undefined) {
-      updatesToSave.phoneNumber = encryptData(updates.phoneNumber);
-      updatesToSave.isDataEncrypted = true;
-    }
-    
-    if (updates.realName !== undefined) {
-      updatesToSave.realName = encryptData(updates.realName);
-      updatesToSave.isDataEncrypted = true;
-    }
-    
-    // Update user in database
-    await db.users.update(userId, updatesToSave);
-    
-    return NextResponse.json({
-      success: true,
-      message: "User updated successfully"
-    });
     
   } catch (error) {
     console.error('Error updating user:', error);

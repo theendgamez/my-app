@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { DatabaseOptimizer } from '@/lib/dbOptimization';
 import { getCurrentUser } from '@/lib/auth';
+import { ApiResponseBuilder } from '@/lib/apiResponse';
+
+// Define a proper filter type for payments
+interface PaymentFilter {
+  status?: string;
+  eventId?: string;
+  paymentMethod?: string;
+}
 
 export async function GET(request: NextRequest) {
+  const responseBuilder = new ApiResponseBuilder();
+  
   try {
     // Verify admin access
     const user = await getCurrentUser(request);
     
-    // Try header auth as fallback
     const userIdHeader = request.headers.get('x-user-id');
     let isAdmin = false;
 
@@ -26,19 +36,38 @@ export async function GET(request: NextRequest) {
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: '僅管理員可訪問此API' },
+        responseBuilder.error('UNAUTHORIZED', '僅管理員可訪問此API'),
         { status: 403 }
       );
     }
 
-    // Get all payments
-    const payments = await db.payments.findMany();
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const status = searchParams.get('status');
+    const eventId = searchParams.get('eventId');
+    const paymentMethod = searchParams.get('paymentMethod');
+    
+    // Build filter with proper typing
+    const filter: PaymentFilter = {};
+    if (status) filter.status = status;
+    if (eventId) filter.eventId = eventId;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+    
+    // Use optimized pagination
+    const result = await DatabaseOptimizer.findWithPagination(
+      'payments',
+      filter,
+      page,
+      limit,
+      { createdAt: 'desc' }
+    );
     
     // Enhance payment data with additional information
     const enhancedPayments = await Promise.all(
-      payments.map(async (payment) => {
+      result.data.map(async (payment) => {
         try {
-          // Add user name
           let userName = undefined;
           if (payment.userId) {
             const userInfo = await db.users.findById(payment.userId);
@@ -47,7 +76,6 @@ export async function GET(request: NextRequest) {
             }
           }
           
-          // Add event name
           let eventName = undefined;
           if (payment.eventId) {
             const eventInfo = await db.events.findById(payment.eventId);
@@ -68,11 +96,24 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({ payments: enhancedPayments });
+    return NextResponse.json(
+      responseBuilder
+        .withPagination(page, limit, result.total)
+        .success({
+          payments: enhancedPayments,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+            totalPages: Math.ceil(result.total / limit)
+          }
+        })
+    );
   } catch (error) {
     console.error('Error fetching payments:', error);
     return NextResponse.json(
-      { error: '獲取付款記錄時出錯' },
+      responseBuilder.error('FETCH_PAYMENTS_ERROR', '獲取付款記錄時出錯'),
       { status: 500 }
     );
   }

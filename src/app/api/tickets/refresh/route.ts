@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { ApiResponseBuilder } from '@/lib/apiResponse';
 
 /**
  * API handler for refreshing a ticket's QR code
  * This generates a new secure code to prevent fraud
  */
 export async function POST(request: NextRequest) {
+  const responseBuilder = new ApiResponseBuilder();
+  
   try {
     // Get current authenticated user with improved logging
     const user = await getCurrentUser(request);
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
     
     if (!user && !headerUserId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        responseBuilder.error('AUTHENTICATION_REQUIRED', 'Authentication required'),
         { status: 401 }
       );
     }
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
       body = await request.json();
     } catch  {
       return NextResponse.json(
-        { error: 'Invalid request body' },
+        responseBuilder.error('INVALID_REQUEST_BODY', 'Invalid request body'),
         { status: 400 }
       );
     }
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
     
     if (!ticketId) {
       return NextResponse.json(
-        { error: 'Missing ticketId' },
+        responseBuilder.error('MISSING_TICKET_ID', 'Missing ticketId'),
         { status: 400 }
       );
     }
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
     
     if (!ticket) {
       return NextResponse.json(
-        { error: 'Ticket not found' },
+        responseBuilder.error('TICKET_NOT_FOUND', 'Ticket not found'),
         { status: 404 }
       );
     }
@@ -63,7 +66,7 @@ export async function POST(request: NextRequest) {
       const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
         return NextResponse.json(
-          { error: 'Unauthorized access to this ticket' },
+          responseBuilder.error('UNAUTHORIZED_ACCESS', 'Unauthorized access to this ticket'),
           { status: 403 }
         );
       }
@@ -86,18 +89,18 @@ export async function POST(request: NextRequest) {
       nextRefresh: nextRefresh
     });
     
-    return NextResponse.json({
-      success: true,
-      ticket: updatedTicket
-    });
+    return NextResponse.json(
+      responseBuilder.success({
+        ticket: updatedTicket
+      })
+    );
     
   } catch (error) {
     console.error('Error refreshing ticket:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to refresh ticket',
+      responseBuilder.error('REFRESH_ERROR', 'Failed to refresh ticket', {
         details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      }),
       { status: 500 }
     );
   }

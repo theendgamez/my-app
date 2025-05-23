@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
 import db from '@/lib/db';
-import { createResponse, registrationRateLimiter } from '@/lib/auth';
+import { createResponse } from '@/lib/auth';
 import sendVerificationCode from '@/utils/sendVerifcationCode';
 import { Users } from '@/types';
 import { encryptData } from '@/utils/encryption';
+import { InputValidator, rateLimitConfigs } from '@/lib/security';
 
 // Define registration data interface
 interface RegistrationData {
@@ -74,20 +75,52 @@ export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   
   // Check rate limit
-  const rateLimit = registrationRateLimiter.check(`register:${ip}`);
+  const rateLimit = rateLimitConfigs.auth.check(`register:${ip}`);
   if (!rateLimit.allowed) {
-    return createResponse({ error: '嘗試次數過多，請稍後再試' }, 429);
+    return createResponse({ error: rateLimit.message }, 429);
   }
 
   try {
+    const { email, password, userName, realName } = await request.json();
+
+    // Validate required fields
+    if (!email || !password || !userName || !realName) {
+      return createResponse({ error: '請填寫所有必填欄位' }, 400);
+    }
+
+    // Sanitize inputs
+    const sanitizedEmail = InputValidator.sanitizeString(email.trim().toLowerCase());
+    const sanitizedUserName = InputValidator.sanitizeString(userName.trim());
+    const sanitizedRealName = InputValidator.sanitizeString(realName.trim());
+
+    // Validate email using sanitized input
+    if (!InputValidator.validateEmail(sanitizedEmail)) {
+      return createResponse({ error: '電子郵件格式無效' }, 400);
+    }
+
+    // Validate password
+    const passwordValidation = InputValidator.validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return createResponse({ 
+        error: '密碼不符合要求', 
+        details: passwordValidation.errors 
+      }, 400);
+    }
+
     // Log request headers for debugging
     console.log('Registration attempt from IP:', ip);
     console.log('Content-Type:', request.headers.get('content-type'));
     
-    // Parse request body with error handling
+    // Parse request body with error handling (use sanitized values)
     let data: RegistrationData;
     try {
-      data = await request.json();
+      data = {
+        email: sanitizedEmail,
+        userName: sanitizedUserName,
+        realName: sanitizedRealName,
+        password: password,
+        phoneNumber: undefined // Will be validated if provided
+      };
       console.log('Parsed registration data:', {
         userName: data.userName,
         email: data.email,
@@ -110,8 +143,8 @@ export async function POST(request: NextRequest) {
       return createResponse({ errors: validationErrors }, 400);
     }
 
-    // Check if email is already registered
-    const existingUser = await db.users.findByEmail(data.email!);
+    // Check if email is already registered using sanitized email
+    const existingUser = await db.users.findByEmail(sanitizedEmail);
     if (existingUser) {
       return createResponse({ error: '該電子郵件已被註冊' }, 400);
     }
@@ -123,15 +156,15 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password!, 12);
 
-    // Prepare user data with encrypted sensitive fields
+    // Prepare user data with encrypted sensitive fields using sanitized values
     const userId = uuidv4();
     const userData: Users = {
       userId,
-      userName: data.userName!,
-      realName: encryptData(data.realName!), // Encrypt realName
-      email: data.email!,
+      userName: sanitizedUserName,
+      realName: encryptData(sanitizedRealName),
+      email: sanitizedEmail,
       password: hashedPassword,
-      phoneNumber: encryptData(data.phoneNumber!), // Encrypt phoneNumber
+      phoneNumber: encryptData(data.phoneNumber!),
       isEmailVerified: false,
       isPhoneVerified: false,
       verificationCode,
@@ -139,16 +172,16 @@ export async function POST(request: NextRequest) {
       createdAt: now,
       role: 'user',
       tokenVersion: 0,
-      isDataEncrypted: true // Flag to indicate data is encrypted
+      isDataEncrypted: true
     };
 
     // Store user in database
     await db.users.create(userData);
     
-    // Send verification code
+    // Send verification code using sanitized email
     try {
-      await sendVerificationCode(data.email!, verificationCode);
-      console.log('Verification code sent successfully to:', data.email);
+      await sendVerificationCode(sanitizedEmail, verificationCode);
+      console.log('Verification code sent successfully to:', sanitizedEmail);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
       // Continue the registration process even if email fails

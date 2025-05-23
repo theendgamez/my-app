@@ -24,8 +24,17 @@ export default function EventsPage() {
         }
         
         const data = await response.json();
-        setEvents(data);
-        setFilteredEvents(data);
+        
+        // Handle both array response (backward compatibility) and object response
+        if (Array.isArray(data)) {
+          setEvents(data);
+          setFilteredEvents(data);
+        } else if (data.events && Array.isArray(data.events)) {
+          setEvents(data.events);
+          setFilteredEvents(data.events);
+        } else {
+          throw new Error('Invalid response format: expected events array');
+        }
       } catch (error) {
         console.error('Failed to fetch events:', error);
         setError(error instanceof Error ? error.message : 'Failed to load events');

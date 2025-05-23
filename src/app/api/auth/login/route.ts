@@ -4,30 +4,38 @@ import db from '@/lib/db';
 import { 
   createResponse, 
   generateTokens, 
-  setAuthCookies, 
-  loginRateLimiter 
+  setAuthCookies
 } from '@/lib/auth';
+import { rateLimitConfigs, InputValidator } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   // Get client IP for rate limiting
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   
-  // Check rate limit
-  const rateLimit = loginRateLimiter.check(`login:${ip}`);
+  // Check rate limit using security.ts rate limiter
+  const rateLimit = rateLimitConfigs.auth.check(`login:${ip}`);
   if (!rateLimit.allowed) {
-    return createResponse({ error: '嘗試次數過多，請稍後再試' }, 429);
+    return createResponse({ error: rateLimit.message }, 429);
   }
 
   try {
     const { email, password } = await request.json();
 
-    // Validate input
+    // Validate input using security.ts validator
     if (!email || !password) {
       return createResponse({ error: '請提供電子郵件和密碼' }, 400);
     }
+    
+    // Sanitize email input
+    const sanitizedEmail = InputValidator.sanitizeString(email.trim().toLowerCase());
+    
+    // Validate email format
+    if (!InputValidator.validateEmail(sanitizedEmail)) {
+      return createResponse({ error: '電子郵件格式無效' }, 400);
+    }
 
     // Find user by email
-    const user = await db.users.findByEmail(email);
+    const user = await db.users.findByEmail(sanitizedEmail);
     if (!user) {
       return createResponse({ error: '用戶不存在或密碼錯誤' }, 401);
     }

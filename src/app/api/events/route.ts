@@ -1,17 +1,60 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { DatabaseOptimizer } from '@/lib/dbOptimization';
 import { writeFile, mkdir } from 'fs/promises';
 import { Events } from '@/types';
 import path from 'path';
+import { ApiResponseBuilder } from '@/lib/apiResponse';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const events = await db.events.findMany();
-    return NextResponse.json(events);
+    // Get query parameters for pagination
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const category = searchParams.get('category');
+    const status = searchParams.get('status');
+    
+    // Build filter
+    const filter: Partial<Events> = {};
+    if (category) filter.category = category;
+    if (status) filter.status = status as Events['status'];
+    
+    // Use optimized pagination
+    const result = await DatabaseOptimizer.findWithPagination(
+      'events',
+      filter,
+      page,
+      limit,
+      { eventDate: 'asc' } // Sort by event date
+    );
+    
+    // For backward compatibility, return just the events array if no pagination params
+    if (!searchParams.get('page') && !searchParams.get('limit')) {
+      return NextResponse.json(result.data);
+    }
+    
+    // Return paginated response with ApiResponseBuilder format
+    const responseBuilder = new ApiResponseBuilder();
+    return NextResponse.json(
+      responseBuilder
+        .withPagination(page, limit, result.total)
+        .success({
+          events: result.data,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            hasMore: result.hasMore,
+            totalPages: Math.ceil(result.total / limit)
+          }
+        })
+    );
   } catch (error) {
     console.error('Error fetching events:', error);
+    const responseBuilder = new ApiResponseBuilder();
     return NextResponse.json(
-      { error: 'Failed to fetch events' },
+      responseBuilder.error('FETCH_EVENTS_ERROR', 'Failed to fetch events'),
       { status: 500 }
     );
   }

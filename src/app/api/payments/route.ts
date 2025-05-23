@@ -3,8 +3,18 @@ import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { decryptData, isEncrypted } from '@/utils/encryption';
+import { rateLimitConfigs, InputValidator } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
+  // Get client IP for rate limiting
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
+  
+  // Apply ticket purchase rate limiting
+  const rateLimit = rateLimitConfigs.ticketPurchase.check(`purchase:${ip}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: rateLimit.message }, { status: 429 });
+  }
+
   try {
     // Authenticate user
     const user = await getCurrentUser(request);
@@ -26,12 +36,18 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const { bookingToken, cardDetails } = await request.json();
 
-    if (!bookingToken) {
+    // Sanitize inputs
+    let sanitizedBookingToken = bookingToken;
+    if (typeof bookingToken === 'string') {
+      sanitizedBookingToken = InputValidator.sanitizeString(bookingToken);
+    }
+
+    if (!sanitizedBookingToken) {
       return NextResponse.json({ error: '缺少訂單標識' }, { status: 400 });
     }
 
-    // Find the booking
-    const booking = await db.bookings.findIntentByToken(bookingToken);
+    // Find the booking using the sanitized token
+    const booking = await db.bookings.findIntentByToken(sanitizedBookingToken);
     if (!booking) {
       return NextResponse.json({ error: '找不到相關訂單' }, { status: 404 });
     }
