@@ -35,7 +35,7 @@ export default function RootLayout({
         <AuthProvider>
           <NotificationProvider>
             <ClientLayout>
-              <div className="min-h-screen pt-16">
+              <div className="main-content">
                 {children}
               </div>
             </ClientLayout>

@@ -7,6 +7,7 @@ import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import { Ticket} from '@/types';
+import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 
 export default function AdminTicketsPage() {
@@ -20,6 +21,7 @@ export default function AdminTicketsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [uniqueEvents, setUniqueEvents] = useState<{id: string, name: string}[]>([]);
+  const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   
   const router = useRouter();
   const { isAuthenticated, isAdmin } = useAuth();
@@ -89,6 +91,17 @@ export default function AdminTicketsPage() {
     }
   }, [loading, isAdmin, router]);
 
+  // Toggle event collapse
+  const toggleEventCollapse = (eventId: string) => {
+    const newCollapsed = new Set(collapsedEvents);
+    if (newCollapsed.has(eventId)) {
+      newCollapsed.delete(eventId);
+    } else {
+      newCollapsed.add(eventId);
+    }
+    setCollapsedEvents(newCollapsed);
+  };
+
   // Handle sort
   const handleSort = (field: string) => {
     if (field === sortField) {
@@ -152,33 +165,44 @@ export default function AdminTicketsPage() {
     return matchesSearch && matchesStatus && matchesEvent;
   });
 
-  // Apply sorting
-  const sortedTickets = [...filteredTickets].sort((a, b) => {
-    let fieldA = a[sortField as keyof Ticket];
-    let fieldB = b[sortField as keyof Ticket];
-    
-    // Handle undefined fields
-    fieldA = fieldA || '';
-    fieldB = fieldB || '';
-    
-    // Handle date comparisons
-    if (sortField === 'eventDate' || sortField === 'purchaseDate' || sortField === 'transferredAt') {
-      const dateA = new Date(fieldA as string).getTime();
-      const dateB = new Date(fieldB as string).getTime();
+  // Group tickets by event
+  const groupedTickets = filteredTickets.reduce((groups, ticket) => {
+    const eventId = ticket.eventId;
+    if (!groups[eventId]) {
+      groups[eventId] = {
+        eventInfo: {
+          id: eventId,
+          name: ticket.eventName,
+          date: ticket.eventDate
+        },
+        tickets: []
+      };
+    }
+    groups[eventId].tickets.push(ticket);
+    return groups;
+  }, {} as Record<string, { eventInfo: { id: string, name: string, date: string }, tickets: Ticket[] }>);
+
+  // Sort tickets within each group
+  Object.keys(groupedTickets).forEach(eventId => {
+    groupedTickets[eventId].tickets.sort((a, b) => {
+      let fieldA = a[sortField as keyof Ticket];
+      let fieldB = b[sortField as keyof Ticket];
+      
+      fieldA = fieldA || '';
+      fieldB = fieldB || '';
+      
+      if (sortField === 'eventDate' || sortField === 'purchaseDate' || sortField === 'transferredAt') {
+        const dateA = new Date(fieldA as string).getTime();
+        const dateB = new Date(fieldB as string).getTime();
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      }
       
       if (sortDirection === 'asc') {
-        return dateA - dateB;
+        return fieldA < fieldB ? -1 : fieldA > fieldB ? 1 : 0;
       } else {
-        return dateB - dateA;
+        return fieldA > fieldB ? -1 : fieldA < fieldB ? 1 : 0;
       }
-    }
-    
-    // Compare based on direction
-    if (sortDirection === 'asc') {
-      return fieldA < fieldB ? -1 : fieldA > fieldB ? 1 : 0;
-    } else {
-      return fieldA > fieldB ? -1 : fieldA < fieldB ? 1 : 0;
-    }
+    });
   });
 
   // Get status badge class
@@ -223,23 +247,23 @@ export default function AdminTicketsPage() {
       isLoading={loading}
       error={error}
     >
-      {/* Filter Controls - Improved for mobile */}
-      <div className="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
-        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center gap-2 sm:gap-4">
+      {/* Filter Controls */}
+      <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <input
               type="text"
               placeholder="搜索票券ID、活動名稱、用戶名稱..."
-              className="w-full p-3 border rounded-md"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-3 border rounded-md flex-1 min-w-[120px]"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px]"
             >
               <option value="all">所有狀態</option>
               <option value="available">可用</option>
@@ -251,7 +275,7 @@ export default function AdminTicketsPage() {
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
-              className="p-3 border rounded-md flex-1 min-w-[120px]"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px]"
             >
               <option value="all">所有活動</option>
               {uniqueEvents.map(event => (
@@ -262,242 +286,243 @@ export default function AdminTicketsPage() {
         </div>
       </div>
 
-      {/* Tickets Table with Mobile-Optimized View */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('ticketId')}
-                >
-                  票券ID
-                  {sortField === 'ticketId' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('eventName')}
-                >
-                  活動名稱
-                  {sortField === 'eventName' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('eventDate')}
-                >
-                  活動日期
-                  {sortField === 'eventDate' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('userRealName')}
-                >
-                  用戶
-                  {sortField === 'userRealName' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('zone')}
-                >
-                  區域/座位
-                  {sortField === 'zone' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('status')}
-                >
-                  狀態
-                  {sortField === 'status' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('purchaseDate')}
-                >
-                  購買日期
-                  {sortField === 'purchaseDate' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedTickets.length > 0 ? (
-                sortedTickets.map((ticket) => (
-                  <tr key={ticket.ticketId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {ticket.ticketId.substring(0, 8)}...
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{ticket.eventName}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{formatDate(ticket.eventDate)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{ticket.userRealName || '未提供姓名'}</div>
-                      <div className="text-xs text-gray-500">{ticket.userId.substring(0, 8)}...</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{ticket.zone}</div>
-                      <div className="text-xs text-gray-500">座位: {ticket.seatNumber || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(ticket.status)}`}>
-                        {translateStatus(ticket.status)}
-                      </span>
-                      {ticket.transferredAt && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          已轉贈 ({formatDate(ticket.transferredAt)})
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(ticket.purchaseDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex flex-col space-y-2">
-                        <Link
-                          href={`/admin/tickets/${ticket.ticketId}`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          查看
-                        </Link>
-                        {ticket.status !== 'used' && (
-                          <button
-                            onClick={() => handleStatusChange(ticket.ticketId, 'used')}
-                            disabled={actionInProgress === ticket.ticketId}
-                            className={`text-green-600 hover:text-green-900 ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            驗證使用
-                          </button>
-                        )}
-                        {ticket.status !== 'cancelled' && (
-                          <button
-                            onClick={() => handleStatusChange(ticket.ticketId, 'cancelled')}
-                            disabled={actionInProgress === ticket.ticketId}
-                            className={`text-red-600 hover:text-red-900 ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            作廢
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 text-sm">
-                    {loading ? (
-                      <div className="flex justify-center py-4">
-                        <LoadingSpinner size="small" />
-                      </div>
-                    ) : (
-                      '沒有找到匹配的票券'
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Mobile Card View */}
-        <div className="md:hidden">
-          {sortedTickets.length > 0 ? (
-            <div className="divide-y divide-gray-200">
-              {sortedTickets.map((ticket) => (
-                <div key={ticket.ticketId} className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{ticket.eventName}</h3>
-                      <p className="text-xs text-gray-500">{formatDate(ticket.eventDate)}</p>
+      {/* Grouped Tickets */}
+      <div className="space-y-6">
+        {Object.keys(groupedTickets).length > 0 ? (
+          Object.entries(groupedTickets).map(([eventId, { eventInfo, tickets }]) => (
+            <div key={eventId} className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              {/* Event Header */}
+              <div 
+                className="bg-gray-50 px-6 py-4 border-b cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => toggleEventCollapse(eventId)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{eventInfo.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      {formatDate(eventInfo.date)} • {tickets.length} 張票券
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-2">
+                      {['available', 'reserved', 'sold', 'used', 'cancelled'].map(status => {
+                        const count = tickets.filter(t => t.status === status).length;
+                        if (count > 0) {
+                          return (
+                            <span 
+                              key={status}
+                              className={`px-2 py-1 text-xs rounded-full ${getStatusBadgeClass(status)}`}
+                            >
+                              {translateStatus(status)}: {count}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })}
                     </div>
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(ticket.status)}`}>
-                      {translateStatus(ticket.status)}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm">
-                      <span className="text-gray-500">持票人:</span> {ticket.userRealName || '未提供姓名'}
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-gray-500">區域/座位:</span> {ticket.zone} {ticket.seatNumber ? `/ ${ticket.seatNumber}` : ''}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      票券ID: {ticket.ticketId.substring(0, 8)}...
-                    </p>
-                  </div>
-                  
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    <Link
-                      href={`/admin/tickets/${ticket.ticketId}`}
-                      className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded text-sm font-medium flex-1 text-center"
-                    >
-                      查看
-                    </Link>
-                    
-                    {ticket.status !== 'used' && (
-                      <button
-                        onClick={() => handleStatusChange(ticket.ticketId, 'used')}
-                        disabled={actionInProgress === ticket.ticketId}
-                        className={`px-3 py-2 bg-green-100 text-green-700 rounded text-sm font-medium flex-1 text-center ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
-                      >
-                        驗證使用
-                      </button>
-                    )}
-                    
-                    {ticket.status !== 'cancelled' && (
-                      <button
-                        onClick={() => handleStatusChange(ticket.ticketId, 'cancelled')}
-                        disabled={actionInProgress === ticket.ticketId}
-                        className={`px-3 py-2 bg-red-100 text-red-700 rounded text-sm font-medium flex-1 text-center ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
-                      >
-                        作廢
-                      </button>
-                    )}
+                    {collapsedEvents.has(eventId) ? <FiChevronDown /> : <FiChevronUp />}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-6 text-center text-gray-500">
-              {loading ? (
-                <div className="flex justify-center py-4">
-                  <LoadingSpinner size="small" />
-                </div>
-              ) : (
-                '沒有找到匹配的票券'
+              </div>
+
+              {/* Tickets Table/Cards */}
+              {!collapsedEvents.has(eventId) && (
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th 
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort('ticketId')}
+                          >
+                            票券ID
+                            {sortField === 'ticketId' && (
+                              <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </th>
+                          <th 
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort('userRealName')}
+                          >
+                            用戶
+                            {sortField === 'userRealName' && (
+                              <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </th>
+                          <th 
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort('zone')}
+                          >
+                            區域/座位
+                            {sortField === 'zone' && (
+                              <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </th>
+                          <th 
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort('status')}
+                          >
+                            狀態
+                            {sortField === 'status' && (
+                              <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </th>
+                          <th 
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort('purchaseDate')}
+                          >
+                            購買日期
+                            {sortField === 'purchaseDate' && (
+                              <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            操作
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {tickets.map((ticket) => (
+                          <tr key={ticket.ticketId} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-mono text-gray-900">
+                                {ticket.ticketId.substring(0, 8)}...
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{ticket.userRealName || '未提供姓名'}</div>
+                              <div className="text-xs text-gray-500 font-mono">{ticket.userId.substring(0, 8)}...</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{ticket.zone}</div>
+                              <div className="text-xs text-gray-500">座位: {ticket.seatNumber || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getStatusBadgeClass(ticket.status)}`}>
+                                {translateStatus(ticket.status)}
+                              </span>
+                              {ticket.transferredAt && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  已轉贈 ({formatDate(ticket.transferredAt)})
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(ticket.purchaseDate)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/admin/tickets/${ticket.ticketId}`}
+                                  className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                                >
+                                  查看
+                                </Link>
+                                {ticket.status !== 'used' && (
+                                  <button
+                                    onClick={() => handleStatusChange(ticket.ticketId, 'used')}
+                                    disabled={actionInProgress === ticket.ticketId}
+                                    className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    驗證
+                                  </button>
+                                )}
+                                {ticket.status !== 'cancelled' && (
+                                  <button
+                                    onClick={() => handleStatusChange(ticket.ticketId, 'cancelled')}
+                                    disabled={actionInProgress === ticket.ticketId}
+                                    className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    作廢
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Mobile Card View */}
+                  <div className="lg:hidden divide-y divide-gray-200">
+                    {tickets.map((ticket) => (
+                      <div key={ticket.ticketId} className="p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{ticket.userRealName || '未提供姓名'}</h4>
+                            <p className="text-xs text-gray-500 font-mono mt-1">
+                              {ticket.ticketId.substring(0, 8)}...
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getStatusBadgeClass(ticket.status)}`}>
+                            {translateStatus(ticket.status)}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                          <div>
+                            <span className="text-gray-500">區域:</span> {ticket.zone}
+                          </div>
+                          <div>
+                            <span className="text-gray-500">座位:</span> {ticket.seatNumber || 'N/A'}
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-500">購買:</span> {formatDate(ticket.purchaseDate)}
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Link
+                            href={`/admin/tickets/${ticket.ticketId}`}
+                            className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-md text-sm font-medium text-center hover:bg-blue-200 transition-colors"
+                          >
+                            查看
+                          </Link>
+                          
+                          {ticket.status !== 'used' && (
+                            <button
+                              onClick={() => handleStatusChange(ticket.ticketId, 'used')}
+                              disabled={actionInProgress === ticket.ticketId}
+                              className={`flex-1 px-3 py-2 bg-green-100 text-green-700 rounded-md text-sm font-medium hover:bg-green-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
+                            >
+                              驗證
+                            </button>
+                          )}
+                          
+                          {ticket.status !== 'cancelled' && (
+                            <button
+                              onClick={() => handleStatusChange(ticket.ticketId, 'cancelled')}
+                              disabled={actionInProgress === ticket.ticketId}
+                              className={`flex-1 px-3 py-2 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
+                            >
+                              作廢
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
-          )}
-        </div>
+          ))
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <LoadingSpinner size="large" />
+              </div>
+            ) : (
+              <div className="text-gray-500">
+                <p className="text-lg mb-2">沒有找到匹配的票券</p>
+                <p className="text-sm">請嘗試調整搜索條件或篩選器</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </AdminPage>
   );

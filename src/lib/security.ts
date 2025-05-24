@@ -43,8 +43,23 @@ export class InputValidator {
     if (!/\d/.test(password)) {
       errors.push('必須包含數字');
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('必須包含特殊字符');
+    // Make special characters optional - only require 3 out of 4 criteria
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    
+    // Count how many criteria are met
+    const criteriaMet = [
+      password.length >= 8,
+      /[A-Z]/.test(password),
+      /[a-z]/.test(password),
+      /\d/.test(password),
+      hasSpecialChar
+    ].filter(Boolean).length;
+    
+    // Require at least 4 out of 5 criteria (length + 3 out of 4 character types)
+    if (criteriaMet < 4) {
+      if (!hasSpecialChar && errors.length === 0) {
+        errors.push('建議包含特殊字符以增強安全性');
+      }
     }
 
     return {

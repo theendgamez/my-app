@@ -47,24 +47,36 @@ function validateRegistrationInput(data: RegistrationData) {
     errors.realName = '真實姓名至少需要2個字符';
   }
   
-  // Validate password with clear requirements
+  // Validate password with more reasonable requirements
   if (!data.password) {
     errors.password = '密碼為必填項';
-  } else if (data.password.length < 6) {
-    errors.password = '密碼至少需要6個字符';
+  } else if (data.password.length < 8) {
+    errors.password = '密碼至少需要8個字符';
   } else {
-    if (!/[A-Z]/.test(data.password)) {
-      errors.password = '密碼必須包含至少一個大寫字母';
-    } else if (!/[a-z]/.test(data.password)) {
-      errors.password = '密碼必須包含至少一個小寫字母';
+    // Check for basic password strength (at least 3 out of 4 criteria)
+    const hasUpper = /[A-Z]/.test(data.password);
+    const hasLower = /[a-z]/.test(data.password);
+    const hasNumber = /\d/.test(data.password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(data.password);
+    
+    const strengthCount = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
+    
+    if (strengthCount < 3) {
+      errors.password = '密碼強度不足，請包含大寫字母、小寫字母、數字中的至少三種';
     }
   }
   
-  // Validate phoneNumber
+  // Validate phoneNumber for Hong Kong format
   if (!data.phoneNumber) {
     errors.phoneNumber = '電話號碼為必填項';
-  } else if (!/^\+?[1-9]\d{1,14}$/.test(data.phoneNumber)) {
-    errors.phoneNumber = '請輸入有效的電話號碼';
+  } else {
+    // Hong Kong phone number validation (8 digits, optionally with +852 prefix)
+    const hkPhoneRegex = /^(\+852)?[2-9]\d{7}$/;
+    const cleanedPhone = data.phoneNumber.replace(/\s+/g, ''); // Remove spaces
+    
+    if (!hkPhoneRegex.test(cleanedPhone)) {
+      errors.phoneNumber = '請輸入有效的香港電話號碼（8位數字，以2-9開頭）';
+    }
   }
   
   return Object.keys(errors).length > 0 ? errors : null;
@@ -81,10 +93,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, password, userName, realName } = await request.json();
+    // Parse the entire request body first
+    const requestBody = await request.json();
+    console.log('Full request body:', requestBody);
+    
+    const { email, password, userName, realName, phoneNumber } = requestBody;
 
     // Validate required fields
-    if (!email || !password || !userName || !realName) {
+    if (!email || !password || !userName || !realName || !phoneNumber) {
+      console.log('Missing fields:', { email: !!email, password: !!password, userName: !!userName, realName: !!realName, phoneNumber: !!phoneNumber });
       return createResponse({ error: '請填寫所有必填欄位' }, 400);
     }
 
@@ -92,6 +109,7 @@ export async function POST(request: NextRequest) {
     const sanitizedEmail = InputValidator.sanitizeString(email.trim().toLowerCase());
     const sanitizedUserName = InputValidator.sanitizeString(userName.trim());
     const sanitizedRealName = InputValidator.sanitizeString(realName.trim());
+    const sanitizedPhoneNumber = InputValidator.sanitizeString(phoneNumber.toString().trim());
 
     // Validate email using sanitized input
     if (!InputValidator.validateEmail(sanitizedEmail)) {
@@ -119,7 +137,7 @@ export async function POST(request: NextRequest) {
         userName: sanitizedUserName,
         realName: sanitizedRealName,
         password: password,
-        phoneNumber: undefined // Will be validated if provided
+        phoneNumber: sanitizedPhoneNumber
       };
       console.log('Parsed registration data:', {
         userName: data.userName,
@@ -164,7 +182,7 @@ export async function POST(request: NextRequest) {
       realName: encryptData(sanitizedRealName),
       email: sanitizedEmail,
       password: hashedPassword,
-      phoneNumber: encryptData(data.phoneNumber!),
+      phoneNumber: encryptData(sanitizedPhoneNumber),
       isEmailVerified: false,
       isPhoneVerified: false,
       verificationCode,

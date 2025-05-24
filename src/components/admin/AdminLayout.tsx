@@ -136,17 +136,19 @@ export default function AdminLayout({
   return (
     <AdminProvider>
       <Navbar />
-      <div className="min-h-screen bg-gray-100 flex">
+      <div className="admin-main-content flex">
         {/* Sidebar */}
         <Sidebar 
           isOpen={isSidebarOpen}
-          toggleSidebar={toggleSidebar} isMobile={false}        />
+          toggleSidebar={toggleSidebar} 
+          isMobile={false}        
+        />
         
         {/* Main content area */}
         <div className={`flex-1 flex flex-col transition-all duration-200 
           ${isSidebarOpen ? 'ml-0 md:ml-64' : 'ml-0 md:ml-16'}`}>
           {/* Header with toggle button */}
-          <header className="bg-white shadow-sm py-3 px-4 flex items-center sticky top-0 z-10">
+          <header className="bg-white shadow-sm py-3 px-4 flex items-center sticky top-navbar z-10">
             <button
               onClick={toggleSidebar}
               className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none"

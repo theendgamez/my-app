@@ -105,6 +105,30 @@ body {
 
 /* Component Base Layer */
 @layer components {
+  /* Navbar Components */
+  .navbar-fixed {
+    @apply fixed top-0 left-0 right-0 z-navbar;
+    height: 4rem; /* 64px - consistent with spacing.navbar */
+  }
+
+  .navbar-content {
+    @apply h-full flex items-center justify-between px-4 lg:px-6;
+    @apply bg-gradient-to-r from-blue-600 to-purple-600;
+    @apply shadow-lg backdrop-blur-sm;
+  }
+
+  .navbar-spacer {
+    @apply pt-navbar; /* Push content below fixed navbar */
+  }
+
+  .main-content {
+    @apply pt-navbar min-h-screen; /* Consistent top spacing for all main content */
+  }
+
+  .admin-main-content {
+    @apply pt-navbar min-h-screen bg-gray-100; /* Admin-specific content spacing */
+  }
+
   /* Button Components */
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border border-transparent;

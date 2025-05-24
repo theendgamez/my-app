@@ -1,141 +1,233 @@
-/**
- * Utility functions for admin API calls
- */
-
-type AdminFetchOptions = RequestInit & {
-  fallbackToUserId?: boolean;
-};
+import { fetchWithAuth } from './fetchWithAuth';
 
 /**
- * Enhanced fetch function for admin endpoints with error handling
- * @param apiUrl API endpoint to call
- * @param options Fetch options
- * @returns Response data or error object
+ * Admin API utilities for health checks and system monitoring
  */
-export async function adminFetch<T>(
-  apiUrl: string,
-  options: AdminFetchOptions = {}
-): Promise<T> {
-  const { fallbackToUserId = true, ...fetchOptions } = options;
-  
-  // Default headers
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(fetchOptions.headers as Record<string, string> || {})
+
+export interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  version: string;
+  timestamp: string;
+  components: {
+    database: {
+      status: 'up' | 'down' | 'degraded';
+      responseTimeMs?: number;
+      details?: string;
+    };
+    api: {
+      status: 'up' | 'down';
+    };
+    mlService?: {
+      status: 'up' | 'down' | 'not_configured';
+      details?: string;
+    };
   };
-  
-  // Add auth headers
-  if (typeof window !== 'undefined') {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    } 
-    
-    if (fallbackToUserId) {
-      const userId = localStorage.getItem('userId');
-      if (userId) {
-        headers['x-user-id'] = userId;
-      }
-    }
-  }
-  
+  uptime: number;
+}
+
+/**
+ * Check system health status
+ */
+export async function checkSystemHealth(): Promise<HealthStatus> {
+  return await fetchWithAuth<HealthStatus>('/api/health', {
+    useToken: false, // Health check doesn't require authentication
+    revalidate: 30, // Cache for 30 seconds
+  });
+}
+
+/**
+ * Get admin dashboard statistics
+ */
+export async function getAdminDashboardStats() {
+  return await fetchWithAuth('/api/admin/dashboard');
+}
+
+/**
+ * Get admin users with pagination
+ */
+export async function getAdminUsers(page = 1, limit = 20, search = '', role = '', isActive = '') {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    ...(search && { search }),
+    ...(role && { role }),
+    ...(isActive && { isActive }),
+  });
+
+  return await fetchWithAuth(`/api/admin/users?${params}`);
+}
+
+/**
+ * Get admin tickets with pagination and filters
+ */
+export async function getAdminTickets(page = 1, limit = 50, eventId = '', status = '', zone = '') {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    ...(eventId && { eventId }),
+    ...(status && { status }),
+    ...(zone && { zone }),
+  });
+
+  return await fetchWithAuth(`/api/admin/tickets?${params}`);
+}
+
+/**
+ * Get admin payments with pagination and filters
+ */
+export async function getAdminPayments(page = 1, limit = 50, status = '', eventId = '', paymentMethod = '') {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    ...(status && { status }),
+    ...(eventId && { eventId }),
+    ...(paymentMethod && { paymentMethod }),
+  });
+
+  return await fetchWithAuth(`/api/admin/payments?${params}`);
+}
+
+/**
+ * Update ticket status (admin only)
+ */
+export async function updateTicketStatus(ticketId: string, status: string, usageTimestamp?: number) {
+  return await fetchWithAuth(`/api/admin/tickets/${ticketId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, usageTimestamp }),
+  });
+}
+
+/**
+ * Update payment status (admin only)
+ */
+export async function updatePaymentStatus(paymentId: string, status: string) {
+  return await fetchWithAuth(`/api/admin/payments/${paymentId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Get lottery events for admin
+ */
+export async function getAdminLotteryEvents() {
+  return await fetchWithAuth('/api/admin/lottery/events');
+}
+
+/**
+ * Get lottery registrations for specific event
+ */
+export async function getAdminLotteryRegistrations(eventId: string) {
+  return await fetchWithAuth(`/api/admin/lottery/registrations/${eventId}`);
+}
+
+/**
+ * Verify ticket with QR data (admin only)
+ */
+export async function verifyTicketAdmin(qrData: string) {
+  return await fetchWithAuth('/api/admin/tickets/verify', {
+    method: 'POST',
+    body: JSON.stringify({ qrData }),
+  });
+}
+
+/**
+ * Check if current user is admin
+ */
+export async function checkAdminStatus(): Promise<{ isAdmin: boolean }> {
   try {
-    console.log(`Fetching ${apiUrl}...`);
-    const response = await fetch(apiUrl, {
-      ...fetchOptions,
-      headers,
-      credentials: 'include'
+    return await fetchWithAuth<{ isAdmin: boolean }>('/api/auth/check-admin', {
+      revalidate: 300, // Cache for 5 minutes
     });
-    
-    // Handle not found responses more gracefully
-    if (response.status === 404) {
-      console.error(`API endpoint not found: ${apiUrl}`);
-      const message = `API endpoint ${apiUrl} not found. Check that the API route exists.`;
-      console.info('Tip: For admin routes, try using direct API paths like "/api/events" instead of "/api/admin/events"');
-      return { 
-        error: message, 
-        status: 404,
-        endpoint: apiUrl
-      } as unknown as T;
-    }
-    
-    // Handle other error responses
-    if (!response.ok) {
-      const errorData = await response.text();
-      let parsedError;
-      
-      try {
-        parsedError = JSON.parse(errorData);
-      } catch {
-        parsedError = { error: errorData || response.statusText };
-      }
-      
-      return {
-        ...parsedError,
-        status: response.status
-      } as unknown as T;
-    }
-    
-    // Return successful response
-    const text = await response.text();
-    try {
-      return text ? JSON.parse(text) : {} as T;
-    } catch (e) {
-      console.error('Error parsing JSON response:', e);
-      console.log('Raw response:', text.substring(0, 200) + '...');
-      return { 
-        error: 'Invalid JSON response', 
-        rawResponse: text.substring(0, 100) + '...' 
-      } as unknown as T;
-    }
-  } catch (error) {
-    console.error('API call error:', error);
-    return { 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 0
-    } as unknown as T;
+  } catch {
+    return { isAdmin: false };
   }
 }
 
 /**
- * Check if user has specific permissions
- * This handles the case when the permissions endpoint doesn't exist yet
- * @param permission Permission to check
- * @returns Boolean indicating if user has permission
+ * Monitor system health with periodic checks
  */
-export async function checkPermission(permission: string): Promise<boolean> {
-  try {
-    // Attempt to fetch permissions, but handle gracefully if endpoint doesn't exist
-    const response = await adminFetch<{permissions?: string[], status?: number, error?: string}>('/api/permissions');
-    
-    // If endpoint doesn't exist, fallback to admin check
-    if (response.status === 404) {
-      console.info('Permissions API not implemented yet, falling back to admin role check');
-      // Fall back to role-based check
-      const userResponse = await fetch('/api/users/me', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'x-user-id': localStorage.getItem('userId') || ''
-        }
-      });
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        // If user is admin, grant all permissions
-        return userData.role === 'admin';
-      }
-      return false;
+export class HealthMonitor {
+  private static instance: HealthMonitor;
+  private intervalId: NodeJS.Timeout | null = null;
+  private callbacks: ((health: HealthStatus) => void)[] = [];
+
+  static getInstance(): HealthMonitor {
+    if (!this.instance) {
+      this.instance = new HealthMonitor();
     }
-    
-    // If permissions endpoint exists but had other errors
-    if ('error' in response) {
-      return false;
-    }
-    
-    // Check if user has the specific permission
-    return Array.isArray(response.permissions) && response.permissions.includes(permission);
-  } catch (error) {
-    console.error('Permission check failed:', error);
-    return false;
+    return this.instance;
   }
+
+  /**
+   * Start monitoring system health
+   */
+  startMonitoring(intervalMs = 60000): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+
+    this.intervalId = setInterval(async () => {
+      try {
+        const health = await checkSystemHealth();
+        this.callbacks.forEach(callback => callback(health));
+      } catch (error) {
+        console.error('Health check failed:', error);
+        // Notify callbacks about unhealthy status
+        const unhealthyStatus: HealthStatus = {
+          status: 'unhealthy',
+          version: 'unknown',
+          timestamp: new Date().toISOString(),
+          components: {
+            database: { status: 'down' },
+            api: { status: 'down' }
+          },
+          uptime: 0
+        };
+        this.callbacks.forEach(callback => callback(unhealthyStatus));
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Stop monitoring
+   */
+  stopMonitoring(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+
+  /**
+   * Subscribe to health status updates
+   */
+  subscribe(callback: (health: HealthStatus) => void): () => void {
+    this.callbacks.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.callbacks.indexOf(callback);
+      if (index > -1) {
+        this.callbacks.splice(index, 1);
+      }
+    };
+  }
+}
+
+/**
+ * Generic admin fetch function that wraps fetchWithAuth with admin-specific defaults
+ */
+export async function adminFetch<T = unknown>(
+  url: string,
+  options: RequestInit & {
+    useToken?: boolean;
+    revalidate?: number | false;
+    tags?: string[];
+  } = {}
+): Promise<T> {
+  return await fetchWithAuth<T>(url, {
+    useToken: true, // Admin operations always require authentication
+    ...options,
+  });
 }

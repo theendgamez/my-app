@@ -73,6 +73,17 @@ export async function fetchWithAuth<T>(
       throw new Error('Authentication failed. Redirecting to login...');
     }
     
+    // Special handling for health check endpoints
+    if (url.includes('/api/health')) {
+      const healthError = {
+        status: 'unhealthy',
+        error: response.statusText,
+        statusCode: response.status,
+        timestamp: new Date().toISOString()
+      };
+      throw new Error(`Health check failed: ${JSON.stringify(healthError)}`);
+    }
+    
     // Try to parse error message
     let errorData: unknown = {};
     try {

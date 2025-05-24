@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, createResponse } from '@/lib/auth';
 import db from '@/lib/db';
+import { decryptData, isEncrypted } from '@/utils/encryption';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,15 +9,28 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser(request);
     
     if (user) {
-      // Return user data if authentication succeeds
-      return NextResponse.json({
+      // Decrypt phone number if needed
+      let phoneNumber = user.phoneNumber;
+      if (phoneNumber && (user.isDataEncrypted || isEncrypted(phoneNumber))) {
+        try {
+          phoneNumber = decryptData(phoneNumber);
+        } catch (error) {
+          console.error('Error decrypting phone number:', error);
+          phoneNumber = ''; // Fallback to empty string
+        }
+      }
+      
+      // Return complete user data
+      return createResponse({
         userId: user.userId,
         userName: user.userName,
         email: user.email,
+        phoneNumber: phoneNumber,
+        realName: user.realName,
         role: user.role || 'user',
         isEmailVerified: user.isEmailVerified,
         isAuthenticated: true
-      });
+      }, 200);
     }
     
     // If standard auth fails, try to check using the user ID header as fallback

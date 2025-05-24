@@ -45,16 +45,14 @@ export default function ProfilePage() {
       }
       
       // Set form values from context user
-      setValue('userName', typeof user.userName === 'string' ? user.userName : '');
-      setValue('email', typeof user.email === 'string' ? user.email : '');
+      setValue('userName', user.userName || '');
+      setValue('email', user.email || '');
       
-      
-      // Fix: More robust handling of phone number
-      if ('phoneNumber' in user && user.phoneNumber !== null && user.phoneNumber !== undefined) {
-        setValue('phoneNumber', String(user.phoneNumber));
+      // Handle phone number - check if it exists in user context first
+      if (user.phoneNumber) {
+        setValue('phoneNumber', user.phoneNumber);
       } else {
-        // If phone number is missing, fetch directly from API as a fallback
-        // Define the fetch function inside useEffect to avoid dependency issues
+        // If phone number is missing from context, fetch directly from API
         const fetchUserDataDirectly = async (userId: string) => {
           try {
             const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -68,9 +66,15 @@ export default function ProfilePage() {
             
             if (response.ok) {
               const userData = await response.json();
-              if (userData && userData.phoneNumber) {
-                setValue('phoneNumber', String(userData.phoneNumber));
+              console.log('Fetched user data:', userData); // Debug log
+              
+              // Handle both direct data and nested data structure
+              const phoneNumber = userData.phoneNumber || userData.data?.phoneNumber;
+              if (phoneNumber) {
+                setValue('phoneNumber', phoneNumber);
               }
+            } else {
+              console.error('Failed to fetch user data:', response.status);
             }
           } catch (err) {
             console.error('Error fetching user data directly:', err);

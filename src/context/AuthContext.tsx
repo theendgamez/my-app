@@ -25,6 +25,10 @@ const isPermissionsCheckRunning = { current: false };
 interface UserType {
   userId: string;
   role: string;
+  userName?: string;
+  email?: string;
+  phoneNumber?: string;
+  realName?: string;
   [key: string]: unknown;
 }
 
@@ -168,11 +172,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (checkResponse.ok) {
         const userData = await checkResponse.json();
 
-        // Update user state
+        // Update user state with complete data
         setUser({
           userId,
           userName: userData.userName,
           email: userData.email,
+          phoneNumber: userData.phoneNumber, // Add phoneNumber here
+          realName: userData.realName,
           role: userData.role || 'user',
         });
 

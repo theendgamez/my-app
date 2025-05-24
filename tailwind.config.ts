@@ -109,6 +109,7 @@ const config: Config = {
         '18': '4.5rem',
         '88': '22rem',
         '128': '32rem',
+        'navbar': '4rem', // 64px - consistent navbar height
       },
       borderRadius: {
         'none': '0',
@@ -193,6 +194,7 @@ const config: Config = {
         '80': '80',
         '90': '90',
         '100': '100',
+        'navbar': '1000', // Ensure navbar is always on top
       },
       aspectRatio: {
         'ticket': '16 / 9',
