@@ -60,7 +60,7 @@ export default function UserLotteryPage() {
     const safePaymentStatus = paymentStatus || 'unknown';
 
     // If we know tickets are purchased, show that status regardless of other statuses
-    if (safeStatus === 'won' && safePaymentStatus === 'paid') {
+    if (safeStatus === 'won' && safePaymentStatus === 'completed') {
       return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購票</span>;
     }
 
@@ -158,7 +158,7 @@ export default function UserLotteryPage() {
                             >
                               付款
                             </Link>
-                          ) : reg.status === 'won' && (reg.paymentStatus === 'paid' || Boolean(reg.ticketsPurchased)) ? (
+                          ) : reg.status === 'won' && (reg.paymentStatus === 'completed' || Boolean(reg.ticketsPurchased)) ? (
                             <Link 
                               href={`/user/order`}
                               className="text-blue-600 hover:text-blue-900"

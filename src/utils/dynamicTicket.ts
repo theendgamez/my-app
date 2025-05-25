@@ -158,14 +158,14 @@ export async function recordToBlockchain(ticketData: DynamicTicketData): Promise
       const db = (await import('@/lib/db')).default;
       await db.ticketAudit.logBlockchainSync(
         ticketData.ticketId,
-        transaction.signature
+        (await transaction).signature
       );
     } catch (dbError) {
       console.warn('Failed to log blockchain sync to audit log:', dbError);
     }
     
     // Return the signature as the blockchain reference
-    return transaction.signature;
+    return (await transaction).signature;
   } catch (error) {
     console.error('Error recording to blockchain:', error);
     

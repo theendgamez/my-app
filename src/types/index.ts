@@ -193,7 +193,7 @@ export interface Registration {
   eventName?: string;
   zoneName: string;
   quantity: number;
-  status: 'registered' | 'won' | 'lost' | 'cancelled' | 'error' | 'processing';
+  status: 'registered' | 'won' | 'lost' | 'cancelled' | 'error' | 'processing'|'drawn';
   createdAt: string;
   updatedAt?: string;
   ticketIds?: string[];
@@ -206,7 +206,12 @@ export interface Registration {
   phoneNumber?: string; // Add optional phoneNumber
   paymentStatus?: 'pending' | 'completed' | 'refunded';
   platformFee ?: number; // Platform fee for the registration
-  
+  cardLastFourDigits?: string; // Last four digits of the card used for payment
+  userRealName?: string; // User's real name for the registration
+  paymentMethod?: string; // Payment method used for the registration
+  paidAt?: string; // Payment completion time
+  ticketPrice?: number; // Price per ticket for the registration
+  ticketPaid?: boolean; // Indicates if the ticket payment is completed
 }
 
 // Friendship related types

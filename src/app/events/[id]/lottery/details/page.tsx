@@ -153,7 +153,7 @@ export default function LotteryDetailsPage() {
                   <tr>
                     <td className="py-2 font-medium">付款狀態</td>
                     <td className="py-2">
-                      {registration?.paymentStatus === 'paid' ? (
+                      {registration?.paymentStatus === 'completed' ? (
                         <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">已付款</span>
                       ) : (
                         <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">未付款</span>

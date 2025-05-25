@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already paid
-    if (registration.paymentStatus === 'paid') {
+    if (registration.paymentStatus === 'completed') {
       return NextResponse.json({ error: '此登記已支付' }, { status: 400 });
     }
 
@@ -50,24 +50,24 @@ export async function POST(request: NextRequest) {
     await db.payments.create({
       paymentId,
       userId: user.userId,
-      amount: registration.totalAmount,
-      totalAmount: registration.totalAmount,
+      amount: registration.totalAmount ?? 0, // Provide default if undefined
+      totalAmount: registration.totalAmount ?? 0, // Provide default if undefined
       paymentMethod,
       status: 'completed',
       createdAt: now,
       relatedTo: 'lottery_registration',
       eventId: registration.eventId,
       eventName: event?.eventName || 'Unknown Event',
-      zone: registration.zoneName, // Add missing zone property
-      payQuantity: registration.quantity, // Add missing payQuantity property
+      zone: registration.zoneName, 
+      payQuantity: registration.quantity ?? 0, // Provide default if undefined
       cardDetails: {
-        lastFourDigits: '1234' // Simulated card details
+        lastFourDigits: registration.cardLastFourDigits || '0000', // Provide default if undefined
       }
     });
 
     // Update registration payment status
     await db.registration.update(registrationToken, {
-      paymentStatus: 'paid',
+      paymentStatus: 'completed',
       paidAt: now,
       paymentId
     });
