@@ -55,6 +55,17 @@ const UserMenu = ({ user, onLogout }: { user: Users; onLogout: () => void }) => 
           </MenuItem>
           <MenuItem>
             {({ active }) => (
+              <Link
+                href="/user/friends"
+                className={`${active ? 'bg-gray-100' : ''} block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-200`}
+              >
+                我的好友
+              </Link>
+            )}
+          </MenuItem>
+          
+          <MenuItem>
+            {({ active }) => (
               <button
                 onClick={onLogout}
                 className={`${active ? 'bg-gray-100' : ''} block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-200`}

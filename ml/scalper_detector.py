@@ -50,7 +50,6 @@ def analyze_domains(df):
                               'yorklohshoes', 'yorkloh', 'hellozlc', 'kakalam', 'douxing']
         has_suspicious_keyword = 1 if any(keyword in domain.lower() for keyword in suspicious_keywords) else 0
         has_repetitive_pattern = detect_repetitive_pattern(domain)
-        # 強化標籤邏輯：主流提供商永遠為非黃牛
         suspected_scalper = 0 if is_common_provider else (1 if (has_suspicious_keyword or has_numbers or has_repetitive_pattern) else 0)
         domain_stats.append({
             'domain': domain,

@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 import { ticketBlockchain, ensureBlockchainReady } from '@/lib/blockchain';
-
+import { Registration } from '@/types';
 // Define the Users interface
 
 export async function POST(request: NextRequest) {
@@ -35,6 +35,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '找不到該活動' }, { status: 404 });
     }
 
+    // Check if the draw has already been performed for this event
+    if (event.isDrawn) {
+      return NextResponse.json({ error: '此活動的抽籤已經完成' }, { status: 400 });
+    }
+    
     // Verify this is a lottery event
     if (!event.isDrawMode) {
       return NextResponse.json({ error: '此活動不支持抽籤模式' }, { status: 400 });
@@ -114,10 +119,10 @@ export async function POST(request: NextRequest) {
           await db.tickets.create({
             ticketId: ticketId,
             userId: reg.userId,
-            userRealName: reg.userRealName,
+            userRealName: reg.userRealName || '',
             eventId: eventId,
             zone: zoneName,
-            paymentId: reg.paymentId,
+            paymentId: reg.paymentId || '',
             status: 'reserved',
             purchaseDate: new Date().toISOString(),
             eventName: event.eventName,
@@ -300,15 +305,5 @@ async function generateQrCode(ticketId: string): Promise<string> {
 }
 
 // Define the registration type
-type Registration = {
-  registrationToken: string;
-  userId: string;
-  userRealName: string;
-  zoneName: string;
-  quantity: number;
-  paymentId: string;
-  email?: string;
-  phoneNumber?: string;
-  priorityScore?: number;
-};
+
 
