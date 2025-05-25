@@ -223,7 +223,7 @@ function LotteryDrawContent() {
       ) : events.length === 0 ? (
         <div className="bg-white p-6 rounded-lg shadow text-center">
           <p className="text-gray-600 mb-4">沒有可進行抽籤的活動</p>
-          <p className="text-sm text-gray-500">只有報名期結束但尚未抽籤的活動才能進行抽籤</p>
+          <p className="text-sm text-gray-500">當活動的報名期限已結束且尚未進行抽籤時，活動會出現在此列表中</p>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-md p-6">

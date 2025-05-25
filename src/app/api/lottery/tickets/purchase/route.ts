@@ -4,6 +4,7 @@ import db from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { decryptData, isEncrypted } from '@/utils/encryption';
 import { Ticket } from '@/types';
+import { CacheManager } from '@/lib/cache'; // Import CacheManager
 
 // Define purchase limit configuration with risk-based rules
 const purchaseLimitConfig = {
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { registrationToken, paymentMethod, cardDetails, totalAmount, quantity } = data;
+    const { registrationToken, paymentMethod, cardDetails, totalAmount, quantity, paymentType } = data;
     
     // 基本驗證
     if (!registrationToken) {
@@ -123,9 +124,12 @@ export async function POST(request: NextRequest) {
       eventId: string;
       userId: string;
       status: string;
-      ticketsPurchased: boolean;
+      ticketsPurchased?: boolean; // Changed to optional to match main type
       zoneName: string;
-      ticketIds?: string[]; // 可能包含的已購票券 ID 列表
+      ticketIds?: string[];
+      platformFeePaid?: boolean;
+      platformFeePaymentId?: string; 
+      quantity: number; // Ensure quantity is part of this local type
     };
     const registration = await db.registration.findByToken(registrationToken) as Registration;
     if (!registration) {
@@ -137,14 +141,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '無權處理此登記的付款' }, { status: 403 });
     }
 
-    // 驗證抽籤狀態
-    if (registration.status !== 'won') {
-      return NextResponse.json({ error: '您尚未在此抽籤中獲勝，無法購買門票' }, { status: 400 });
-    }
+    // For platform fee payments, we can bypass the won status check
+    if (paymentType !== 'platform_fee') {
+      // 驗證抽籤狀態
+      if (registration.status !== 'won') {
+        return NextResponse.json({ error: '您尚未在此抽籤中獲勝，無法購買門票' }, { status: 400 });
+      }
 
-    // 驗證是否已購票
-    if (registration.ticketsPurchased) {
-      return NextResponse.json({ error: '您已經購買了此活動的門票' }, { status: 400 });
+      // 驗證是否已購票
+      if (registration.ticketsPurchased) {
+        return NextResponse.json({ error: '您已經購買了此活動的門票' }, { status: 400 });
+      }
+    } else {
+      // For platform fee payments, check if already paid
+      if (registration.platformFeePaid) {
+        return NextResponse.json({ error: '平台費用已經支付' }, { status: 400 });
+      }
     }
 
     // 檢查購票限制 - updated to pass quantity
@@ -159,29 +171,6 @@ export async function POST(request: NextRequest) {
     const event = await db.events.findById(registration.eventId);
     if (!event) {
       return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
-    }
-
-    // 更新區域票數
-    const zoneFromEvent = event.zones?.find(zone => zone.name === registration.zoneName);
-    if (zoneFromEvent && zoneFromEvent.zoneQuantity !== undefined) {
-      const currentEvent = await db.events.findById(registration.eventId);
-      if (!currentEvent) {
-        return NextResponse.json({ error: '找不到相關活動' }, { status: 404 });
-      }
-      
-      const currentZoneDetails = currentEvent.zones?.find(z => z.name === registration.zoneName);
-      if (currentZoneDetails && currentZoneDetails.zoneQuantity !== undefined) {
-        const currentQuantity = Number(currentZoneDetails.zoneQuantity);
-        const newQuantity = Math.max(0, currentQuantity - quantity);
-        
-        await db.events.updateZoneRemaining(
-          registration.eventId,
-          registration.zoneName,
-          newQuantity
-        );
-        
-        console.log(`Zone quantity updated: ${registration.zoneName} in event ${registration.eventId}: ${currentQuantity} -> ${newQuantity}`);
-      }
     }
 
     // 處理支付
@@ -201,7 +190,7 @@ export async function POST(request: NextRequest) {
       eventName: event.eventName,
       zone: registration.zoneName,
       payQuantity: quantity,
-      relatedTo: 'ticket_purchase',
+      relatedTo: paymentType === 'platform_fee' ? 'platform_fee' : 'ticket_purchase',
       cardDetails
     });
 
@@ -214,42 +203,71 @@ export async function POST(request: NextRequest) {
     // Prepare tickets array to collect ticket info for response
     const tickets: Ticket[] = [];
 
-    // Check if there are existing tickets that need to be updated from "reserved" to "sold"
+    // If this is a platform fee payment, update the registration
+    if (paymentType === 'platform_fee') {
+      await db.registration.update(registrationToken, {
+        platformFeePaid: true,
+        paymentStatus: 'paid', // Status for platform fee
+        platformFeePaymentId: paymentId // Store the paymentId for the platform fee
+      });
+
+      // Invalidate cache as registration details affecting ticket status might change
+      await CacheManager.invalidateUserCache(user.userId); // Corrected method name
+      
+      return NextResponse.json({
+        success: true,
+        message: '平台費用支付成功',
+        paymentId,
+        receipt: {
+          paymentId,
+          amount: totalAmount,
+          date: now,
+          eventName: event.eventName,
+          bookingToken
+        }
+      });
+    }
+
+    // For ticket purchase (paymentType === 'ticket_price')
+    const purchasedTicketIds: string[] = [];
+
     if (registration.ticketIds && registration.ticketIds.length > 0) {
+      console.log(`Updating existing ${registration.ticketIds.length} reserved tickets for registration ${registrationToken}`);
       for (const ticketId of registration.ticketIds) {
         await db.tickets.update(ticketId, {
           status: 'sold',
-          paymentId,
-          purchaseDate: now
+          paymentId, // This is the paymentId for the ticket purchase
+          purchaseDate: now,
+          // Ensure other relevant fields like userId, userRealName are already on the ticket or add them
         });
-        // Optionally, fetch the updated ticket to include in the response
         const updatedTicket = await db.tickets.findById(ticketId);
         if (updatedTicket) {
           tickets.push(updatedTicket);
+          purchasedTicketIds.push(ticketId);
         }
       }
     } else {
-      // Create new tickets if needed
+      console.log(`Creating ${quantity} new tickets for registration ${registrationToken} as no existing ticketIds found.`);
       for (let i = 0; i < quantity; i++) {
         const ticketId = uuidv4();
-        const ticket = {
+        const ticket: Ticket = { // Ensure using the global Ticket type
           ticketId,
           eventId: registration.eventId,
           eventName: event.eventName,
           userId: user.userId,
           userRealName: userRealName,
           zone: registration.zoneName,
-          paymentId,
-          bookingToken,
-          status: "sold" as const,
+          paymentId, // This is the paymentId for the ticket purchase
+          bookingToken, 
+          status: "sold", // Explicitly type as 'sold'
           purchaseDate: now,
           eventDate: event.eventDate,
           eventLocation: event.location ?? '',
-          seatNumber: '',
+          seatNumber: '', 
           price: String(totalAmount / quantity),
-          qrCode: ticketId,
-          lastRefreshed: '',
-          nextRefresh: '',
+          qrCode: ticketId, 
+          lastRefreshed: now,
+          nextRefresh: new Date(Date.now() + 5 * 60 * 1000).toISOString(), 
           lastVerified: null,
           verificationCount: 0,
           transferredAt: null,
@@ -259,16 +277,19 @@ export async function POST(request: NextRequest) {
         
         tickets.push(ticket);
         await db.tickets.create(ticket);
+        purchasedTicketIds.push(ticketId);
       }
     }
 
-    // 更新註冊信息
+    // Update registration to reflect tickets purchased
     await db.registration.update(registrationToken, {
       ticketsPurchased: true,
-      paymentId
+      paymentStatus: 'paid', // General payment status for the registration related to tickets
+      paymentId: paymentId, // Store the paymentId for the ticket purchase
+      ticketIds: purchasedTicketIds // Update/set the ticketIds on the registration
     });
 
-    // 記錄購買信息
+    // Record purchase information with correct pricing
     await db.userPurchases.create({
       userId: user.userId,
       eventId: registration.eventId,
@@ -278,7 +299,7 @@ export async function POST(request: NextRequest) {
       purchaseId: uuidv4(),
       ticketId: tickets.map(ticket => ticket.ticketId).join(','),
       status: 'completed',
-      totalAmount,
+      totalAmount, // Use the consistent totalAmount
       eventName: event.eventName,
       zoneName: registration.zoneName,
       userRealName: userRealName,
@@ -287,6 +308,9 @@ export async function POST(request: NextRequest) {
         lastFourDigits: cardDetails?.lastFourDigits || 'XXXX'
       }
     });
+
+    // Invalidate user's ticket cache after successful purchase
+    await CacheManager.invalidateUserCache(user.userId); // Corrected method name
 
     return NextResponse.json({
       success: true,

@@ -206,9 +206,9 @@ export default function AdminLotteryPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(event.status)}`}>
                           {event.status === 'registering' && '登記中'}
-                          {event.status === 'drawing' && '抽籤進行中'}
+                          {event.status === 'drawing' && '可抽籤'}
                           {event.status === 'drawn' && '已抽籤'}
-                          {event.status === 'closed' && '已結束'}
+                          {event.status === 'closed' && '已完結'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

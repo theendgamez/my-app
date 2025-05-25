@@ -190,27 +190,23 @@ export interface Registration {
   registrationToken: string;
   userId: string;
   eventId: string;
-  eventName?: string; // Add this to fix "未知活動"
+  eventName?: string;
   zoneName: string;
   quantity: number;
-  status: 'pending' | 'registered' | 'drawn' | 'won' | 'lost' | 'confirmed';
-  paymentStatus?: 'pending' | 'paid' | 'failed';
-  platformFee?: number;
-  platformFeePaid?: boolean;
-  ticketPrice?: number;
-  ticketPaid?: boolean;
-  ticketIds?: string[];
-  ticketsPurchased?: boolean;
+  status: 'registered' | 'won' | 'lost' | 'cancelled' | 'error' | 'processing';
   createdAt: string;
-  drawDate?: string;
-  paymentId?: string;
-  paidAt?: string;
-  totalAmount?: number;
-  phoneNumber?: string;
-  isDrawn?: boolean;
-  drawnAt?: string;
-  resultViewed?: boolean;
-  userRealName?: string;
+  updatedAt?: string;
+  ticketIds?: string[];
+  paymentId?: string; // For the main ticket purchase
+  platformFeePaid?: boolean;
+  platformFeePaymentId?: string; // For the platform fee payment
+  ticketsPurchased?: boolean;
+  totalAmount?: number; // Total amount for the registration if applicable
+  drawDate?: string; // Draw date for the lottery
+  phoneNumber?: string; // Add optional phoneNumber
+  paymentStatus?: 'pending' | 'completed' | 'refunded';
+  platformFee ?: number; // Platform fee for the registration
+  
 }
 
 // Friendship related types

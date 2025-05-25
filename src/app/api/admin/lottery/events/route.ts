@@ -50,13 +50,15 @@ export async function GET(request: NextRequest) {
         let status = 'registering';
         const now = new Date();
         const drawDate = event.drawDate ? new Date(event.drawDate) : null;
+        const endRegisterDate = event.endregisterDate ? new Date(event.endregisterDate) : null;
         
         if (event.isDrawn) {
           status = 'drawn';
+        } else if (endRegisterDate && endRegisterDate < now) {
+          // Registration period ended but not yet drawn - ready for drawing
+          status = 'drawing';
         } else if (drawDate && drawDate < now) {
           status = 'closed';
-        } else if (event.endregisterDate && new Date(event.endregisterDate) < now) {
-          status = 'drawing';
         }
 
         // Calculate remaining days until draw

@@ -54,17 +54,21 @@ export default function UserLotteryPage() {
     }
   }, [isAuthenticated, authLoading, router, user]);
 
-  const getStatusBadge = (status: string, paymentStatus: string) => {
+  const getStatusBadge = (status: string | undefined, paymentStatus: string | undefined) => {
+    // Use default values if undefined
+    const safeStatus = status || 'unknown';
+    const safePaymentStatus = paymentStatus || 'unknown';
+
     // If we know tickets are purchased, show that status regardless of other statuses
-    if (status === 'won' && paymentStatus === 'paid') {
+    if (safeStatus === 'won' && safePaymentStatus === 'paid') {
       return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購票</span>;
     }
 
-    if (paymentStatus === 'pending') {
+    if (safePaymentStatus === 'pending') {
       return <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded">未付款</span>;
     }
     
-    switch (status) {
+    switch (safeStatus) {
       case 'registered':
         return <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">等待抽籤</span>;
       case 'drawn':
@@ -73,7 +77,7 @@ export default function UserLotteryPage() {
       case 'lost':
         return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">未中籤</span>;
       default:
-        return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">{status}</span>;
+        return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">{safeStatus}</span>;
     }
   };
 
@@ -154,7 +158,7 @@ export default function UserLotteryPage() {
                             >
                               付款
                             </Link>
-                          ) : reg.status === 'won' && (reg.paymentStatus === 'paid' || (typeof reg.ticketsPurchased === 'function' ? Boolean(reg.ticketsPurchased(null)) : reg.ticketsPurchased)) ? (
+                          ) : reg.status === 'won' && (reg.paymentStatus === 'paid' || Boolean(reg.ticketsPurchased)) ? (
                             <Link 
                               href={`/user/order`}
                               className="text-blue-600 hover:text-blue-900"

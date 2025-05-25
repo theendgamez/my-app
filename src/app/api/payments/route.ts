@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       zone: booking.zone,
       payQuantity: booking.quantity,
       totalAmount,
-      amount: totalAmount,
+      amount: subtotal, // Store the subtotal without platform fee in amount
       paymentMethod: 'credit_card',
       relatedTo: "ticket_purchase" as const,
       createdAt: now,

@@ -15,11 +15,13 @@ interface Payment {
   eventId: string;
   eventName?: string;
   amount: number;
+  totalAmount: number; // Add this field if not already present
   status: string;
   createdAt: string;
   updatedAt?: string;
   method?: string;
   paymentDetails?: Record<string, unknown>;
+  payQuantity?: number;
 }
 
 interface Ticket {
@@ -188,7 +190,7 @@ export default function PaymentDetailPage() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">金額</dt>
                   <dd className="mt-1 text-sm text-gray-900 font-semibold">
-                    {formatCurrency(payment.amount, '免費票券')}
+                    {formatCurrency(payment.totalAmount || payment.amount, '免費票券')}
                   </dd>
                 </div>
                 <div>
@@ -207,6 +209,14 @@ export default function PaymentDetailPage() {
                   <dt className="text-sm font-medium text-gray-500">上次更新</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     {payment.updatedAt ? formatDate(payment.updatedAt) : '無更新記錄'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">票價</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {payment.payQuantity && payment.amount ? 
+                      `${formatCurrency(payment.amount/payment.payQuantity)} × ${payment.payQuantity}` : 
+                      formatCurrency(payment.amount, '免費票券')}
                   </dd>
                 </div>
               </dl>

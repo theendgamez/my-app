@@ -17,24 +17,17 @@ export async function GET(
       return NextResponse.json({ error: 'Registration not found', registrationToken: token }, { status: 404 });
     }
 
-    // Check for associated tickets to determine purchase status
+    // Determine purchase status directly from the registration record's flag
+    // This flag is set to true only when actual tickets are purchased in the purchase API.
+    const ticketsPurchased = Boolean(registration.ticketsPurchased); 
+
     let associatedTickets: unknown[] = [];
-    let ticketsPurchased = Boolean(registration.ticketsPurchased);
-    
-    // If ticketIds exists, use them to check for actual tickets
     if (Array.isArray(registration.ticketIds) && registration.ticketIds.length > 0) {
       try {
         associatedTickets = await Promise.all(
           registration.ticketIds.map(ticketId => db.tickets.findById(ticketId))
         );
-        
-        // Filter out any null results
         associatedTickets = associatedTickets.filter(ticket => ticket !== null);
-        
-        // If we have valid tickets and a payment, then tickets were purchased
-        if (associatedTickets.length > 0 && registration.paymentId) {
-          ticketsPurchased = true;
-        }
       } catch (ticketError) {
         console.error(`Error fetching associated tickets for registration ${token}:`, ticketError);
       }
@@ -43,7 +36,8 @@ export async function GET(
     // Provide more detailed purchase status in the response
     const enhancedRegistration = {
       ...registration,
-      ticketsPurchased,
+      ticketsPurchased, // Use the authoritative value
+      platformFeePaid: Boolean(registration.platformFeePaid), // Ensure platformFeePaid is always boolean
       hasAssociatedTickets: associatedTickets.length > 0,
       ticketCount: associatedTickets.length
     };
