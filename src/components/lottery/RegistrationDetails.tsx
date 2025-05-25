@@ -6,23 +6,31 @@ interface RegistrationDetailsProps {
 }
 
 export default function RegistrationDetails({ registration }: RegistrationDetailsProps) {
-  const getStatusBadge = (status: string, paymentStatus?: string, platformFeePaid?: boolean) => {
-    // If platform fee not paid, show that status first
-    if (paymentStatus === 'pending' || platformFeePaid === false) {
+  const getStatusBadge = (regDetails: Registration) => {
+    const { status, platformFeePaid, ticketsPurchased } = regDetails;
+
+    // Priority 1: Platform fee for 'registered' or 'won' (if somehow missed or needs to be paid post-win)
+    if (!platformFeePaid && (status === 'registered' || status === 'won')) {
       return <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded">平台費未付款</span>;
     }
 
-    // Otherwise show lottery status
+    // Priority 2: Lottery status
     switch (status) {
-      case 'registered':
+      case 'registered': // Platform fee must be paid by now if this branch is reached
         return <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">等待抽籤</span>;
-      case 'drawn':
       case 'won':
-        return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已中籤</span>;
+        if (ticketsPurchased) {
+          return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已中籤 (已購票)</span>;
+        } else { // Platform fee paid (due to check above), won, but tickets not purchased
+          return <span className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">已中籤 (待購票)</span>;
+        }
       case 'lost':
         return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">未中籤</span>;
+      case 'drawn':
+         return <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">已開獎</span>;
       default:
-        return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">{status || '未知狀態'}</span>;
+        // Fallback for other statuses like 'cancelled', 'error', 'processing'
+        return <span className="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">{status || '未知'}</span>;
     }
   };
 
@@ -40,7 +48,7 @@ export default function RegistrationDetails({ registration }: RegistrationDetail
       <h2 className="text-xl font-semibold mb-4">抽籤登記詳情</h2>
       
       <div className="mb-4">
-        {getStatusBadge(registration.status, registration.paymentStatus, registration.platformFeePaid)}
+        {getStatusBadge(registration)}
       </div>
 
       <div className="space-y-3">

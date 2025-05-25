@@ -112,16 +112,17 @@ export default function LotteryDetailsPage() {
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold">抽籤登記詳情</h1>
               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                registration?.status === 'won' ? 'bg-green-100 text-green-800' :
+                registration?.status === 'won' ? (registration?.ticketsPurchased ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') :
                 registration?.status === 'lost' ? 'bg-gray-100 text-gray-800' :
-                registration?.status === 'drawn' ? 'bg-blue-100 text-blue-800' :
-                'bg-yellow-100 text-yellow-800'
+                registration?.status === 'drawn' ? 'bg-purple-100 text-purple-800' :
+                registration?.status === 'registered' ? (!registration?.platformFeePaid ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-800') :
+                'bg-gray-200 text-gray-700'
               }`}>
-                {registration?.status === 'won' && '已中籤'}
-                {registration?.status === 'lost' && '未中籤'}
-                {registration?.status === 'drawn' && '已抽籤'}
-                {registration?.status === 'registered' && '等待抽籤'}
-                {!['won', 'lost', 'drawn', 'registered'].includes(registration?.status || '') && '未知狀態'}
+                {registration?.status === 'won' ? (registration?.ticketsPurchased ? '已中籤 (已購票)' : '已中籤 (待購票)') :
+                 registration?.status === 'lost' ? '未中籤' :
+                 registration?.status === 'drawn' ? '已開獎' :
+                 registration?.status === 'registered' ? (!registration?.platformFeePaid ? '等待抽籤 (待付平台費)' : '等待抽籤') :
+                 registration?.status || '未知狀態'}
               </span>
             </div>
 
@@ -150,25 +151,46 @@ export default function LotteryDetailsPage() {
                     <td className="py-2 font-medium">登記時間</td>
                     <td className="py-2">{formatDate(registration?.createdAt)}</td>
                   </tr>
+                  {/* Platform Fee Status */}
                   <tr>
-                    <td className="py-2 font-medium">付款狀態</td>
+                    <td className="py-2 font-medium">平台費狀態</td>
                     <td className="py-2">
-                      {registration?.paymentStatus === 'completed' ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">已付款</span>
+                      {registration?.platformFeePaid ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">已支付</span>
                       ) : (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">未付款</span>
+                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">未支付</span>
                       )}
                     </td>
                   </tr>
-                  {registration?.paymentId && (
+                  {registration?.platformFeePaymentId && (
                     <tr>
-                      <td className="py-2 font-medium">付款ID</td>
+                      <td className="py-2 font-medium">平台費支付ID</td>
+                      <td className="py-2">{registration.platformFeePaymentId}</td>
+                    </tr>
+                  )}
+
+                  {/* Ticket Payment Status - only if won */}
+                  {registration?.status === 'won' && (
+                    <tr>
+                      <td className="py-2 font-medium">票券付款狀態</td>
+                      <td className="py-2">
+                        {registration?.ticketsPurchased ? (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">已購票</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">待購票</span>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  {registration?.status === 'won' && registration?.paymentId && registration?.ticketsPurchased && ( // paymentId here is for ticket purchase
+                    <tr> 
+                      <td className="py-2 font-medium">票券支付ID</td>
                       <td className="py-2">{registration.paymentId}</td>
                     </tr>
                   )}
-                  {registration?.paidAt && (
+                  {registration?.paidAt && (registration?.platformFeePaid || registration?.ticketsPurchased) && ( // Show paidAt if either fee is paid
                     <tr>
-                      <td className="py-2 font-medium">付款時間</td>
+                      <td className="py-2 font-medium">最近付款時間</td>
                       <td className="py-2">{formatDate(registration.paidAt)}</td>
                     </tr>
                   )}
@@ -176,13 +198,14 @@ export default function LotteryDetailsPage() {
                     <td className="py-2 font-medium">抽籤日期</td>
                     <td className="py-2">{formatDate(registration?.drawDate)}</td>
                   </tr>
-                  {registration?.status !== 'registered' && (
+                  {registration?.status !== 'registered' && registration?.status !== 'processing' && (
                     <tr>
                       <td className="py-2 font-medium">抽籤結果</td>
                       <td className="py-2">
                         {registration?.status === 'won' ? '中籤' : 
                          registration?.status === 'lost' ? '未中籤' : 
-                         '未知結果'}
+                         registration?.status === 'drawn' ? '已開獎' :
+                         '結果待確認'}
                       </td>
                     </tr>
                   )}
@@ -200,16 +223,18 @@ export default function LotteryDetailsPage() {
               </ol>
             </div>
 
-            {/* Payment Section - Add this section */}
-            {registration?.paymentStatus === 'pending' && (
+            {/* Platform Fee Payment Section */}
+            {!registration?.platformFeePaid && 
+             (registration?.status === 'registered' || (registration?.status === 'won' && !registration?.ticketsPurchased)) && (
               <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h3 className="font-semibold text-yellow-800 mb-2">需要付款</h3>
+                <h3 className="font-semibold text-yellow-800 mb-2">平台費用待支付</h3>
                 <p className="text-yellow-700 mb-4">
-                  您需要支付平台費用以完成抽籤登記。平台費用為每張票券 HK$18。
+                  您需要支付平台費用以 {registration?.status === 'registered' ? '完成抽籤登記' : '確認中籤資格'}。
+                  平台費用為每張票券 HK${registration.platformFee || 18}。
                 </p>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-semibold">
-                    總金額: HK${((registration.quantity || 1) * 18).toLocaleString()}
+                    總金額: HK${((registration.quantity || 1) * (registration.platformFee || 18)).toLocaleString()}
                   </span>
                   <Link
                     href={`/events/${id}/lottery/payment?registrationToken=${registration.registrationToken}`}
@@ -228,7 +253,7 @@ export default function LotteryDetailsPage() {
               >
                 返回我的抽籤
               </Link>
-              {registration?.status === 'won' && registration?.paymentStatus === 'pending' && (
+              {registration?.status === 'won' && registration.platformFeePaid && !registration.ticketsPurchased && (
                 <Link 
                   href={`/events/${id}/lottery/payment?registrationToken=${registration.registrationToken}`}
                   className="flex-1 px-4 py-2 bg-green-500 text-white hover:bg-green-600 rounded text-center"

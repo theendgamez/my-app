@@ -54,31 +54,32 @@ export default function UserLotteryPage() {
     }
   }, [isAuthenticated, authLoading, router, user]);
 
-  const getStatusBadge = (status: string | undefined, paymentStatus: string | undefined) => {
-    // Use default values if undefined
-    const safeStatus = status || 'unknown';
-    const safePaymentStatus = paymentStatus || 'unknown';
+  const getStatusBadge = (reg: Registration) => {
+    const { status, platformFeePaid, ticketsPurchased, paymentStatus } = reg;
 
-    // If we know tickets are purchased, show that status regardless of other statuses
-    if (safeStatus === 'won' && safePaymentStatus === 'completed') {
-      return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購票</span>;
-    }
-
-    if (safePaymentStatus === 'pending') {
-      return <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded">未付款</span>;
-    }
-    
-    switch (safeStatus) {
-      case 'registered':
+    if (status === 'won') {
+      if (ticketsPurchased) {
+        return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已購票</span>;
+      } else if (platformFeePaid) { // Won, platform fee paid, but tickets not yet purchased
+        return <span className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">已中籤 (待購票)</span>;
+      } else { // Won, but platform fee not paid (implies it's the next step)
+        return <span className="inline-block px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">已中籤 (待付平台費)</span>;
+      }
+    } else if (status === 'registered') {
+      if (!platformFeePaid) {
+        return <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">等待抽籤 (待付平台費)</span>;
+      } else {
         return <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">等待抽籤</span>;
-      case 'drawn':
-      case 'won':
-        return <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded">已中籤</span>;
-      case 'lost':
-        return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">未中籤</span>;
-      default:
-        return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">{safeStatus}</span>;
+      }
+    } else if (status === 'lost') {
+      return <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">未中籤</span>;
+    } else if (status === 'drawn') {
+        return <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">已開獎</span>;
+    } else if (paymentStatus === 'pending' && !platformFeePaid && !ticketsPurchased) {
+        return <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded">未付款</span>;
     }
+    // Fallback for other statuses like 'cancelled', 'error', 'processing'
+    return <span className="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">{status || '未知'}</span>;
   };
 
   if (loading || authLoading) {
@@ -148,27 +149,41 @@ export default function UserLotteryPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(reg.status, reg.paymentStatus)}
+                          {getStatusBadge(reg)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {reg.status === 'won' && reg.paymentStatus === 'pending' && !reg.ticketsPurchased ? (
-                            <Link 
-                              href={`/events/${reg.eventId}/tickets/purchase?registrationToken=${reg.registrationToken}`}
+                          {reg.status === 'registered' && !reg.platformFeePaid ? (
+                            <Link
+                              href={`/events/${reg.eventId}/lottery/payment?registrationToken=${reg.registrationToken}`}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              支付平台費
+                            </Link>
+                          ) : reg.status === 'won' && !reg.platformFeePaid ? (
+                            <Link
+                              href={`/events/${reg.eventId}/lottery/payment?registrationToken=${reg.registrationToken}`}
+                              className="text-orange-600 hover:text-orange-900"
+                            >
+                              支付平台費
+                            </Link>
+                          ) : reg.status === 'won' && reg.platformFeePaid && !reg.ticketsPurchased ? (
+                            <Link
+                              href={`/events/${reg.eventId}/lottery/payment?registrationToken=${reg.registrationToken}`}
                               className="text-blue-600 hover:text-blue-900"
                             >
-                              付款
+                              購買門票
                             </Link>
-                          ) : reg.status === 'won' && (reg.paymentStatus === 'completed' || Boolean(reg.ticketsPurchased)) ? (
+                          ) : reg.ticketsPurchased ? (
                             <Link 
                               href={`/user/order`}
-                              className="text-blue-600 hover:text-blue-900"
+                              className="text-green-600 hover:text-green-900"
                             >
                               查看門票
                             </Link>
                           ) : (
                             <Link 
                               href={`/events/${reg.eventId}/lottery/details?registrationToken=${reg.registrationToken}`}
-                              className="text-blue-600 hover:text-blue-900"
+                              className="text-gray-600 hover:text-gray-900"
                             >
                               查看詳情
                             </Link>
