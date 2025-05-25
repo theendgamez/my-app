@@ -58,9 +58,21 @@ export async function GET(
       return NextResponse.json({ error: '無權訪問此抽籤登記' }, { status: 403 });
     }
 
-    // Return registration data
+    // Fetch event details to get event name
+    let eventName = '未知活動';
+    try {
+      const event = await db.events.findById(registration.eventId);
+      if (event) {
+        eventName = event.eventName;
+      }
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+    }
+
+    // Return registration data with event name
     return NextResponse.json({
       ...registration,
+      eventName, // Add event name to fix "未知活動"
       phoneNumber: registration.phoneNumber || '',
     });
   } catch (error) {

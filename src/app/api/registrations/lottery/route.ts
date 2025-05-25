@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { Registration } from '@/types';
+import { linkTicketToRegistration } from '@/lib/lottery';
 
 export const dynamic = 'force-dynamic'; // Don't cache this route 
 
@@ -53,6 +54,38 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching registrations:', error);
     return NextResponse.json(
       { error: '無法獲取抽籤登記', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+// Add this to your existing lottery registration success handler
+export async function PUT(request: Request) {
+  try {
+    const data = await request.json();
+    const { registrationToken, ticketId } = data;
+    
+    if (!registrationToken || !ticketId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required parameters' },
+        { status: 400 }
+      );
+    }
+    
+    // Link the ticket to the registration
+    const linked = await linkTicketToRegistration(ticketId, registrationToken);
+    if (!linked) {
+      return NextResponse.json(
+        { success: false, error: 'Could not link ticket to registration' },
+        { status: 400 }
+      );
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating lottery registration:', error);
+    return NextResponse.json(
+      { success: false, error: 'Registration update failed' },
       { status: 500 }
     );
   }

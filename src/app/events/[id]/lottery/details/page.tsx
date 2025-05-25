@@ -200,6 +200,27 @@ export default function LotteryDetailsPage() {
               </ol>
             </div>
 
+            {/* Payment Section - Add this section */}
+            {registration?.paymentStatus === 'pending' && (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 className="font-semibold text-yellow-800 mb-2">需要付款</h3>
+                <p className="text-yellow-700 mb-4">
+                  您需要支付平台費用以完成抽籤登記。平台費用為每張票券 HK$18。
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-semibold">
+                    總金額: HK${((registration.quantity || 1) * 18).toLocaleString()}
+                  </span>
+                  <Link
+                    href={`/events/${id}/lottery/payment?registrationToken=${registration.registrationToken}`}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                  >
+                    支付平台費用
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between gap-4">
               <Link 
                 href="/user/lottery" 

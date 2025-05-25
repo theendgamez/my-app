@@ -187,31 +187,30 @@ export interface BookingDetails {
 }
 
 export interface Registration {
-  ticketIds: boolean;
-  ticketsPurchased(ticketsPurchased: unknown): unknown;
   registrationToken: string;
-  eventId: string;
   userId: string;
-  userRealName?: string;
-  email?: string;
-  phoneNumber?: string;
-  eventName?: string;
+  eventId: string;
+  eventName?: string; // Add this to fix "未知活動"
   zoneName: string;
   quantity: number;
-  platformFee: number;
-  totalAmount: number;
+  status: 'pending' | 'registered' | 'drawn' | 'won' | 'lost' | 'confirmed';
+  paymentStatus?: 'pending' | 'paid' | 'failed';
+  platformFee?: number;
+  platformFeePaid?: boolean;
+  ticketPrice?: number;
+  ticketPaid?: boolean;
+  ticketIds?: string[];
+  ticketsPurchased?: boolean;
   createdAt: string;
-  status: 'registered' | 'paid' | 'drawn' | 'won' | 'lost' | 'cancelled';
-  paymentStatus: 'pending' | 'paid' | 'refunded';
+  drawDate?: string;
   paymentId?: string;
   paidAt?: string;
-  drawDate?: string;
+  totalAmount?: number;
+  phoneNumber?: string;
   isDrawn?: boolean;
-  sessionId?: string;
-  priorityScore?: number;  
-  riskScore?: number;      
-  lastPurchaseDate?: string;
-  
+  drawnAt?: string;
+  resultViewed?: boolean;
+  userRealName?: string;
 }
 
 // Friendship related types

@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
+import { ticketBlockchain, ensureBlockchainReady } from '@/lib/blockchain';
 
 // Define the Users interface
 
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
     if (!eventId) {
       return NextResponse.json({ error: '請提供活動ID' }, { status: 400 });
     }
+
+    // Ensure blockchain is ready
+    await ensureBlockchainReady();
 
     // Fetch the event
     const event = await db.events.findById(eventId);
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
           drawnAt: new Date().toISOString()
         });
         
-        // Automatically create tickets for winners since they've already paid
+        // Create tickets and record to blockchain
         const ticketIds = [];
         for (let i = 0; i < quantity; i++) {
           const ticketId = uuidv4();
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
             eventId: eventId,
             zone: zoneName,
             paymentId: reg.paymentId,
-            status: 'reserved', // Change from 'available' to 'reserved'
+            status: 'reserved',
             purchaseDate: new Date().toISOString(),
             eventName: event.eventName,
             eventDate: event.eventDate,
@@ -130,13 +134,40 @@ export async function POST(request: NextRequest) {
             transferredFrom: null,
             adminNotes: ''
           });
+
+          // Record ticket creation to blockchain
+          try {
+            await ticketBlockchain.addTransaction({
+              ticketId: ticketId,
+              timestamp: Date.now(),
+              action: 'create',
+              toUserId: reg.userId,
+              eventId: eventId
+            });
+          } catch (blockchainError) {
+            console.error('Error recording ticket creation to blockchain:', blockchainError);
+          }
         }
         
         // Save ticket IDs to the registration
         await db.registration.update(reg.registrationToken, {
           ticketIds: ticketIds
         });
-        
+
+        // Record lottery win to blockchain
+        try {
+          await ticketBlockchain.addTransaction({
+            ticketId: `lottery_${reg.registrationToken}`,
+            timestamp: Date.now(),
+            action: 'verify',
+            fromUserId: 'lottery_system',
+            toUserId: reg.userId,
+            eventId: eventId
+          });
+        } catch (blockchainError) {
+          console.error('Error logging lottery win to blockchain:', blockchainError);
+        }
+
         // Add lottery history
         await db.lotteryHistory.create({
           userId,
@@ -163,6 +194,20 @@ export async function POST(request: NextRequest) {
           drawnAt: new Date().toISOString()
         });
         
+        // Record lottery loss to blockchain
+        try {
+          await ticketBlockchain.addTransaction({
+            ticketId: `lottery_${reg.registrationToken}`,
+            timestamp: Date.now(),
+            action: 'cancel',
+            fromUserId: 'lottery_system',
+            toUserId: reg.userId,
+            eventId: eventId
+          });
+        } catch (blockchainError) {
+          console.error('Error logging lottery loss to blockchain:', blockchainError);
+        }
+
         // Add lottery history
         await db.lotteryHistory.create({
           userId,
@@ -188,7 +233,30 @@ export async function POST(request: NextRequest) {
       drawnAt: new Date().toISOString()
     });
     
-    // In a real application, send notifications to all participants here
+    // Process all pending transactions to create new blocks
+    try {
+      await ticketBlockchain.processPendingTransactions();
+      console.log('All lottery transactions processed and saved to blockchain');
+    } catch (blockchainError) {
+      console.error('Error processing pending blockchain transactions:', blockchainError);
+    }
+    
+    // Record draw completion to blockchain
+    try {
+      await ticketBlockchain.addTransaction({
+        ticketId: `draw_completion_${eventId}`,
+        timestamp: Date.now(),
+        action: 'verify',
+        fromUserId: 'admin_system',
+        toUserId: 'lottery_participants',
+        eventId: eventId
+      });
+      
+      // Process this final transaction
+      await ticketBlockchain.processPendingTransactions();
+    } catch (blockchainError) {
+      console.error('Error logging draw completion to blockchain:', blockchainError);
+    }
     
     return NextResponse.json({
       success: true,
@@ -206,7 +274,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       error: '執行抽籤時出錯', 
       details: error instanceof Error ? error.message : String(error)
-    });
+    }, { status: 500 });
   }
 }
 

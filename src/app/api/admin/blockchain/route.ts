@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { ticketBlockchain } from '@/lib/blockchain';
+import { ticketBlockchain, ensureBlockchainReady } from '@/lib/blockchain';
 
 // Define the transaction structure
 interface Transaction {
@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
     if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: '此功能僅限管理員使用' }, { status: 403 });
     }
+    
+    // Ensure blockchain is initialized before accessing
+    await ensureBlockchainReady();
     
     // Access the blockchain data
     // @ts-expect-error - Accessing private property for admin view

@@ -81,21 +81,21 @@ export class TicketBlockchain {
   private difficulty: number;
   private pendingTransactions: TicketTransaction[];
   private readonly SECRET_KEY: string;
+  private isInitialized: boolean = false;
 
   constructor() {
-    this.difficulty = 4; // 調整難度以控制挖礦速度
+    this.difficulty = 4;
     this.pendingTransactions = [];
-    // In actual use, this key should be stored in environment variables
     this.SECRET_KEY = process.env.NEXT_PUBLIC_BLOCKCHAIN_SECRET || 'your-secret-blockchain-key';
-    
-    // Initialize with empty chain, will be loaded later
     this.chain = [];
     
-    // Immediately attempt to load saved data
+    // Initialize chain asynchronously
     this.initializeChain();
   }
 
   private async initializeChain(): Promise<void> {
+    if (this.isInitialized) return;
+    
     try {
       const savedData = await storage.loadData();
       if (savedData && savedData.chain && savedData.chain.length > 0) {
@@ -105,11 +105,14 @@ export class TicketBlockchain {
       } else {
         console.log('No existing blockchain found, creating genesis block');
         this.chain = [this.createGenesisBlock()];
-        this.saveChain();
+        await this.saveChain();
       }
+      this.isInitialized = true;
     } catch (error) {
       console.error('Error initializing blockchain:', error);
       this.chain = [this.createGenesisBlock()];
+      this.isInitialized = true;
+      await this.saveChain();
     }
   }
 
@@ -155,14 +158,19 @@ export class TicketBlockchain {
         chain: this.chain,
         pendingTransactions: this.pendingTransactions
       });
-      console.log(`Blockchain saved with ${this.chain.length} blocks`);
+      console.log(`Blockchain saved with ${this.chain.length} blocks and ${this.pendingTransactions.length} pending transactions`);
     } catch (error) {
       console.error('Error saving blockchain:', error);
     }
   }
 
   // 添加新交易到待處理列表
-  public addTransaction(transaction: Omit<TicketTransaction, 'signature'>): TicketTransaction {
+  public async addTransaction(transaction: Omit<TicketTransaction, 'signature'>): Promise<TicketTransaction> {
+    // Ensure blockchain is initialized
+    if (!this.isInitialized) {
+      await this.initializeChain();
+    }
+    
     // 為交易生成簽名
     const dataToSign = JSON.stringify(transaction);
     const signature = crypto
@@ -173,14 +181,21 @@ export class TicketBlockchain {
     const signedTransaction = { ...transaction, signature };
     this.pendingTransactions.push(signedTransaction);
     
+    console.log('Added transaction to pending:', signedTransaction);
+    
     // Save the updated pending transactions
-    this.saveChain();
+    await this.saveChain();
     
     return signedTransaction;
   }
 
   // 處理待處理的交易並創建新區塊
-  public processPendingTransactions(): void {
+  public async processPendingTransactions(): Promise<void> {
+    // Ensure blockchain is initialized
+    if (!this.isInitialized) {
+      await this.initializeChain();
+    }
+    
     if (this.pendingTransactions.length === 0) {
       console.log('No pending transactions to process');
       return;
@@ -191,7 +206,7 @@ export class TicketBlockchain {
     const block = {
       index: this.chain.length,
       timestamp: Date.now(),
-      data: this.pendingTransactions,
+      data: [...this.pendingTransactions], // Create a copy
       previousHash: this.getLatestBlock().hash,
       nonce: 0,
       hash: ''
@@ -200,13 +215,12 @@ export class TicketBlockchain {
     const newBlock = this.mineBlock(block);
     this.chain.push(newBlock);
     
-    // Log for debugging
     console.log(`New block added to chain: Block #${newBlock.index} with ${this.pendingTransactions.length} transactions`);
     
     this.pendingTransactions = [];
     
     // Save the updated chain
-    this.saveChain();
+    await this.saveChain();
   }
 
   // 驗證整個鏈的完整性
@@ -301,7 +315,7 @@ export class TicketBlockchain {
   }
 
   // 同步審計記錄到區塊鏈
-  public syncTransferFromAudit(ticketId: string, fromUserId: string, toUserId: string, timestamp: number, eventId: string): TicketTransaction {
+  public async syncTransferFromAudit(ticketId: string, fromUserId: string, toUserId: string, timestamp: number, eventId: string): Promise<TicketTransaction> {
     // 檢查是否已存在此轉讓交易
     const history = this.getTicketHistory(ticketId);
     const hasTransfer = history.some(tx => 
@@ -322,7 +336,7 @@ export class TicketBlockchain {
     }
     
     // 添加轉讓交易
-    const transaction = this.addTransaction({
+    const transaction = await this.addTransaction({
       ticketId,
       timestamp,
       action: 'transfer',
@@ -401,7 +415,7 @@ export async function syncTicketTransferToBlockchain(
     // Log for debugging
     console.log(`Syncing ticket transfer to blockchain: ${ticketId} from ${fromUserId} to ${toUserId} at ${new Date(ts).toISOString()}`);
     
-    const transaction = ticketBlockchain.syncTransferFromAudit(ticketId, fromUserId, toUserId, ts, eventId);
+    const transaction = await ticketBlockchain.syncTransferFromAudit(ticketId, fromUserId, toUserId, ts, eventId);
     
     // Check if transaction was added
     console.log(`Transfer transaction created with signature: ${transaction.signature}`);
@@ -616,5 +630,14 @@ export function recordTicketUsage(ticketId: string, eventId: string): { success:
       success: false,
       usageTime: null
     };
+  }
+}
+
+// Export function to ensure blockchain is ready
+export async function ensureBlockchainReady(): Promise<void> {
+  // @ts-expect-error - accessing private method for initialization
+  if (!ticketBlockchain.isInitialized) {
+    // @ts-expect-error - accessing private method for initialization
+    await ticketBlockchain.initializeChain();
   }
 }
