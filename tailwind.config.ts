@@ -5,8 +5,23 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx}", // Add broader coverage
   ],
   darkMode: 'class',
+  // Safelist important classes to prevent purging
+  safelist: [
+    'navbar-fixed',
+    'navbar-content', 
+    'main-content',
+    'admin-main-content',
+    'btn',
+    'btn-primary',
+    'btn-secondary',
+    'card',
+    'form-input',
+    'edit-sidebar',
+    // Add other critical classes
+  ],
   theme: {
     extend: {
       colors: {

@@ -7,8 +7,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }>}
 ) {
   try {
-    const user = await getCurrentUser(request);
-    if (!user || (user.role !== 'admin' && !request.headers.get('x-ticket-checker'))) {
+    const currentUser = await getCurrentUser(request);
+    const isTicketCheckerHeaderPresent = !!request.headers.get('x-ticket-checker');
+
+    if (!currentUser || (currentUser.role !== 'admin' && !isTicketCheckerHeaderPresent)) {
       return NextResponse.json(
         { error: '無權限執行此操作' },
         { status: 403 }
@@ -62,8 +64,8 @@ interface TicketUpdate {
         lastVerified: now,
         usageTimestamp: timestamp,
         verificationCount: (ticket.verificationInfo?.verificationCount || 0) + 1,
-        verifiedBy: user.userId,
-        verifierName: user.userName || 'Administrator'
+        verifiedBy: currentUser.userId,
+        verifierName: currentUser.userName || 'Administrator'
       };
     }
     

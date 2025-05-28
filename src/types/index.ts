@@ -134,6 +134,7 @@ export interface Ticket {
     originalOwner?: string | null;
     usageTimestamp?: string;
     adminNotes?: string | null;
+    eventLocation?: string; // Location where the ticket was verified
   };
 }
 
@@ -204,7 +205,7 @@ export interface Registration {
   totalAmount?: number; // Total amount for the registration if applicable
   drawDate?: string; // Draw date for the lottery
   phoneNumber?: string; // Add optional phoneNumber
-  paymentStatus?: 'pending' | 'completed' | 'refunded';
+  paymentStatus?: 'pending' | 'completed' | 'refunded'| 'paid';
   platformFee ?: number; // Platform fee for the registration
   cardLastFourDigits?: string; // Last four digits of the card used for payment
   userRealName?: string; // User's real name for the registration

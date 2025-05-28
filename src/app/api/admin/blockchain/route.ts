@@ -27,9 +27,9 @@ interface RawBlock {
 export async function GET(request: NextRequest) {
   try {
     // Verify admin access
-    const user = await getCurrentUser(request);
+    const currentUser = await getCurrentUser(request);
     
-    if (!user || user.role !== 'admin') {
+    if (!currentUser || currentUser.role !== 'admin') {
       return NextResponse.json({ error: '此功能僅限管理員使用' }, { status: 403 });
     }
     

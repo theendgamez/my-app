@@ -6,37 +6,10 @@ import { CacheManager } from '@/lib/cache';
 export async function GET(request: NextRequest) {
   try {
     // First try standard authentication
-    const user = await getCurrentUser(request);
+    const currentUser = await getCurrentUser(request);
     
-    // Then check for direct user ID if that's available as fallback
-    const userIdHeader = request.headers.get('x-user-id');
-    let isAdmin = false;
-
-    // If we have a user from getCurrentUser
-    if (user && user.role === 'admin') {
-      isAdmin = true;
-    } 
-    // If not, but we have a user ID header, try to verify directly
-    else if (userIdHeader) {
-      // Try to fetch user directly from database
-      try {
-        const dbUser = await db.users.findById(userIdHeader);
-        if (dbUser?.role === 'admin') {
-          isAdmin = true;
-        }
-      } catch (error) {
-        console.error('Error verifying admin via user ID:', error);
-      }
-    }
-
-    // If we still don't have an admin, reject the request
-    if (!isAdmin) {
-      console.log('Admin dashboard access denied', { 
-        user: user?.userId || 'none', 
-        headerUserId: userIdHeader || 'none',
-        hasRole: user?.role || 'none' 
-      });
-      
+    if (!currentUser || currentUser.role !== 'admin') {
+      console.log(`Admin dashboard access denied. User ID: ${currentUser?.userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}`);
       return NextResponse.json(
         { error: '僅管理員可存取此API', details: 'Not authorized as admin' },
         { status: 403 }

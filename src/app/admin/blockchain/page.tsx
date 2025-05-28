@@ -32,7 +32,7 @@ export default function AdminBlockchainPage() {
   }, []);
 
   return (
-    <AdminPage title="區塊鏈瀏覽器">  
+    <AdminPage title="區塊鏈瀏覽">  
         
         {/* Add the BlockchainExplorer component to display the chain */}
         <div className="mt-8">

@@ -96,7 +96,8 @@ export function generateTicketQRData(ticketData: DynamicTicketData): string {
     ticketId: ticketData.ticketId,
     timestamp: ticketData.timestamp,
     signature: ticketData.signature,
-    nonce: ticketData.nonce
+    nonce: ticketData.nonce,
+    previousHash: ticketData.previousHash // ADDED: Include previousHash
   });
   
   // 將數據構造為URL格式，方便iOS相機掃描
@@ -125,7 +126,8 @@ export function generatePublicTicketQRData(ticketData: DynamicTicketData): strin
     timestamp: ticketData.timestamp,
     signature: ticketData.signature,
     nonce: ticketData.nonce,
-    expiresAt: ticketTime + maxValidTime // Add explicit expiration time
+    expiresAt: ticketTime + maxValidTime, // Add explicit expiration time
+    previousHash: ticketData.previousHash // ADDED: Include previousHash
   });
   
   // 使用base64編碼數據參數

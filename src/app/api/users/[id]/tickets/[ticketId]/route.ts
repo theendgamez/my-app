@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +11,9 @@ export async function GET(
     const userId = resolvedParams.id;
     const ticketId = resolvedParams.ticketId;
     
-    console.log(`[User Tickets API] Looking up ticket ${ticketId} for user ${userId}`);
+    console.log(`[User Tickets API] Looking up ticket ${ticketId} for user ${userId}`, {
+      timestamp: new Date().toISOString()
+    });
     
     if (!userId || !ticketId) {
       return NextResponse.json({ 
@@ -20,16 +22,24 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Authentication checks
+    // Enhanced authentication checks
     const user = await getCurrentUser(request);
     const headerUserId = request.headers.get('x-user-id');
+    const isAdminRequest = await isAdmin(request);
     
-    // Authorization - user can only access their own tickets
-    const isAuthorized = (user?.userId === userId) || 
-                         (user?.role === 'admin') || 
+    // Authorization with improved logic
+    const isAuthorized = isAdminRequest || 
+                         (user?.userId === userId) || 
                          (headerUserId === userId);
                          
     if (!isAuthorized) {
+      console.error('[User Tickets API] Access denied:', {
+        user: user?.userId || 'none',
+        headerUserId: headerUserId || 'none',
+        requestedUserId: userId,
+        isAdmin: isAdminRequest
+      });
+      
       return NextResponse.json({ 
         error: '無權訪問此用戶的票券',
         code: 'UNAUTHORIZED_ACCESS' 

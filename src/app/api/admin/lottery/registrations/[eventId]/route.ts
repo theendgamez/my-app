@@ -8,26 +8,9 @@ export async function GET(
 ) {
   try {
     // Check admin authentication
-    const user = await getCurrentUser(request);
+    const currentUser = await getCurrentUser(request);
     
-    // Also check header auth as fallback
-    const fallbackUserId = request.headers.get('x-user-id');
-    let isAdmin = false;
-
-    if (user && user.role === 'admin') {
-      isAdmin = true;
-    } else if (fallbackUserId) {
-      try {
-        const dbUser = await db.users.findById(fallbackUserId);
-        if (dbUser?.role === 'admin') {
-          isAdmin = true;
-        }
-      } catch (error) {
-        console.error('Error verifying admin via user ID:', error);
-      }
-    }
-
-    if (!isAdmin) {
+    if (!currentUser || currentUser.role !== 'admin') {
       return NextResponse.json(
         { error: '僅管理員可存取此API' },
         { status: 403 }

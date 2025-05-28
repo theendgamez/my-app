@@ -5,10 +5,10 @@ import { migrateAllUserTicketTransfers, migrateTicketTransfer } from '@/utils/mi
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const user = await getCurrentUser(request);
+    const currentUser = await getCurrentUser(request);
     
     // Only allow admins to run this migration
-    if (!user || user.role !== 'admin') {
+    if (!currentUser || currentUser.role !== 'admin') {
       return NextResponse.json({ error: '無權執行此操作' }, { status: 403 });
     }
     

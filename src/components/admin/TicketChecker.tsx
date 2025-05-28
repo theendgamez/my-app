@@ -2,6 +2,9 @@ import React, { useState,useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import QRScanner from './QRScanner';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import { adminFetch, updateTicketStatus, handleAdminError } from '@/utils/adminApi';
+import { Ticket } from '@/types/index';
+// This component allows admins to scan and verify tickets, with options for auto-verification and custom success/error handling.
 
 interface TicketCheckerProps {
   autoVerify?: boolean;
@@ -33,30 +36,11 @@ export default function TicketChecker({
   const router = useRouter();
 
   const handleScan = useCallback(async (ticketId: string) => {
-    if (!ticketId || processing) return;
     
     try {
-      setProcessing(true);
-      setResult(null);
       
-      // Get auth data
-      const accessToken = localStorage.getItem('accessToken') || '';
-      const userId = localStorage.getItem('userId') || '';
-      
-      // First, get ticket details
-      const response = await fetch(`/api/tickets/${ticketId}?verifying=true`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': userId,
-          'x-ticket-checker': 'true'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`票券查詢失敗 (${response.status})`);
-      }
-      
-      const ticket = await response.json();
+      // Use adminFetch for consistent authentication
+      const ticket = await adminFetch(`/api/tickets/${ticketId}?verifying=true`) as Ticket;
       
       // Check if ticket is already used - enhanced error message
       if (ticket.status === 'used') {
@@ -67,13 +51,13 @@ export default function TicketChecker({
             ticketId: ticket.ticketId,
             eventName: ticket.eventName,
             userName: ticket.userRealName || '未提供姓名',
-            zone: ticket.zone,
+            zone: ticket.zone ?? '未知區域',
             usedAt: ticket.verificationInfo?.lastVerified 
               ? new Date(ticket.verificationInfo.lastVerified).toLocaleString('zh-TW') 
               : '未知時間',
             verifiedBy: ticket.verificationInfo?.verifierName || '未知人員',
             verificationCount: ticket.verificationInfo?.verificationCount || 1,
-            location: ticket.verificationInfo?.location || '未知地點'
+            location: ticket.verificationInfo?.eventLocation || '未知地點'
           }
         });
         return;
@@ -88,7 +72,7 @@ export default function TicketChecker({
             ticketId: ticket.ticketId,
             eventName: ticket.eventName,
             userName: ticket.userRealName || '未提供姓名',
-            zone: ticket.zone
+            zone: ticket.zone ?? '未知區域'
           }
         });
         return;
@@ -96,20 +80,7 @@ export default function TicketChecker({
       
       // If autoVerify is enabled, automatically mark the ticket as used
       if (autoVerify) {
-        const verifyResponse = await fetch(`/api/admin/tickets/${ticketId}/status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'x-user-id': userId
-          },
-          body: JSON.stringify({ status: 'used' })
-        });
-        
-        if (!verifyResponse.ok) {
-          const errorData = await verifyResponse.json();
-          throw new Error(errorData.error || `驗證失敗 (${verifyResponse.status})`);
-        }
+        await updateTicketStatus(ticketId, 'used');
         
         setResult({
           success: true,
@@ -118,7 +89,7 @@ export default function TicketChecker({
             ticketId: ticket.ticketId,
             eventName: ticket.eventName,
             userName: ticket.userRealName || '未提供姓名',
-            zone: ticket.zone
+            zone: ticket.zone ?? '未知區域'
           }
         });
         
@@ -134,13 +105,13 @@ export default function TicketChecker({
             ticketId: ticket.ticketId,
             eventName: ticket.eventName,
             userName: ticket.userRealName || '未提供姓名',
-            zone: ticket.zone
+            zone: ticket.zone ?? '未知區域'
           }
         });
       }
     } catch (err) {
       console.error('Error verifying ticket:', err);
-      const errorMessage = err instanceof Error ? err.message : '票券驗證失敗';
+      const errorMessage = handleAdminError(err);
       setResult({
         success: false,
         message: errorMessage
@@ -152,7 +123,7 @@ export default function TicketChecker({
     } finally {
       setProcessing(false);
     }
-  }, [processing, autoVerify, onSuccess, onError]);
+  }, [autoVerify, onSuccess, onError]);
   
   const handleScanError = useCallback((error: string) => {
     if (onError) {
@@ -166,23 +137,7 @@ export default function TicketChecker({
     try {
       setProcessing(true);
       
-      const accessToken = localStorage.getItem('accessToken') || '';
-      const userId = localStorage.getItem('userId') || '';
-      
-      const response = await fetch(`/api/admin/tickets/${result.ticketInfo.ticketId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'x-user-id': userId
-        },
-        body: JSON.stringify({ status: 'used' })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `操作失敗 (${response.status})`);
-      }
+      await updateTicketStatus(result.ticketInfo.ticketId, 'used');
       
       setResult({
         ...result,
@@ -195,14 +150,15 @@ export default function TicketChecker({
       }
     } catch (err) {
       console.error('Error marking ticket as used:', err);
+      const errorMessage = handleAdminError(err);
       setResult({
         ...result,
         success: false,
-        message: err instanceof Error ? err.message : '標記票券失敗'
+        message: errorMessage
       });
       
       if (onError) {
-        onError(err instanceof Error ? err.message : '標記票券失敗');
+        onError(errorMessage);
       }
     } finally {
       setProcessing(false);

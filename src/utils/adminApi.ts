@@ -226,8 +226,50 @@ export async function adminFetch<T = unknown>(
     tags?: string[];
   } = {}
 ): Promise<T> {
-  return await fetchWithAuth<T>(url, {
-    useToken: true, // Admin operations always require authentication
+  // Default to using token for admin requests
+  const adminOptions = {
+    useToken: true,
     ...options,
-  });
+    headers: {
+      ...options.headers,
+      // Always include admin-specific headers
+      'x-admin-request': 'true',
+    }
+  };
+
+  try {
+    return await fetchWithAuth<T>(url, adminOptions);
+  } catch (error) {
+    console.error('Admin API request failed:', { url, error });
+    throw error;
+  }
+}
+
+/**
+ * Verify admin access before making API calls
+ */
+export async function verifyAdminAccess(): Promise<boolean> {
+  try {
+    const result = await checkAdminStatus();
+    return result.isAdmin;
+  } catch (error) {
+    console.error('Admin access verification failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Admin-specific error handler
+ */
+export function handleAdminError(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.message.includes('403') || error.message.includes('Forbidden')) {
+      return '您沒有管理員權限執行此操作';
+    }
+    if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      return '請重新登入以繼續';
+    }
+    return error.message;
+  }
+  return '發生未知錯誤';
 }

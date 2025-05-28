@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { CacheManager } from '@/lib/cache';
 
 export async function GET(
@@ -14,7 +14,8 @@ export async function GET(
     console.log('[Tickets API] Request received:', { 
       requestedUserId: userId,
       url: request.url,
-      hasAuthHeader: !!request.headers.get('authorization')
+      hasAuthHeader: !!request.headers.get('authorization'),
+      timestamp: new Date().toISOString()
     });
 
     if (!userId || userId === 'undefined') {
@@ -25,27 +26,30 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Authentication check with fallbacks
+    // Enhanced authentication check
     const user = await getCurrentUser(request);
     const headerUserId = request.headers.get('x-user-id');
+    const isAdminRequest = await isAdmin(request);
     
     console.log('[Tickets API] Authentication check:', { 
       authenticatedUser: user?.userId || 'none', 
       headerUserId: headerUserId || 'none',
-      requestedUserId: userId
+      requestedUserId: userId,
+      isAdmin: isAdminRequest,
+      userRole: user?.role || 'none'
     });
     
-    // Check permissions - allow access if:
-    // 1. User is authenticated and either matches the requested ID or is an admin
-    // 2. Header user ID matches the requested ID (fallback)
-    const hasAccess = (user && (user.userId === userId || user.role === 'admin')) ||
+    // Check permissions with improved logic
+    const hasAccess = isAdminRequest || 
+                      (user && user.userId === userId) ||
                       (headerUserId && headerUserId === userId);
     
     if (!hasAccess) {
       console.error('[Tickets API] Access denied:', { 
         authenticatedUser: user?.userId || 'none',
         headerUserId: headerUserId || 'none',
-        requestedUserId: userId
+        requestedUserId: userId,
+        isAdmin: isAdminRequest
       });
       
       return NextResponse.json({ 

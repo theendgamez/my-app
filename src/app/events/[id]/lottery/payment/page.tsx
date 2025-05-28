@@ -330,6 +330,26 @@ function LotteryPaymentPage() {
 
       console.log("Payment successful:", data);
       setSuccess('門票購買成功！您將收到確認電子郵件。');
+      setShowPaymentForm(false); // Hide payment form elements immediately
+
+      // Manually update local registration state to reflect payment
+      if (registration) {
+        setRegistration(prevReg => {
+          const updatedReg = { ...prevReg! };
+          if (paymentType === 'platform_fee') {
+            updatedReg.platformFeePaid = true;
+            updatedReg.paymentStatus = 'paid'; // Assuming 'paid' is the status for platform fee
+          } else { // ticket_price
+            updatedReg.ticketsPurchased = true;
+            // paymentStatus might also be relevant here, e.g., 'paid'
+          }
+          // Update paymentId on registration if API returns it and it's part of your Registration type
+          if (data.paymentId) {
+            updatedReg.paymentId = data.paymentId; 
+          }
+          return updatedReg;
+        });
+      }
       
       // Redirect to appropriate page after a short delay
       setTimeout(() => {

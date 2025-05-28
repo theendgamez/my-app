@@ -7,9 +7,13 @@ import { Users } from '@/types';
 // Configuration constants
 export const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
-const ACCESS_TOKEN_EXPIRY = '12h'; // Increased from '15m' to '24h'
-const REFRESH_TOKEN_EXPIRY = '7d'; // Increased from '7d' to '30d'
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const ACCESS_TOKEN_EXPIRY = '12h';
+const REFRESH_TOKEN_EXPIRY = '7d';
+
+// Determine if cookies should be marked as Secure
+const isNodeEnvProduction = process.env.NODE_ENV === 'production';
+const allowInsecureProdCookies = process.env.ALLOW_INSECURE_PROD_COOKIES === 'true';
+const useSecureCookies = isNodeEnvProduction && !allowInsecureProdCookies;
 
 // Types
 export interface JWTPayload {
@@ -24,6 +28,14 @@ export interface AuthResponse {
   message?: string;
   user?: Partial<Users>;
   error?: string;
+}
+
+export interface User {
+  userId: string;
+  userName: string;
+  email: string;
+  role: 'user' | 'admin';
+  realName?: string;
 }
 
 // Standardized response creator
@@ -54,7 +66,7 @@ export const generateTokens = async (user: Users) => {
 export const setAuthCookies = async (response: NextResponse, accessToken: string, refreshToken: string) => {
   response.cookies.set('accessToken', accessToken, {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: useSecureCookies,
     sameSite: 'strict',
     maxAge: 12 * 60 * 60, // 12 hours in seconds
     path: '/'
@@ -62,7 +74,7 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
   
   response.cookies.set('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: useSecureCookies,
     sameSite: 'strict',
     maxAge: 15 * 24 * 60 * 60, // 15 days in seconds
     path: '/'
@@ -80,35 +92,25 @@ export const setAuthCookies = async (response: NextResponse, accessToken: string
   // Set the userRole cookie with longer expiry for better persistence
   response.cookies.set('userRole', role, {
     httpOnly: false, // Must be false so client JS can read it
-    secure: IS_PRODUCTION,
+    secure: useSecureCookies,
     sameSite: 'strict',
     maxAge: 15 * 24 * 60 * 60, // Match refresh token expiry
     path: '/'
   });
 };
 
-// Verify JWT token with improved error handling for Vercel Edge Runtime
+// Verify JWT token with improved error handling
 export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<JWTPayload | null> => {
+  if (!secret) {
+    return null;
+  }
+  
   try {
-    // Use jose for Vercel environment to ensure Edge Runtime compatibility
     const secretBytes = new TextEncoder().encode(secret);
-    try {
-      const { payload } = await jwtVerify(token, secretBytes, {
-        algorithms: ['HS256'],
-      });
-      return payload as unknown as JWTPayload;
-    } catch (err: unknown) {
-      // Handle jose-specific errors
-      if (typeof err === 'object' && err !== null) {
-        if ('code' in err && (err as { code?: string }).code === 'ERR_JWT_EXPIRED') {
-          return null;
-        }
-        if ('code' in err && (err as { code?: string }).code === 'ERR_JWS_INVALID') {
-          return null;
-        }
-      }
-      throw err;
-    }
+    const { payload } = await jwtVerify(token, secretBytes, {
+      algorithms: ['HS256'],
+    });
+    return payload as unknown as JWTPayload;
   } catch {
     return null;
   }
@@ -130,44 +132,52 @@ export const signToken = async (payload: JWTPayload, expiresIn: string | number,
   }
 };
 
-// Get current user from request with more robust role handling
+// Get current user from request - single implementation
 export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
   const headers = req.headers;
-  
-  // Get token from Authorization header
+  let token: string | undefined = undefined;
+
+  // 1. Try Authorization header
   const authHeader = headers.get('authorization');
-  const token = authHeader?.split(' ')[1];
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+
+  // 2. If no token from header, try accessToken cookie
+  if (!token) {
+    token = req.cookies.get('accessToken')?.value;
+  }
   
-  // Get userId from header (added for Vercel deployment)
+  // Get userId from header (less secure, use with caution or phase out)
   const userIdHeader = headers.get('x-user-id');
   
   try {
     // Try using the token first
     if (token) {
-      try {
-        // Verify token
-        const decoded = await verifyToken(token);
-        if (decoded?.userId) {
-          const user = await db.users.findById(decoded.userId);
-          
-          // Verify token version to ensure token hasn't been invalidated
-          if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
-            return user;
-          }
+      const decoded = await verifyToken(token); // verifyToken uses JWT_SECRET
+      if (decoded?.userId) {
+        const user = await db.users.findById(decoded.userId);
+        
+        // Check token version for session invalidation
+        if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
+          return user;
         }
-      } catch {
-        // Token is invalid or expired
-        // Continue to try other methods
       }
     }
     
-    // Fall back to userId header if token doesn't work
+    // Fall back to userId header if token doesn't work or not present
+    // Consider security implications of trusting x-user-id without further validation
     if (userIdHeader) {
-      return await db.users.findById(userIdHeader);
+      const userFromHeader = await db.users.findById(userIdHeader);
+      if (userFromHeader) {
+        // Potentially add role/permission checks if relying on x-user-id
+        return userFromHeader;
+      }
     }
     
     return null;
-  } catch  {
+  } catch (error) {
+    console.error('[Auth] Error in getCurrentUser:', error);
     return null;
   }
 };
@@ -235,7 +245,7 @@ export const invalidateUserSessions = async (userId: string): Promise<void> => {
   }
 };
 
-// Rate limiting utility (improved version with external storage)
+// Rate limiting utility
 export class RateLimiter {
   private store: Map<string, { count: number, timestamp: number }>;
   private windowMs: number;
@@ -246,7 +256,6 @@ export class RateLimiter {
     this.windowMs = windowMs;
     this.maxAttempts = maxAttempts;
     
-    // Clean up expired entries every minute
     if (typeof setInterval !== 'undefined') {
       setInterval(() => this.cleanUp(), 60000);
     }
@@ -285,6 +294,46 @@ export class RateLimiter {
 }
 
 // Initialize rate limiters
-export const loginRateLimiter = new RateLimiter(10 * 60 * 1000, 10); // 10 attempts per 10 minutes
-export const verificationRateLimiter = new RateLimiter(10 * 60 * 1000, 10); // 10 attempts per 5 minutes
-export const registrationRateLimiter = new RateLimiter(60 * 60 * 1000, 10); // 10 attempts per hour
+export const loginRateLimiter = new RateLimiter(10 * 60 * 1000, 10);
+export const verificationRateLimiter = new RateLimiter(10 * 60 * 1000, 10);
+export const registrationRateLimiter = new RateLimiter(60 * 60 * 1000, 10);
+
+/**
+ * Enhanced admin check with fallback authentication methods
+ */
+export async function isAdmin(request: NextRequest): Promise<boolean> {
+  try {
+    const user = await getCurrentUser(request);
+    if (user && user.role === 'admin') {
+      return true;
+    }
+
+    const userIdHeader = request.headers.get('x-user-id');
+    if (userIdHeader) {
+      const dbUser = await db.users.findById(userIdHeader);
+      return dbUser?.role === 'admin';
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[Auth] Admin check failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Get user ID from request (with fallbacks)
+ */
+export async function getUserId(request: NextRequest): Promise<string | null> {
+  try {
+    const user = await getCurrentUser(request);
+    if (user) {
+      return user.userId;
+    }
+
+    return request.headers.get('x-user-id') || null;
+  } catch (error) {
+    console.error('[Auth] Error getting user ID:', error);
+    return null;
+  }
+}

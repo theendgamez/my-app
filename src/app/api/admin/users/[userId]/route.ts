@@ -9,33 +9,16 @@ export async function DELETE(
 ) {
   try {
     // Verify admin access
-    const user = await getCurrentUser(request);
+    const requestingUser = await getCurrentUser(request);
     
-    // Also check header auth as fallback
-    const userIdHeader = request.headers.get('x-user-id');
-    let isAdmin = false;
-
-    if (user && user.role === 'admin') {
-      isAdmin = true;
-    } else if (userIdHeader) {
-      try {
-        const dbUser = await db.users.findById(userIdHeader);
-        if (dbUser?.role === 'admin') {
-          isAdmin = true;
-        }
-      } catch (error) {
-        console.error('Error verifying admin via user ID:', error);
-      }
-    }
-
-    if (!isAdmin) {
+    if (!requestingUser || requestingUser.role !== 'admin') {
       return NextResponse.json(
         { error: '僅管理員可刪除用戶' },
         { status: 403 }
       );
     }
 
-    const { userId } = await params;
+    const { userId } = await params; // This is the ID of the user to be deleted
     
     if (!userId) {
       return NextResponse.json(
@@ -45,7 +28,7 @@ export async function DELETE(
     }
 
     // Prevent deleting yourself
-    if (user && userId === user.userId) {
+    if (requestingUser.userId === userId) {
       return NextResponse.json(
         { error: '無法刪除當前登入的管理員帳戶' },
         { status: 400 }
@@ -75,16 +58,16 @@ export async function GET(
 ) {
   try {
     // Verify admin access
-    const currentUser = await getCurrentUser(request);
+    const requestingUser = await getCurrentUser(request);
     
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!requestingUser || requestingUser.role !== 'admin') {
       return NextResponse.json(
         { error: '僅管理員可查看用戶詳情' },
         { status: 403 }
       );
     }
 
-    const { userId } = await params;
+    const { userId } = await params; // This is the ID of the user to be fetched
     
     // Get user details
     const user = await db.users.findById(userId);

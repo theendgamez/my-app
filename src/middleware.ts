@@ -113,22 +113,27 @@ export async function middleware(request: NextRequest) {
       if (JWT_SECRET) {
         const decoded = await verifyJWT(accessToken, JWT_SECRET);
         isAdmin = decoded?.role === 'admin';
+        if (!decoded) {
+            console.warn('Middleware: JWT verification failed. Token might be invalid, malformed, or expired.');
+        } else if (decoded.role !== 'admin') {
+            console.warn(`Middleware: User (ID from token: ${decoded.userId || 'N/A'}) is not admin. Role: ${decoded.role}`);
+        }
       } else {
-        console.error('JWT_SECRET is not defined');
+        console.error('Middleware: JWT_SECRET is not defined. Cannot verify admin status via JWT. Access will be denied.');
+        // isAdmin remains false, leading to redirect.
       }
+    } else {
+        console.warn('Middleware: No access token found for admin route. Access will be denied.');
     }
 
-    // Also check user ID header as fallback
-    if (!isAdmin) {
-      const userId = request.headers.get('x-user-id');
-      if (userId) {
-        // This would ideally make a DB call, but that's not possible in Edge middleware
-        // So we'll rely on the API routes to do proper role checks
-      }
-    }
+    // The x-user-id header fallback in middleware is not secure for determining admin role
+    // as middleware (especially Edge) cannot reliably perform DB lookups for role verification.
+    // API routes are responsible for full DB-backed auth.
+    // If JWT check fails or doesn't confirm admin, isAdmin remains false.
     
     // If not admin, redirect to home
     if (!isAdmin) {
+      console.log(`Middleware: Admin access denied for path ${pathname}. User not authenticated as admin. Redirecting to /.`);
       return NextResponse.redirect(new URL('/', request.url));
     }
   }

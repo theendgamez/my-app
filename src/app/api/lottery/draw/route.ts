@@ -114,6 +114,18 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < quantity; i++) {
           const ticketId = uuidv4();
           ticketIds.push(ticketId);
+
+          let finalPaymentId = reg.paymentId;
+          if (!finalPaymentId && reg.platformFeePaymentId) {
+            finalPaymentId = reg.platformFeePaymentId;
+          }
+          
+          // If still no valid paymentId, use a placeholder.
+          // This indicates a potential gap in how payment/registration fees are tracked.
+          if (!finalPaymentId || finalPaymentId.trim() === "") {
+            finalPaymentId = `LOTTERY_WIN_${reg.registrationToken.substring(0, 8)}_${ticketId.substring(0,8)}`;
+            console.warn(`Ticket ${ticketId} for event ${eventId} (user ${reg.userId}) created with a fallback paymentId: ${finalPaymentId}. Review registration payment flow.`);
+          }
           
           // Create a ticket for the winner
           await db.tickets.create({
@@ -122,7 +134,7 @@ export async function POST(request: NextRequest) {
             userRealName: reg.userRealName || '',
             eventId: eventId,
             zone: zoneName,
-            paymentId: reg.paymentId || '',
+            paymentId: finalPaymentId, // Use the determined non-empty paymentId
             status: 'reserved',
             purchaseDate: new Date().toISOString(),
             eventName: event.eventName,
