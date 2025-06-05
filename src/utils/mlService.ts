@@ -4,7 +4,6 @@ export const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'https://machine-lea
 type BatchUser = {
   userId: string;
   email: string;
-  userName?: string; // 可選，與 UserData 模型一致
 };
 
 export async function batchAnalyzeUsers(users: BatchUser[]) {
@@ -19,7 +18,6 @@ export async function batchAnalyzeUsers(users: BatchUser[]) {
         users: users.map(user => ({
           userId: user.userId,
           email: user.email,
-          userName: user.userName // 可選字段
         }))
       }),
       signal: AbortSignal.timeout(10000) // 添加 10 秒超時
