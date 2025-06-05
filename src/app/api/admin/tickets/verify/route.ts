@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 檢查時間戳（票券刷新時間不應過久，假設30分鐘內有效）
-    const maxValidTime = 30 * 60 * 1000; // 30分鐘（毫秒）
+    // 檢查時間戳（票券刷新時間不應過久，假設5分鐘內有效）
+    const maxValidTime = 5 * 60 * 1000; // Keep 5 minutes for verification validity
     const ticketTimestamp = Number(ticket.dynamicData.timestamp);
     const now = Date.now();
     

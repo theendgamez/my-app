@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
     const randomString = uuidv4().substring(0, 8);
     const newQrCode = `TICKET:${ticketId}:${timestamp}:${randomString}`;
     
-    // Calculate next refresh time (5 minutes from now)
+    // Calculate next refresh time (1 minute from now)
     const now = new Date();
-    const nextRefresh = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+    const nextRefresh = new Date(now.getTime() + 1 * 60 * 1000).toISOString(); // Changed from 5 minutes to 1 minute
     
     // Update the ticket with new QR code
     const updatedTicket = await db.tickets.update(ticketId, {

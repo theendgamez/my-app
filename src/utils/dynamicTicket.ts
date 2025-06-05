@@ -47,15 +47,15 @@ export function verifyTicketData(ticketData: DynamicTicketData, secretKey: strin
     ? parseInt(ticketData.timestamp, 10) 
     : ticketData.timestamp;
   
-  // Strict 5-minute expiration check
-  const maxValidTime = 5 * 60 * 1000; // 5 minutes
+  // Strict 1-minute expiration check for QR code generation
+  const maxValidTime = 1 * 60 * 1000; // Changed from 5 minutes to 1 minute
   const timeDiff = currentTime - ticketTime;
-  
+
   if (isNaN(ticketTime)) {
     console.warn('Invalid timestamp in ticket data:', ticketData.timestamp);
     return false;
   }
-  
+
   if (timeDiff > maxValidTime) {
     console.warn('Ticket data expired:', {
       ticketTime: new Date(ticketTime).toISOString(),
@@ -114,8 +114,8 @@ export function generatePublicTicketQRData(ticketData: DynamicTicketData): strin
   const ticketTime = typeof ticketData.timestamp === 'string' 
     ? parseInt(ticketData.timestamp, 10) 
     : ticketData.timestamp;
+  const maxValidTime = 1 * 60 * 1000; // Changed from 5 minutes to 1 minute
   
-  const maxValidTime = 5 * 60 * 1000; // 5 minutes
   if (currentTime - ticketTime > maxValidTime) {
     throw new Error('Cannot generate QR data for expired ticket');
   }

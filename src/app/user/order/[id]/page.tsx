@@ -376,11 +376,10 @@ export default function OrderDetailPage() {
                                 <DynamicQRCode
                                   ticketId={ticket.ticketId}
                                   initialQrData={ticket.qrCode}
-                                  refreshInterval={300}
+                                  refreshInterval={60} // Changed from 300 to 60 seconds (1 minute)
                                   size={200}
                                   showVerifyInfo={true}
                                 />
-                                <p className="mt-2 text-sm text-gray-600">請妥善保管您的票券，QR碼會使用區塊鏈技術保護以防偽造</p>
                               </div>
                             ) : (
                               <div className="bg-gray-50 p-4 rounded-lg">

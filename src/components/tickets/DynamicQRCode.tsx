@@ -17,7 +17,7 @@ interface DynamicQRCodeProps {
 export default function DynamicQRCode({
   ticketId,
   initialQrData,
-  refreshInterval = 300, // 預設5分鐘刷新一次
+  refreshInterval = 60, // Changed from 300 to 60 seconds (1 minute)
   size = 200,
   showVerifyInfo = false
 }: DynamicQRCodeProps) {
@@ -153,6 +153,7 @@ export default function DynamicQRCode({
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
+          // 時間到了，刷新QR碼
           refreshQRCode();
           return refreshInterval;
         }
