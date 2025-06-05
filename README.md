@@ -73,8 +73,14 @@ python scalper_detector.py
 
 4. Start the ML service:
 
+For development:
 ```bash
 python app.py
+```
+
+For production:
+```bash
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker app:app
 ```
 
 The ML service will run on port 10000 by default.
@@ -120,10 +126,18 @@ npm run start
 
 ### ML Service (Python)
 
-For production deployment of the ML service, consider using a proper WSGI server:
+For production deployment of the ML service, first ensure gunicorn is installed:
 
 ```bash
 cd ml
+pip install gunicorn
+# or install all requirements
+pip install -r requirements.txt
+```
+
+Then start with gunicorn:
+
+```bash
 gunicorn -w 4 -k uvicorn.workers.UvicornWorker app:app
 ```
 
