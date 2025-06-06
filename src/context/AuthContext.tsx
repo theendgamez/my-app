@@ -150,6 +150,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // Set cookies for middleware access
+      if (token && userId) {
+        document.cookie = `accessToken=${token}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `userId=${userId}; path=/; max-age=86400; SameSite=Lax`;
+        if (storedRole) {
+          document.cookie = `userRole=${storedRole}; path=/; max-age=86400; SameSite=Lax`;
+        }
+      }
+
       // Add loop prevention logic
       const authCheckCount = parseInt(localStorage.getItem(AUTH_CHECK_FLAG) || '0', 10);
       if (authCheckCount > MAX_AUTH_ATTEMPTS) {
@@ -177,7 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           userId,
           userName: userData.userName,
           email: userData.email,
-          phoneNumber: userData.phoneNumber, // Add phoneNumber here
+          phoneNumber: userData.phoneNumber,
           realName: userData.realName,
           role: userData.role || 'user',
         });
@@ -186,9 +195,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(true);
         setIsAdmin(userData.role === 'admin');
 
-        // Update local storage if role changed
+        // Update local storage and cookies if role changed
         if (storedRole !== userData.role) {
           localStorage.setItem('userRole', userData.role);
+          document.cookie = `userRole=${userData.role}; path=/; max-age=86400; SameSite=Lax`;
         }
 
         // NEW: Mark that we should check permissions but don't do it immediately
@@ -199,6 +209,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem(AUTH_CHECK_FLAG);
         return true;
       } else {
+        // Clear cookies on auth failure
+        document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'userId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        
         // Token invalid, clear auth state
         console.log('Auth token invalid, clearing state');
         await logout();

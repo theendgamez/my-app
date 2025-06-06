@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { CacheManager } from '@/lib/cache';
 
 export async function GET(
@@ -29,7 +29,7 @@ export async function GET(
     // Enhanced authentication check
     const user = await getCurrentUser(request);
     const headerUserId = request.headers.get('x-user-id');
-    const isAdminRequest = await isAdmin(request);
+    const isAdminRequest = user?.role === 'admin';
     
     console.log('[Tickets API] Authentication check:', { 
       authenticatedUser: user?.userId || 'none', 

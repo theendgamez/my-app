@@ -13,9 +13,9 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const promoImages = [
-    '/img/0fa38ee3-2eba-4791-add7-e7e51875aa99-8c562be975bedfb29f99876ef156d434042172ff.jpg',
-    '/images/promo2.jpg',
-    '/images/promo3.jpg',
+    '/img/749028-hins_cheung_2026.jpg',
+    '/img/LESSERAFIMUnforgiven.webp',
+    '/img/442924-gian-super-recital.webp',
   ];
 
   useEffect(() => {

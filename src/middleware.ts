@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-// Import jose instead of using crypto-dependent verification
-import { jwtVerify } from 'jose';
 import { rateLimitConfigs, securityHeaders } from '@/lib/security';
 
 // Define admin and protected routes patterns
@@ -35,23 +33,6 @@ const containsBypassAttempts = (path: string): boolean => {
     || path.includes('%252e%252e%252f')  // ../ double URL encoded
     || /\/\.+\//.test(path);  // Path manipulation
 };
-
-// Edge-compatible JWT verification function
-async function verifyJWT(token: string, secret: string) {
-  if (!token) return null;
-  
-  try {
-    // Convert secret to Uint8Array for jose
-    const secretBytes = new TextEncoder().encode(secret);
-    
-    // Verify token with jose
-    const { payload } = await jwtVerify(token, secretBytes);
-    return payload;
-  } catch (e) {
-    console.error('Edge-compatible token verification failed:', e);
-    return null;
-  }
-}
 
 // Basic security checks middleware
 export async function middleware(request: NextRequest) {
@@ -99,45 +80,44 @@ export async function middleware(request: NextRequest) {
 
   // Protect admin routes with stricter validation
   if (isProtectedRoute(pathname, 'admin')) {
-    // Get the authorization header or access token from cookie
-    const authHeader = request.headers.get('authorization');
-    const accessToken = authHeader?.startsWith('Bearer ') 
-      ? authHeader.substring(7)
-      : request.cookies.get('accessToken')?.value;
+    console.log('Middleware: Checking admin route access for:', pathname);
     
-    let isAdmin = false;
+    // Get tokens from multiple sources (cookies, headers, localStorage via headers)
+    const cookieAccessToken = request.cookies.get('accessToken')?.value;
+    const cookieUserRole = request.cookies.get('userRole')?.value;
+    const cookieUserId = request.cookies.get('userId')?.value;
     
-    if (accessToken) {
-      // Use Edge-compatible verification
-      const JWT_SECRET = process.env.JWT_SECRET;
-      if (JWT_SECRET) {
-        const decoded = await verifyJWT(accessToken, JWT_SECRET);
-        isAdmin = decoded?.role === 'admin';
-        if (!decoded) {
-            console.warn('Middleware: JWT verification failed. Token might be invalid, malformed, or expired.');
-        } else if (decoded.role !== 'admin') {
-            console.warn(`Middleware: User (ID from token: ${decoded.userId || 'N/A'}) is not admin. Role: ${decoded.role}`);
-        }
-      } else {
-        console.error('Middleware: JWT_SECRET is not defined. Cannot verify admin status via JWT. Access will be denied.');
-        // isAdmin remains false, leading to redirect.
-      }
-    } else {
-        console.warn('Middleware: No access token found for admin route. Access will be denied.');
-    }
-
-    // The x-user-id header fallback in middleware is not secure for determining admin role
-    // as middleware (especially Edge) cannot reliably perform DB lookups for role verification.
-    // API routes are responsible for full DB-backed auth.
-    // If JWT check fails or doesn't confirm admin, isAdmin remains false.
+    // Also check headers (for API calls)
+    const headerAuth = request.headers.get('authorization');
+    const headerUserId = request.headers.get('x-user-id');
+    const headerUserRole = request.headers.get('x-user-role');
     
-    // If not admin, redirect to home
-    if (!isAdmin) {
-      console.log(`Middleware: Admin access denied for path ${pathname}. User not authenticated as admin. Redirecting to /.`);
+    const accessToken = cookieAccessToken || (headerAuth?.replace('Bearer ', ''));
+    const userRole = cookieUserRole || headerUserRole;
+    const userId = cookieUserId || headerUserId;
+    
+    console.log('Middleware: Auth check results:', {
+      hasAccessToken: !!accessToken,
+      userRole: userRole || 'none',
+      hasUserId: !!userId,
+      source: cookieAccessToken ? 'cookie' : headerAuth ? 'header' : 'none'
+    });
+    
+    // If no access token, deny access
+    if (!accessToken) {
+      console.log('Middleware: No access token found for admin route. Access will be denied.');
       return NextResponse.redirect(new URL('/', request.url));
     }
+    
+    // If no admin role, deny access
+    if (userRole !== 'admin') {
+      console.log('Middleware: Admin access denied for path', pathname, '. User not authenticated as admin. Redirecting to /.');
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    
+    console.log('Middleware: Admin access granted for:', pathname);
   }
-
+  
   // Block requests to API routes that have suspicious patterns
   if (isProtectedRoute(pathname, 'api') && containsSuspiciousPatterns(pathname)) {
     return new NextResponse('Bad Request', { status: 400 });

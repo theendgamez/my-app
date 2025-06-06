@@ -1,339 +1,264 @@
-import { NextResponse } from 'next/server';
-import { NextRequest } from 'next/server';
-import { jwtVerify, SignJWT } from 'jose';
+import { NextRequest, NextResponse } from 'next/server';
+import { SignJWT, jwtVerify, JWTPayload as JoseJWTPayload } from 'jose';
 import db from '@/lib/db';
 import { Users } from '@/types';
 
-// Configuration constants
-export const JWT_SECRET = process.env.JWT_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
-const ACCESS_TOKEN_EXPIRY = '12h';
-const REFRESH_TOKEN_EXPIRY = '7d';
+// JWT Configuration - validation moved to runtime
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
 
-// Determine if cookies should be marked as Secure
-const isNodeEnvProduction = process.env.NODE_ENV === 'production';
-const allowInsecureProdCookies = process.env.ALLOW_INSECURE_PROD_COOKIES === 'true';
-const useSecureCookies = isNodeEnvProduction && !allowInsecureProdCookies;
+// Helper function to validate and get JWT secrets
+function getJWTSecrets() {
+  if (!JWT_SECRET || !REFRESH_SECRET) {
+    throw new Error('JWT_SECRET and REFRESH_SECRET must be defined in environment variables');
+  }
+  return {
+    jwtSecretKey: new TextEncoder().encode(JWT_SECRET),
+    refreshSecretKey: new TextEncoder().encode(REFRESH_SECRET)
+  };
+}
 
-// Types
-export interface JWTPayload {
+// JWT Payload interface that extends jose's JWTPayload
+export interface JWTPayload extends JoseJWTPayload {
   userId: string;
   email: string;
   role: string;
-  tokenVersion?: number;
 }
 
-export interface AuthResponse {
-  success: boolean;
-  message?: string;
-  user?: Partial<Users>;
-  error?: string;
-}
-
-export interface User {
-  userId: string;
-  userName: string;
-  email: string;
-  role: 'user' | 'admin';
-  realName?: string;
-}
-
-// Standardized response creator
-export const createResponse = <T extends Record<string, unknown>>(data: T = {} as T, status: number = 200, message: string = '') => {
-  const success = status >= 200 && status < 300;
-  return NextResponse.json(
-    { success, message, ...data }, 
-    { status }
-  );
-};
-
-// Generate tokens
-export const generateTokens = async (user: Users) => {
-  const payload: JWTPayload = {
+// Token generation
+export async function generateTokens(user: Users) {
+  const { jwtSecretKey, refreshSecretKey } = getJWTSecrets();
+  
+  const payload = {
     userId: user.userId,
     email: user.email,
-    role: user.role || 'user',
-    tokenVersion: user.tokenVersion || 0
+    role: user.role || 'user'
   };
-  
-  const accessToken = await signToken(payload, ACCESS_TOKEN_EXPIRY, JWT_SECRET);
-  const refreshToken = await signToken(payload, REFRESH_TOKEN_EXPIRY, REFRESH_TOKEN_SECRET);
-  
+
+  // Create access token (30 minutes)
+  const accessToken = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('30m')
+    .sign(jwtSecretKey);
+
+  // Create refresh token (7 days)
+  const refreshToken = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(refreshSecretKey);
+
   return { accessToken, refreshToken };
-};
+}
 
-// Set auth cookies with improved userRole handling
-export const setAuthCookies = async (response: NextResponse, accessToken: string, refreshToken: string) => {
-  response.cookies.set('accessToken', accessToken, {
-    httpOnly: true,
-    secure: useSecureCookies,
-    sameSite: 'strict',
-    maxAge: 12 * 60 * 60, // 12 hours in seconds
-    path: '/'
-  });
-  
-  response.cookies.set('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: useSecureCookies,
-    sameSite: 'strict',
-    maxAge: 15 * 24 * 60 * 60, // 15 days in seconds
-    path: '/'
-  });
-
-  // Non-HTTP-only cookie for UI purposes - making sure role is extracted
-  let role = 'user';
+// JWT verification for access tokens
+export async function verifyAccessToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(accessToken, new TextEncoder().encode(JWT_SECRET));
-    role = typeof payload.role === 'string' ? payload.role : 'user';
-  } catch {
-    // fallback to 'user'
-  }
-  
-  // Set the userRole cookie with longer expiry for better persistence
-  response.cookies.set('userRole', role, {
-    httpOnly: false, // Must be false so client JS can read it
-    secure: useSecureCookies,
-    sameSite: 'strict',
-    maxAge: 15 * 24 * 60 * 60, // Match refresh token expiry
-    path: '/'
-  });
-};
-
-// Verify JWT token with improved error handling
-export const verifyToken = async (token: string, secret = JWT_SECRET): Promise<JWTPayload | null> => {
-  if (!secret) {
-    return null;
-  }
-  
-  try {
-    const secretBytes = new TextEncoder().encode(secret);
-    const { payload } = await jwtVerify(token, secretBytes, {
-      algorithms: ['HS256'],
-    });
+    const { jwtSecretKey } = getJWTSecrets();
+    const { payload } = await jwtVerify(token, jwtSecretKey);
     return payload as unknown as JWTPayload;
-  } catch {
-    return null;
-  }
-};
-
-// Sign JWT token - updated for Edge Runtime compatibility
-export const signToken = async (payload: JWTPayload, expiresIn: string | number, secret = JWT_SECRET): Promise<string> => {
-  try {
-    // Use jose for all environments to ensure consistency
-    const secretBytes = new TextEncoder().encode(secret);
-    const token = await new SignJWT(payload as unknown as Record<string, unknown>)
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime(typeof expiresIn === 'string' ? expiresIn : `${expiresIn}s`)
-      .sign(secretBytes);
-    return token;
   } catch (error) {
-    throw error;
-  }
-};
-
-// Get current user from request - single implementation
-export const getCurrentUser = async (req: NextRequest): Promise<Users | null> => {
-  const headers = req.headers;
-  let token: string | undefined = undefined;
-
-  // 1. Try Authorization header
-  const authHeader = headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  }
-
-  // 2. If no token from header, try accessToken cookie
-  if (!token) {
-    token = req.cookies.get('accessToken')?.value;
-  }
-  
-  // Get userId from header (less secure, use with caution or phase out)
-  const userIdHeader = headers.get('x-user-id');
-  
-  try {
-    // Try using the token first
-    if (token) {
-      const decoded = await verifyToken(token); // verifyToken uses JWT_SECRET
-      if (decoded?.userId) {
-        const user = await db.users.findById(decoded.userId);
-        
-        // Check token version for session invalidation
-        if (user && (user.tokenVersion || 0) === (decoded.tokenVersion || 0)) {
-          return user;
-        }
-      }
-    }
-    
-    // Fall back to userId header if token doesn't work or not present
-    // Consider security implications of trusting x-user-id without further validation
-    if (userIdHeader) {
-      const userFromHeader = await db.users.findById(userIdHeader);
-      if (userFromHeader) {
-        // Potentially add role/permission checks if relying on x-user-id
-        return userFromHeader;
-      }
-    }
-    
+    console.error('Access token verification failed:', error);
     return null;
+  }
+}
+
+// JWT verification for refresh tokens
+export async function verifyRefreshToken(token: string): Promise<JWTPayload | null> {
+  try {
+    const { refreshSecretKey } = getJWTSecrets();
+    const { payload } = await jwtVerify(token, refreshSecretKey);
+    return payload as unknown as JWTPayload;
   } catch (error) {
-    console.error('[Auth] Error in getCurrentUser:', error);
+    console.error('Refresh token verification failed:', error);
     return null;
   }
-};
+}
 
-// Protected route handler creator
-export const createProtectedRouteHandler = (
-  handler: (req: NextRequest, user: Users) => Promise<NextResponse>,
-  requiredRole: string = 'user'
-) => {
-  return async (req: NextRequest) => {
-    const user = await getCurrentUser(req);
-    
-    if (!user) {
-      return createResponse({ error: '請先登入' }, 401);
-    }
-    
-    if (requiredRole && user.role !== requiredRole && user.role !== 'admin') {
-      return createResponse({ error: '權限不足' }, 403);
-    }
-    
-    return handler(req, user);
-  };
-};
-
-// Clear auth cookies
-export const clearAuthCookies = (response: NextResponse) => {
-  response.cookies.delete('accessToken');
-  response.cookies.delete('refreshToken');
-  response.cookies.delete('userRole');
-};
-
-// Handle token refresh
-export const handleTokenRefresh = async (req: NextRequest): Promise<NextResponse | null> => {
+// Get current user from request
+export async function getCurrentUser(request: NextRequest): Promise<Users | null> {
   try {
-    const refreshToken = req.cookies.get('refreshToken')?.value;
-    if (!refreshToken) return null;
+    // Try to get token from Authorization header first
+    const authHeader = request.headers.get('authorization');
+    let token = authHeader?.replace('Bearer ', '');
     
-    const decoded = await verifyToken(refreshToken, REFRESH_TOKEN_SECRET);
-    if (!decoded) return null;
+    // If no auth header, try cookies
+    if (!token) {
+      token = request.cookies.get('accessToken')?.value;
+    }
     
-    const user = await db.users.findById(decoded.userId);
-    if (!user || (user.tokenVersion || 0) !== (decoded.tokenVersion || 0)) {
+    if (!token) {
       return null;
     }
-    
-    const tokens = await generateTokens(user);
-    const response = createResponse({ message: 'Token refreshed' });
-    
-    setAuthCookies(response, tokens.accessToken, tokens.refreshToken);
-    
-    return response;
-  } catch  {
+
+    // Verify the token
+    const payload = await verifyAccessToken(token);
+    if (!payload) {
+      return null;
+    }
+
+    // Get user from database
+    const user = await db.users.findById(payload.userId);
+    return user;
+  } catch (error) {
+    console.error('Error getting current user:', error);
     return null;
   }
-};
+}
 
-// Invalidate all user sessions
-export const invalidateUserSessions = async (userId: string): Promise<void> => {
-  const user = await db.users.findById(userId);
-  if (user) {
-    const currentVersion = user.tokenVersion || 0;
-    await db.users.update(userId, {
-      tokenVersion: currentVersion + 1
-    });
-  }
-};
+// Set authentication cookies
+export function setAuthCookies(
+  response: NextResponse, 
+  accessToken: string, 
+  refreshToken: string, 
+  role: string, 
+  userId: string
+) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/'
+  };
 
-// Rate limiting utility
-export class RateLimiter {
-  private store: Map<string, { count: number, timestamp: number }>;
-  private windowMs: number;
-  private maxAttempts: number;
-  
-  constructor(windowMs: number, maxAttempts: number) {
-    this.store = new Map();
-    this.windowMs = windowMs;
-    this.maxAttempts = maxAttempts;
-    
-    if (typeof setInterval !== 'undefined') {
-      setInterval(() => this.cleanUp(), 60000);
-    }
+  response.cookies.set('accessToken', accessToken, {
+    ...cookieOptions,
+    maxAge: 30 * 60 // 30 minutes
+  });
+
+  response.cookies.set('refreshToken', refreshToken, {
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 // 7 days
+  });
+
+  response.cookies.set('userRole', role, {
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 // 7 days
+  });
+
+  response.cookies.set('userId', userId, {
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 // 7 days
+  });
+}
+
+// Clear authentication cookies
+export function clearAuthCookies(response: NextResponse) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 0
+  };
+
+  response.cookies.set('accessToken', '', cookieOptions);
+  response.cookies.set('refreshToken', '', cookieOptions);
+  response.cookies.set('userRole', '', cookieOptions);
+  response.cookies.set('userId', '', cookieOptions);
+}
+
+// Create standardized API response
+export function createResponse(data: Record<string, unknown> | unknown[] | null, status = 200, message?: string) {
+  if (message && data && typeof data === 'object' && !Array.isArray(data)) {
+    const responseData = { ...data, message };
+    return NextResponse.json(responseData, { status });
   }
   
-  check(key: string): { allowed: boolean, remaining: number } {
+  const responseData = message ? { data, message } : data;
+  return NextResponse.json(responseData, { status });
+}
+
+// Admin check helper function
+export function isAdmin(user: Users | null): boolean {
+  return user?.role === 'admin';
+}
+
+// Rate limiter for verification attempts
+export const verificationRateLimiter = {
+  attempts: new Map<string, { count: number; resetTime: number }>(),
+  
+  check(key: string, maxAttempts = 5, windowMs = 15 * 60 * 1000) {
     const now = Date.now();
-    const record = this.store.get(key);
+    const record = this.attempts.get(key);
     
-    if (!record) {
-      this.store.set(key, { count: 1, timestamp: now });
-      return { allowed: true, remaining: this.maxAttempts - 1 };
+    if (!record || now > record.resetTime) {
+      this.attempts.set(key, { count: 1, resetTime: now + windowMs });
+      return { allowed: true, remaining: maxAttempts - 1 };
     }
     
-    if (now - record.timestamp > this.windowMs) {
-      this.store.set(key, { count: 1, timestamp: now });
-      return { allowed: true, remaining: this.maxAttempts - 1 };
-    }
-    
-    if (record.count >= this.maxAttempts) {
+    if (record.count >= maxAttempts) {
       return { allowed: false, remaining: 0 };
     }
     
-    this.store.set(key, { count: record.count + 1, timestamp: record.timestamp });
-    return { allowed: true, remaining: this.maxAttempts - record.count - 1 };
+    record.count++;
+    return { allowed: true, remaining: maxAttempts - record.count };
   }
-  
-  private cleanUp() {
-    const now = Date.now();
-    for (const [key, record] of this.store.entries()) {
-      if (now - record.timestamp > this.windowMs) {
-        this.store.delete(key);
+};
+
+// Token refresh handler
+export async function handleTokenRefresh(request: NextRequest): Promise<NextResponse | null> {
+  try {
+    const refreshToken = request.cookies.get('refreshToken')?.value;
+    
+    if (!refreshToken) {
+      return null;
+    }
+    
+    const payload = await verifyRefreshToken(refreshToken);
+    if (!payload) {
+      return null;
+    }
+    
+    // Get user from database to ensure they still exist and get latest data
+    const user = await db.users.findById(payload.userId);
+    if (!user) {
+      return null;
+    }
+    
+    // Generate new tokens
+    const { accessToken, refreshToken: newRefreshToken } = await generateTokens(user);
+    
+    // Create response with new tokens
+    const response = NextResponse.json({ 
+      message: 'Token refreshed successfully',
+      user: {
+        userId: user.userId,
+        email: user.email,
+        role: user.role
       }
-    }
-  }
-}
-
-// Initialize rate limiters
-export const loginRateLimiter = new RateLimiter(10 * 60 * 1000, 10);
-export const verificationRateLimiter = new RateLimiter(10 * 60 * 1000, 10);
-export const registrationRateLimiter = new RateLimiter(60 * 60 * 1000, 10);
-
-/**
- * Enhanced admin check with fallback authentication methods
- */
-export async function isAdmin(request: NextRequest): Promise<boolean> {
-  try {
-    const user = await getCurrentUser(request);
-    if (user && user.role === 'admin') {
-      return true;
-    }
-
-    const userIdHeader = request.headers.get('x-user-id');
-    if (userIdHeader) {
-      const dbUser = await db.users.findById(userIdHeader);
-      return dbUser?.role === 'admin';
-    }
-
-    return false;
+    });
+    
+    // Set new auth cookies
+    setAuthCookies(response, accessToken, newRefreshToken, user.role || 'user', user.userId);
+    
+    return response;
   } catch (error) {
-    console.error('[Auth] Admin check failed:', error);
-    return false;
-  }
-}
-
-/**
- * Get user ID from request (with fallbacks)
- */
-export async function getUserId(request: NextRequest): Promise<string | null> {
-  try {
-    const user = await getCurrentUser(request);
-    if (user) {
-      return user.userId;
-    }
-
-    return request.headers.get('x-user-id') || null;
-  } catch (error) {
-    console.error('[Auth] Error getting user ID:', error);
+    console.error('Token refresh error:', error);
     return null;
   }
+}
+
+// Verify token helper (alias for verifyAccessToken for backward compatibility)
+export const verifyToken = verifyAccessToken;
+
+// Protected route handler creator
+export function createProtectedRouteHandler<T>(
+  handler: (request: NextRequest, user: Users, ...args: T[]) => Promise<NextResponse>
+) {
+  return async (request: NextRequest, ...args: T[]): Promise<NextResponse> => {
+    try {
+      const user = await getCurrentUser(request);
+      
+      if (!user) {
+        return createResponse({ error: 'Unauthorized' }, 401);
+      }
+      
+      return await handler(request, user, ...args);
+    } catch (error) {
+      console.error('Protected route error:', error);
+      return createResponse({ error: 'Internal server error' }, 500);
+    }
+  };
 }

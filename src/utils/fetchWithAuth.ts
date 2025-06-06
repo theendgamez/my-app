@@ -2,11 +2,11 @@
  * Utility for making authenticated fetch requests in client components
  */
 
-type FetchOptions = RequestInit & {
+interface FetchOptions extends RequestInit {
   useToken?: boolean;
   revalidate?: number | false;
   tags?: string[];
-};
+}
 
 /**
  * Enhanced fetch function that automatically adds auth headers
@@ -34,34 +34,48 @@ export async function fetchWithAuth<T>(
   if (typeof window !== 'undefined' && useToken) {
     const accessToken = localStorage.getItem('accessToken');
     const userId = localStorage.getItem('userId');
+    const userRole = localStorage.getItem('userRole');
     
     // Always send userId as fallback for Vercel deployment
     if (userId) {
       headers['x-user-id'] = userId;
     }
     
+    // Add role header for middleware
+    if (userRole) {
+      headers['x-user-role'] = userRole;
+    }
+    
     // Add token if available
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
+    
+    // Set cookies for middleware (if not already set)
+    if (accessToken && userId && userRole) {
+      document.cookie = `accessToken=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `userId=${userId}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `userRole=${userRole}; path=/; max-age=86400; SameSite=Lax`;
+    }
   }
   
-  // Next.js 15 cache options
-  const nextFetchOptions: RequestInit & { next?: { revalidate?: number | false, tags?: string[] } } = {
+  // Build the final options with proper typing
+  const finalOptions: RequestInit & { next?: { revalidate?: number | false; tags?: string[] } } = {
     ...fetchOptions,
     headers,
+    credentials: 'include'
   };
   
-  // Add Next.js 15 cache control options if provided
+  // Add Next.js specific options if provided
   if (revalidate !== undefined || tags) {
-    nextFetchOptions.next = {
-      ...(revalidate !== undefined ? { revalidate } : {}),
-      ...(tags ? { tags } : {}),
+    finalOptions.next = {
+      ...(revalidate !== undefined && { revalidate }),
+      ...(tags && { tags })
     };
   }
   
   // Make the request
-  const response = await fetch(url, nextFetchOptions);
+  const response = await fetch(url, finalOptions);
   
   // Handle response
   if (!response.ok) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { getCurrentUser} from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +25,7 @@ export async function GET(
     // Enhanced authentication checks
     const user = await getCurrentUser(request);
     const headerUserId = request.headers.get('x-user-id');
-    const isAdminRequest = await isAdmin(request);
+    const isAdminRequest = user?.role === 'admin';
     
     // Authorization with improved logic
     const isAuthorized = isAdminRequest || 

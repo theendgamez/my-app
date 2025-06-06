@@ -65,13 +65,13 @@ export async function POST(request: NextRequest) {
     const response = createResponse({
       user: {
         userId: user.userId,
-        role: user.role, // Include role so client knows if user is admin
+        role: user.role,
       },
       accessToken
     }, 200, '登入成功');
     
-    // Set cookies with secure flags
-    setAuthCookies(response, accessToken, refreshToken);
+    // Set cookies with secure flags for middleware access
+    setAuthCookies(response, accessToken, refreshToken, user.role, user.userId);
     
     // Add security headers
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
