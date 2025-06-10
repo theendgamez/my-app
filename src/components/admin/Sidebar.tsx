@@ -20,6 +20,7 @@ import {
   FiLink
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface MenuSection {
   title: string;
@@ -37,82 +38,89 @@ interface SidebarProps {
   isMobile: boolean;
 }
 
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) => {
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const { t } = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   
   // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
   const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
   
-  const [sections, setSections] = useState<MenuSection[]>([
-    {
-      title: '儀表板',
-      isOpen: true,
-      items: [
-        { name: '總覽', icon: <FiHome size={18} />, href: '/admin/dashboard' },
-      ]
-    },
-    {
-      title: '活動管理',
-      isOpen: false,
-      items: [
-        { name: '建立活動', icon: <FiPlus size={18} />, href: '/admin/create-event' },
-        { name: '活動列表', icon: <FiList size={18} />, href: '/admin/events' },
-      ]
-    },
-    {
-      title: '抽籤系統',
-      isOpen: false,
-      items: [
-        { name: '抽籤管理', icon: <RiBattery2Line size={18} />, href: '/admin/lottery' },
-        { name: '執行抽籤', icon: <RiBattery2Line size={18} />, href: '/admin/lottery/draw' },
-      ]
-    },
-    {
-      title: '用戶與票券',
-      isOpen: false,
-      items: [
-        { name: '用戶管理', icon: <FiUsers size={18} />, href: '/admin/users' },
-        { name: '票券管理', icon: <FiTag size={18} />, href: '/admin/tickets' },
-        { name: '訂單管理', icon: <FiShoppingBag size={18} />, href: '/admin/orders' },
-        {
-          name: '掃描票券',
-          href: '/admin/tickets/scan',
-          icon: <FiCamera size={18} />,
-        },
-      ]
-    },
-    {
-      title: '財務',
-      isOpen: false,
-      items: [
-        { name: '支付記錄', icon: <FiDollarSign size={18} />, href: '/admin/payments' },
-        { name: '財務報告', icon: <FiBarChart2 size={18} />, href: '/admin/reports' },
-      ]
-    },
-    {
-      title: '系統設定',
-      isOpen: false,
-      items: [
-        { name: '系統設定', icon: <FiSettings size={18} />, href: '/admin/settings' },
-      ]
-    },
-    {
-      title: '區塊鏈管理',
-      isOpen: false,
-      items: [
-        {
-          name: '區塊鏈',
-          href: '/admin/blockchain',
-          icon: <FiLink size={18} />,
-        },
-      ]
-    },
-  ]);
+  const [sections, setSections] = useState<MenuSection[]>([]);
+
+  useEffect(() => {
+    setSections([
+      {
+        title: t('sidebarDashboard'),
+        isOpen: true,
+        items: [
+          { name: t('sidebarOverview'), icon: <FiHome size={18} />, href: '/admin/dashboard' },
+        ]
+      },
+      {
+        title: t('sidebarEventManagement'),
+        isOpen: false,
+        items: [
+          { name: t('sidebarCreateEvent'), icon: <FiPlus size={18} />, href: '/admin/create-event' },
+          { name: t('sidebarEventList'), icon: <FiList size={18} />, href: '/admin/events' },
+        ]
+      },
+      {
+        title: t('sidebarLotterySystem'),
+        isOpen: false,
+        items: [
+          { name: t('lotteryManagement'), icon: <RiBattery2Line size={18} />, href: '/admin/lottery' },
+          { name: t('performDraw'), icon: <RiBattery2Line size={18} />, href: '/admin/lottery/draw' },
+        ]
+      },
+      {
+        title: t('sidebarUsersAndTickets'),
+        isOpen: false,
+        items: [
+          { name: t('sidebarUserManagement'), icon: <FiUsers size={18} />, href: '/admin/users' },
+          { name: t('sidebarTicketManagement'), icon: <FiTag size={18} />, href: '/admin/tickets' },
+          { name: t('sidebarOrderManagement'), icon: <FiShoppingBag size={18} />, href: '/admin/orders' },
+          {
+            name: t('sidebarScanTickets'),
+            href: '/admin/tickets/scan',
+            icon: <FiCamera size={18} />,
+          },
+        ]
+      },
+      {
+        title: t('sidebarFinance'),
+        isOpen: false,
+        items: [
+          { name: t('paymentRecords'), icon: <FiDollarSign size={18} />, href: '/admin/payments' },
+          { name: t('sidebarFinancialReports'), icon: <FiBarChart2 size={18} />, href: '/admin/reports' },
+        ]
+      },
+      {
+        title: t('sidebarSystemSettingsSection'),
+        isOpen: false,
+        items: [
+          { name: t('systemSettings'), icon: <FiSettings size={18} />, href: '/admin/settings' },
+        ]
+      },
+      {
+        title: t('sidebarBlockchainManagement'),
+        isOpen: false,
+        items: [
+          {
+            name: t('sidebarBlockchain'),
+            href: '/admin/blockchain',
+            icon: <FiLink size={18} />,
+          },
+        ]
+      },
+    ]);
+  }, [t]);
+
 
   // Use localStorage to check if admin on client-side
   useEffect(() => {
@@ -143,15 +151,40 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
   if (authLoading || !isAuthenticated) {
     return null;
   }
+
+  const NAVBAR_HEIGHT = "4rem"; // Height of the main Navbar from ClientLayout
+  const FOOTER_HEIGHT_ESTIMATE = "6rem"; // Estimated height of the Footer
+
+  // Base classes for the sidebar container
+  const sidebarContainerBaseClasses = `fixed z-30 w-64 bg-white shadow-md transition-transform duration-300 overflow-y-auto`;
   
-  // Mobile sidebar should be a overlay when open
-  const mobileStyles = isMobile 
-    ? isOpen 
-      ? 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform translate-x-0' 
-      : 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform -translate-x-full'
+  // Desktop specific classes
+  const desktopTopClass = `top-[${NAVBAR_HEIGHT}]`;
+  const desktopHeightClass = `h-[calc(100vh-${NAVBAR_HEIGHT}-${FOOTER_HEIGHT_ESTIMATE})]`;
+  const desktopTransformOpen = "transform translate-x-0";
+  const desktopTransformClosed = "transform -translate-x-full";
+
+  const desktopOpenClasses = `${sidebarContainerBaseClasses} ${desktopTopClass} ${desktopHeightClass} ${desktopTransformOpen} left-0`;
+  const desktopClosedClasses = `${sidebarContainerBaseClasses} ${desktopTopClass} ${desktopHeightClass} ${desktopTransformClosed} left-0`;
+
+  // Mobile specific classes (overlay style)
+  const mobileContainerBaseClasses = `fixed z-40 w-64 bg-white shadow-lg transition-transform duration-300 overflow-y-auto`;
+  const mobileTopClass = `top-[${NAVBAR_HEIGHT}]`; // Starts below main navbar
+  const mobileHeightClass = `h-[calc(100vh-${NAVBAR_HEIGHT})]`; // Extends to viewport bottom
+  const mobileTransformOpen = "transform translate-x-0";
+  const mobileTransformClosed = "transform -translate-x-full";
+  
+  const mobileOpenClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformOpen} inset-x-0`; // inset-x-0 for full width behavior if needed, or left-0
+  const mobileClosedClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformClosed} inset-x-0`;
+
+
+  const generatedSidebarClasses = isMobile
+    ? isOpen
+      ? mobileOpenClasses
+      : mobileClosedClasses
     : isOpen
-      ? 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform translate-x-0'
-      : 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform -translate-x-full md:translate-x-0';
+      ? desktopOpenClasses
+      : desktopClosedClasses;
 
   return (
     <>
@@ -164,10 +197,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
       )}
       
       {/* Sidebar */}
-      <aside className={mobileStyles}>
+      <aside className={generatedSidebarClasses}> {/* Use generated classes */}
         {isMobile && (
           <div className="p-4 border-b">
-            <button 
+            <button
               onClick={toggleSidebar}
               className="text-gray-700 hover:text-gray-900"
             >

@@ -8,6 +8,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
 import { Registration } from '@/types';
+import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import the new formatter
+import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
@@ -26,6 +28,7 @@ function LotteryPaymentPage() {
   const ticketId = searchParams.get('ticketId');
   const registrationToken = searchParams.get('registrationToken');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { t, locale } = useTranslations(); // Initialize useTranslations
   
   const [registration, setRegistration] = useState<Registration | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +39,10 @@ function LotteryPaymentPage() {
   const [ticketPrice, setTicketPrice] = useState<number>(0);
   const [resolvedToken, setResolvedToken] = useState<string | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(true); // Control payment form visibility
+
+  const formatDate = (dateString: string) => {
+    return formatDateUtil(dateString, 'Pp', { locale });
+  };
 
   useEffect(() => {
     // Check authentication first
@@ -131,7 +138,7 @@ function LotteryPaymentPage() {
         }
 
         if (!token) {
-          setError('缺少抽籤登記令牌，無法處理付款');
+          setError(t('errorFetchingRegistration')); // Use translated error
           setLoading(false);
           return;
         }
@@ -147,7 +154,7 @@ function LotteryPaymentPage() {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`API error (${response.status}):`, errorText);
-          throw new Error(`無法獲取登記詳情: ${response.status}`);
+          throw new Error(t('errorFetchingRegistration')); // Use translated error
         }
 
         const data = await response.json();
@@ -157,7 +164,7 @@ function LotteryPaymentPage() {
         
         if (!registrationData || typeof registrationData.ticketsPurchased === 'undefined' || typeof registrationData.platformFeePaid === 'undefined' || !registrationData.status) {
           console.error("Invalid or incomplete registration data from API:", registrationData);
-          setError('無法獲取有效的登記資料。');
+          setError(t('errorFetchingRegistration')); // Use translated error
           setLoading(false);
           return;
         }
@@ -167,7 +174,7 @@ function LotteryPaymentPage() {
         // Determine payment type and form visibility
         if (registrationData.ticketsPurchased) {
           console.log("Tickets already purchased.");
-          setSuccess('您已成功購買此活動的門票。'); 
+          setSuccess(t('ticketsPurchasedSuccess')); 
           setError(null); 
           setShowPaymentForm(false); // Ensure form is hidden
         } else if (registrationData.platformFeePaid) {
@@ -179,7 +186,7 @@ function LotteryPaymentPage() {
           } else {
             // Platform fee paid, but not 'won' (e.g., 'registered', 'lost')
             console.log(`Status is '${registrationData.status}'. No further payment needed at this time.`);
-            setError('平台費用已支付。請等候抽籤結果或檢查您的票券狀態。');
+            setError(t('platformFeePaid'));
             // setShowPaymentForm remains false
           }
         } else { 
@@ -193,7 +200,7 @@ function LotteryPaymentPage() {
           } else {
             // e.g., status is 'lost', 'cancelled', and fee not paid. Payment not applicable.
             console.log(`Status is '${registrationData.status}'. Platform fee not payable for this status.`);
-            setError(`目前狀態 (${registrationData.status}) 無法支付平台費用。`);
+            setError(t('paymentNotPayableCurrentStatus', { status: registrationData.status }));
             // setShowPaymentForm remains false
           }
         }
@@ -225,7 +232,7 @@ function LotteryPaymentPage() {
                   console.log(`Setting ticket price from event data: ${selectedZone.price}`);
                 } else {
                   console.error('Zone price not found in event data');
-                  setError('無法獲取票券價格信息');
+                  setError(t('errorFetchingRegistration')); // Generic error
                 }
               }
             } catch (eventError) {
@@ -235,7 +242,7 @@ function LotteryPaymentPage() {
         }
       } catch (err) {
         console.error('Error fetching registration details:', err);
-        setError(err instanceof Error ? err.message : '獲取詳情時出錯');
+        setError(err instanceof Error ? err.message : t('errorFetchingRegistration'));
         setShowPaymentForm(false); // Ensure form is hidden on any error during fetch
       } finally {
         setLoading(false);
@@ -245,19 +252,19 @@ function LotteryPaymentPage() {
     if (isAuthenticated && (ticketId || registrationToken)) {
       fetchDetails();
     }
-  }, [id, registrationToken, ticketId, isAuthenticated, authLoading, router, user]);
+  }, [id, registrationToken, ticketId, isAuthenticated, authLoading, router, user, t, locale]); // Added t and locale
 
   // This function is called when the CreditCardForm is submitted
   const handlePayment = async (cardData: CardData) => {
     if (!registration) {
       console.error("Cannot process payment: registration data is missing");
-      setError("無法處理付款：缺少登記資料");
+      setError(t('errorProcessingPayment'));
       return;
     }
     
     if (!user) {
       console.error("Cannot process payment: user data is missing");
-      setError("無法處理付款：缺少用戶資料");
+      setError(t('errorProcessingPayment'));
       return;
     }
     
@@ -265,7 +272,7 @@ function LotteryPaymentPage() {
     const tokenToUse = registrationToken || resolvedToken;
     if (!tokenToUse) {
       console.error("Cannot process payment: missing registration token");
-      setError("無法處理付款：缺少登記令牌");
+      setError(t('errorProcessingPayment'));
       return;
     }
 
@@ -321,15 +328,15 @@ function LotteryPaymentPage() {
       try {
         data = JSON.parse(responseText);
       } catch { // Prefix 'e' with an underscore as it's not used
-        throw new Error(`伺服器回應無效: ${responseText}`);
+        throw new Error(t('errorProcessingPayment')); // Generic error
       }
       
       if (!response.ok) {
-        throw new Error(data.error || '支付處理時出錯');
+        throw new Error(data.error || t('errorProcessingPayment'));
       }
 
       console.log("Payment successful:", data);
-      setSuccess('門票購買成功！您將收到確認電子郵件。');
+      setSuccess(t('ticketPurchaseSuccess'));
       setShowPaymentForm(false); // Hide payment form elements immediately
 
       // Manually update local registration state to reflect payment
@@ -361,7 +368,7 @@ function LotteryPaymentPage() {
       }, 2000);
     } catch (err) {
       console.error('Payment error:', err);
-      setError(err instanceof Error ? err.message : '支付處理時出錯');
+      setError(err instanceof Error ? err.message : t('errorProcessingPayment'));
     } finally {
       setIsProcessing(false);
     }
@@ -383,13 +390,13 @@ function LotteryPaymentPage() {
       <>
         <Navbar />
         <div className="container mx-auto p-4 pt-20">
-          <Alert type="error" title="錯誤" message={error} />
+          <Alert type="error" title={t('error')} message={error} /> {/* Ensure 'error' key exists or use a specific one */}
           <div className="mt-4 flex justify-center">
             <button
               onClick={() => router.back()}
               className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
             >
-              返回
+              {t('back')}
             </button>
           </div>
         </div>
@@ -402,15 +409,6 @@ function LotteryPaymentPage() {
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-          {/* Display payment type title only if form is relevant or registration exists */}
-          {registration && !success && !registration.ticketsPurchased && ( // Hide title if success message implies page is just informational or tickets are purchased
-             <h1 className="text-2xl font-bold mb-6">
-              {paymentType === 'ticket_price' ? '門票費用付款' : '抽籤登記付款'}
-            </h1>
-          )}
-          
-          {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
-          {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />}
           
           {registration && (
             <div className="bg-white p-6 rounded-lg shadow-md">
@@ -419,31 +417,31 @@ function LotteryPaymentPage() {
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 {/* Informational text based on current state */}
                 {showPaymentForm && paymentType === 'ticket_price' && (
-                  <p><span className="font-semibold">恭喜中獎！</span> 您需要支付門票費用以確認您的門票。</p>
+                  <p><span className="font-semibold">{t('congratulationsWon')}</span></p>
                 )}
                 {showPaymentForm && paymentType === 'platform_fee' && (
                   <>
-                    <p className="mb-2"><span className="font-semibold">提醒：</span> 您正在支付抽籤登記的費用。如果您在抽籤中被選中，此費用將作為票券的全額付款，無需再次付款。</p>
-                    <p>如果您未中籤，此費用將不予退還，作為平台手續費。</p>
+                    <p className="mb-2"><span className="font-semibold">{t('reminderLotteryFee')}</span></p>
+                    <p>{t('reminderLotteryFeeNotWon')}</p>
                   </>
                 )}
                 {/* Display messages when payment form is hidden due to specific states */}
                 {registration.ticketsPurchased && ( 
                   <div>
                     {/* This message is shown if success alert is dismissed or page reloaded after purchase */}
-                    {!success && <p className="mb-2">您已成功購買此活動的門票。</p>}
+                    {!success && <p className="mb-2">{t('ticketsPurchasedSuccess')}</p>}
                     {registration.paymentId && (
                       <button
                         onClick={() => router.push(`/user/order`)} // Simplified to go to main order page
                         className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
                       >
-                        查看我的票券
+                        {t('viewMyTickets')}
                       </button>
                     )}
                   </div>
                 )}
                 {!showPaymentForm && !registration.ticketsPurchased && registration.platformFeePaid && registration.status !== 'won' && (
-                  <p>平台費用已支付。請靜候抽籤結果或檢查您的票券狀態。</p>
+                  <p>{t('platformFeePaid')}</p>
                 )}
                  {/* The main error Alert above will cover other !showPaymentForm cases where error is set */}
               </div>
@@ -453,36 +451,36 @@ function LotteryPaymentPage() {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                      <h3 className="font-semibold mb-4">登記詳情</h3>
+                      <h3 className="font-semibold mb-4">{t('registrationDetails')}</h3>
                       <table className="w-full text-sm">
                         <tbody className="divide-y">
                           <tr>
-                            <td className="py-2 font-medium">登記號碼</td>
+                            <td className="py-2 font-medium">{t('registrationNumber')}</td>
                             <td className="py-2">{registration.registrationToken.substring(0, 8)}...</td>
                           </tr>
                           <tr>
-                            <td className="py-2 font-medium">選擇區域</td>
-                            <td className="py-2">{registration.zoneName}區</td>
+                            <td className="py-2 font-medium">{t('selectedZone')}</td>
+                            <td className="py-2">{t('zoneNameWithSuffix', { zoneName: registration.zoneName })}</td>
                           </tr>
                           <tr>
-                            <td className="py-2 font-medium">數量</td>
-                            <td className="py-2">{registration.quantity} 張</td>
+                            <td className="py-2 font-medium">{t('quantity')}</td>
+                            <td className="py-2">{registration.quantity} {t('ticketsUnit')}</td>
                           </tr>
                           <tr>
-                            <td className="py-2 font-medium">登記時間</td>
-                            <td className="py-2">{new Date(registration.createdAt).toLocaleString()}</td>
+                            <td className="py-2 font-medium">{t('registrationTime')}</td>
+                            <td className="py-2">{formatDate(registration.createdAt)}</td>
                           </tr>
                         </tbody>
                       </table>
                     </div>
                 
                     <div>
-                      <h3 className="font-semibold mb-4">費用詳情</h3>
+                      <h3 className="font-semibold mb-4">{t('feeDetails')}</h3>
                       <table className="w-full text-sm">
                         <tbody className="divide-y">
                           <tr>
                             <td className="py-2">
-                              {paymentType === 'ticket_price' ? '門票價格' : '平台手續費'}
+                              {paymentType === 'ticket_price' ? t('ticketPrice') : t('platformFeeLabel')}
                             </td>
                             <td className="py-2 text-right">
                               HKD {paymentType === 'ticket_price' 
@@ -491,7 +489,7 @@ function LotteryPaymentPage() {
                             </td>
                           </tr>
                           <tr>
-                            <td className="py-2 font-semibold">總計</td>
+                            <td className="py-2 font-semibold">{t('total')}</td>
                             <td className="py-2 text-right font-semibold">
                               HKD {paymentType === 'ticket_price' 
                                 ? (ticketPrice * registration.quantity).toLocaleString('en-HK')
@@ -505,7 +503,7 @@ function LotteryPaymentPage() {
               
                   {showPaymentForm && (
                     <div className="border-t pt-6">
-                      <h3 className="font-semibold mb-4">付款方式</h3>
+                      <h3 className="font-semibold mb-4">{t('paymentMethod')}</h3>
                       <CreditCardForm onSubmit={handlePayment} isProcessing={isProcessing} />
                     </div>
                   )}

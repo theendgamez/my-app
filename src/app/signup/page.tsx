@@ -6,6 +6,7 @@ import Navbar from "@/components/navbar/Navbar";
 import { useState } from "react";
 import authEvents from "@/utils/authEvents";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslations } from "@/hooks/useTranslations";
 
 interface FormData {
   userName: string;
@@ -20,6 +21,7 @@ export default function SignUpPage() {
   const [isSubmitting, setIsSubmitting] = useState(false); // 加載狀態
   const router = useRouter();
   const { refreshAuthState } = useAuth();
+  const { t } = useTranslations();
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true); // 設置加載狀態
@@ -75,17 +77,17 @@ export default function SignUpPage() {
       <Navbar />
       <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-          <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900">註冊</h2>
+          <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900">{t('signup')}</h2>
         </div>
 
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
-              <label className="block text-sm/6 font-medium text-gray-900">用戶名稱</label>
+              <label className="block text-sm/6 font-medium text-gray-900">{t('userName')}</label>
               <div className="mt-2">
                 <input
                   type="text"
-                  placeholder="用戶名稱"
+                  placeholder={t('userName')}
                   {...register("userName", { 
                     required: "用戶名稱是必填的。", 
                     maxLength: { value: 20, message: "用戶名稱不能超過20個字符。" },
@@ -98,11 +100,11 @@ export default function SignUpPage() {
             </div>
 
             <div>
-            <label className="block text-sm/6 font-medium text-gray-900">真實姓名</label>
+            <label className="block text-sm/6 font-medium text-gray-900">{t('realName')}</label>
             <div className="mt-2">
               <input
                 type="text"
-                placeholder="真實姓名"
+                placeholder={t('realName')}
                 {...register("realName", { required: "真實姓名是必填的。" })}
                 className="border border-black block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
               />
@@ -111,11 +113,11 @@ export default function SignUpPage() {
           </div>
 
             <div>
-              <label className="block text-sm/6 font-medium text-gray-900">電子郵件</label>
+              <label className="block text-sm/6 font-medium text-gray-900">{t('email')}</label>
               <div className="mt-2">
                 <input
                   type="email"
-                  placeholder="電子郵件"
+                  placeholder={t('email')}
                   {...register("email", {
                     required: "電子郵件是必填的。",
                     pattern: {
@@ -130,11 +132,11 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="block text-sm/6 font-medium text-gray-900">電話號碼</label>
+              <label className="block text-sm/6 font-medium text-gray-900">{t('phoneNumber')}</label>
               <div className="mt-2">
                 <input
                   type="text"
-                  placeholder="電話號碼"
+                  placeholder={t('phoneNumber')}
                   {...register("phoneNumber", {
                     required: "電話號碼是必填的。",
                     pattern: {
@@ -149,11 +151,11 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="block text-sm/6 font-medium text-gray-900">密碼</label>
+              <label className="block text-sm/6 font-medium text-gray-900">{t('password')}</label>
               <div className="mt-2">
                 <input
                   type="password"
-                  placeholder="密碼"
+                  placeholder={t('password')}
                   {...register("password", {
                     required: "密碼是必填的。",
                     minLength: { value: 6, message: "密碼至少需要6個字符。" },

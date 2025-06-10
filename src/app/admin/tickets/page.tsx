@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import { Ticket} from '@/types';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import and alias
 
 
 export default function AdminTicketsPage() {
@@ -226,7 +227,7 @@ export default function AdminTicketsPage() {
   // Format date for display
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('zh-HK');
+    return formatDateUtil(dateString); // Use imported formatter
   };
 
   // Translate status to Chinese

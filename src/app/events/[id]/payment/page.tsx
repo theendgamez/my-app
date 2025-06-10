@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
 import { BookingDetails} from '@/types';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 // 10-minute countdown timer component
 const CountdownTimer = ({ expiresAt }: { expiresAt: number }) => {
@@ -219,32 +220,6 @@ export default function PaymentPage() {
     }
   };
 
-  const formatEventDate = (dateString?: string) => {
-    if (!dateString) return '未指定';
-    
-    try {
-      const date = new Date(dateString);
-      
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date:', dateString);
-        return '日期格式有誤';
-      }
-      
-      return date.toLocaleString('zh-HK', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-    } catch (err) {
-      console.error('Error formatting date:', err);
-      return '日期格式有誤';
-    }
-  };
-
   if (loading || authLoading) {
     return (
       <>
@@ -310,7 +285,7 @@ export default function PaymentPage() {
                 </div>
                 <div className="flex justify-between mb-1">
                   <span>場次時間:</span>
-                  <span>{formatEventDate(bookingDetails.eventDate)}</span>
+                  <span>{formatDate(bookingDetails.eventDate, undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span>場地:</span>

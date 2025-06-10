@@ -7,6 +7,8 @@ import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/admin/Sidebar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
+import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import the new formatter
+import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 interface LotteryEvent {
   eventId: string;
@@ -20,6 +22,7 @@ interface LotteryEvent {
 export default function AdminLotteryPage() {
   const router = useRouter();
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
+  const { t, locale } = useTranslations(); // Initialize useTranslations
   const [events, setEvents] = useState<LotteryEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +87,7 @@ export default function AdminLotteryPage() {
         } else {
           // Handle different error status codes
           if (response.status === 403) {
-            setError('無權訪問抽籤管理。請確保您具有管理員權限。');
+            setError(t('errorFetchingLotteryEvents')); // Use translated error
             console.error('Admin lottery access denied. Check user role permissions.');
 
             // Optional: could add redirect to login here
@@ -92,12 +95,12 @@ export default function AdminLotteryPage() {
               router.push('/login?redirect=/admin/lottery');
             }, 2000);
           } else {
-            setError(`無法獲取抽籤活動資料: ${response.status}`);
+            setError(t('errorFetchingLotteryEvents')); // Use translated error
           }
         }
       } catch (err) {
         console.error('Error fetching lottery events:', err);
-        setError('獲取抽籤活動資料時發生錯誤');
+        setError(t('errorFetchingLotteryEvents')); // Use translated error
       } finally {
         setLoading(false);
       }
@@ -106,7 +109,7 @@ export default function AdminLotteryPage() {
     if (!authLoading && isAdmin) {
       fetchLotteryEvents();
     }
-  }, [authLoading, isAdmin, router]);
+  }, [authLoading, isAdmin, router, t]); // Added t to dependency array
 
   const getStatusClass = (status: string) => {
     switch (status) {
@@ -121,6 +124,10 @@ export default function AdminLotteryPage() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatDate = (dateString: string, formatOptions?: Intl.DateTimeFormatOptions) => {
+    return formatDateUtil(dateString, undefined, { locale, ...formatOptions });
   };
 
   if (authLoading) {
@@ -146,12 +153,12 @@ export default function AdminLotteryPage() {
         />
         <div className={`container mx-auto p-4 md:p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-0 md:ml-64' : 'ml-0'}`}>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-            <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-0">抽籤活動管理</h1>
+            <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-0">{t('lotteryManagement')}</h1>
             <Link
               href="/admin/lottery/draw"
               className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
             >
-              執行抽籤
+              {t('performDraw')}
             </Link>
           </div>
 
@@ -173,19 +180,19 @@ export default function AdminLotteryPage() {
             </div>
           ) : events.length === 0 ? (
             <div className="bg-white p-6 rounded-lg shadow text-center">
-              <p className="text-gray-600 mb-4">目前沒有抽籤模式的活動</p>
+              <p className="text-gray-600 mb-4">{t('noLotteryEvents')}</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">活動名稱</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">抽籤日期</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">登記人數</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">剩餘天數</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('eventName')}</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('drawDate')}</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('registeredCount')}</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('remainingDays')}</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -197,28 +204,29 @@ export default function AdminLotteryPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {event.drawDate ? new Date(event.drawDate).toLocaleDateString() : 'N/A'}
+                          {event.drawDate ? formatDate(event.drawDate, { year: 'numeric', month: '2-digit', day: '2-digit' }) : t('notApplicable')}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {event.drawDate ? new Date(event.drawDate).toLocaleTimeString() : ''}
+                          {event.drawDate ? formatDate(event.drawDate, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(event.status)}`}>
-                          {event.status === 'registering' && '登記中'}
-                          {event.status === 'drawing' && '可抽籤'}
-                          {event.status === 'drawn' && '已抽籤'}
-                          {event.status === 'closed' && '已完結'}
+                          {event.status === 'registering' && t('statusRegistering')}
+                          {event.status === 'drawing' && t('statusReadyForDraw')}
+                          {event.status === 'drawn' && t('statusDrawn')}
+                          {event.status === 'closed' && t('statusClosed')}
+                          {!['registering', 'drawing', 'drawn', 'closed'].includes(event.status) && event.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {event.registerCount} 人
+                        {event.registerCount} {t('user')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {event.remainingDays > 0 ? (
-                          <span className="text-green-600">{event.remainingDays} 天</span>
+                          <span className="text-green-600">{event.remainingDays} {t('days')}</span>
                         ) : (
-                          <span className="text-red-600">0 天</span>
+                          <span className="text-red-600">0 {t('days')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -227,14 +235,14 @@ export default function AdminLotteryPage() {
                             href={`/admin/lottery/registrations/${event.eventId}`}
                             className="text-indigo-600 hover:text-indigo-900"
                           >
-                            查看登記
+                            {t('viewRegistrations')}
                           </Link>
                           {event.status === 'drawing' && (
                             <Link
                               href={`/admin/lottery/draw?eventId=${event.eventId}`}
                               className="text-purple-600 hover:text-purple-900"
                             >
-                              執行抽籤
+                              {t('performDraw')}
                             </Link>
                           )}
                         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface Transaction {
   transactionDate: string;
@@ -83,7 +84,6 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
 
   return (
     <div className="mt-4">
-      <h5 className="text-sm font-medium text-gray-700 mb-2">區塊鏈交易記錄</h5>
       <div className="overflow-x-auto">
         <div className="flex items-center space-x-4 pb-4 overflow-x-auto">
           {transactions.map((tx, index) => {
@@ -92,26 +92,9 @@ export default function BlockchainVisualizer({ ticketId }: BlockchainVisualizerP
                 key={index} 
                 className="min-w-[180px] max-w-[240px] bg-white border rounded-md p-3 shadow-sm"
               >
-                <div className="flex items-center mb-2">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${
-                    tx.action === 'create' ? 'bg-green-500' :
-                    tx.action === 'transfer' ? 'bg-blue-500' :
-                    tx.action === 'use' ? 'bg-purple-500' :
-                    tx.action === 'verify' ? 'bg-yellow-500' : 
-                    tx.action === 'blockchain_sync' ? 'bg-indigo-500' : 'bg-gray-500'
-                  }`}></div>
-                  <span className="text-xs font-medium">{
-                    tx.action === 'create' ? '創建票券' :
-                    tx.action === 'transfer' ? '轉讓票券' :
-                    tx.action === 'use' ? '使用票券' :
-                    tx.action === 'verify' ? '驗證票券' :
-                    tx.action === 'blockchain_sync' ? '區塊鏈同步' :
-                    tx.action
-                  }</span>
-                </div>
                 
                 <div className="text-xs text-gray-500 mb-1">
-                  {new Date(tx.transactionDate).toLocaleString('zh-HK')}
+                  {formatDate(tx.transactionDate)} {/* Use new formatter */}
                 </div>
                 
                 {tx.action === 'transfer' && (tx.fromUser || tx.toUser) && (

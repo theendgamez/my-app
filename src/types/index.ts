@@ -117,6 +117,7 @@ export interface Ticket {
   transferredFrom: string | null;
   adminNotes?: string;
   bookingToken?: string;
+  
   dynamicData?: {
     ticketId: string;
     timestamp: string | number;

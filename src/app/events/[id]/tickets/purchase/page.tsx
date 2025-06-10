@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import CreditCardForm from '@/components/ui/CreditCardForm';
 import Link from 'next/link';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 // Define types needed for this page
 type EventDetails = {
@@ -329,7 +330,7 @@ export default function LotteryTicketPurchasePage() {
                       <tr>
                         <td className="py-2 font-medium">活動日期</td>
                         <td className="py-2">
-                          {event.eventDate ? new Date(event.eventDate).toLocaleString() : '未指定'}
+                          {event.eventDate ? formatDate(event.eventDate) : '未指定'}
                         </td>
                       </tr>
                       <tr>

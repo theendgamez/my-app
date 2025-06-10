@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import { Ticket } from '@/types';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface TicketTransaction {
   ticketId: string;
@@ -86,17 +87,6 @@ export default function TicketHistory({ ticketId, isAdminView = false, emptyMess
       fetchTicketHistory();
     }
   }, [ticketId]);
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('zh-HK', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
   
   // Helper function to extract name from user objects or use string directly
   const getUserName = (user: string | { userId: string; name: string } | undefined | null): string => {
@@ -164,7 +154,7 @@ export default function TicketHistory({ ticketId, isAdminView = false, emptyMess
             {history.map((transaction, index) => (
               <tr key={index}>
                 <td className="px-4 py-3 text-xs text-gray-900">
-                  {formatDate(transaction.timestamp)}
+                  {formatDate(new Date (transaction.timestamp))}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

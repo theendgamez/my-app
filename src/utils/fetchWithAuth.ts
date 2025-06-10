@@ -86,6 +86,11 @@ export async function fetchWithAuth<T>(
       window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&auth_error=true`;
       throw new Error('Authentication failed. Redirecting to login...');
     }
+
+    // Specific handling for 404 Not Found
+    if (response.status === 404) {
+      throw new Error(`Error 404: Resource not found at ${url}`);
+    }
     
     // Special handling for health check endpoints
     if (url.includes('/api/health')) {
@@ -103,17 +108,17 @@ export async function fetchWithAuth<T>(
     try {
       errorData = await response.json();
     } catch {
-      // If parsing fails, use status text
-      throw new Error(response.statusText);
+      // If parsing fails, use status text, including URL and status
+      throw new Error(`Request to ${url} failed with status ${response.status}: ${response.statusText}`);
     }
     
     if (typeof errorData === 'object' && errorData !== null) {
       const message = (errorData as { message?: string; error?: string }).message
-        || (errorData as { message?: string; error?: string }).error
-        || 'Request failed';
+        || (errorData as { message?:string; error?: string }).error
+        || `Request to ${url} failed with status ${response.status}`; // Include URL and status
       throw new Error(message);
     }
-    throw new Error('Request failed');
+    throw new Error(`Request to ${url} failed with status ${response.status}`); // Include URL and status
   }
   
   // Return successful response data

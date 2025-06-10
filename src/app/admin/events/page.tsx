@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AdminPage from '@/components/admin/AdminPage';
 import { Events } from '@/types';
 import { adminFetch } from '@/utils/adminApi';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<Events[]>([]);
@@ -117,10 +118,10 @@ export default function AdminEventsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'N/A'}
+                      {event.eventDate ? formatDate(event.eventDate, undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }) : 'N/A'}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {event.eventDate ? new Date(event.eventDate).toLocaleTimeString() : ''}
+                      {event.eventDate ? formatDate(event.eventDate, undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : ''}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

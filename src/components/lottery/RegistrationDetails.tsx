@@ -1,5 +1,6 @@
 import React from 'react';
 import { Registration } from '@/types';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface RegistrationDetailsProps {
   registration: Registration;
@@ -31,15 +32,6 @@ export default function RegistrationDetails({ registration }: RegistrationDetail
       default:
         // Fallback for other statuses like 'cancelled', 'error', 'processing'
         return <span className="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">{status || '未知'}</span>;
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '未指定';
-    try {
-      return new Date(dateString).toLocaleString('zh-TW');
-    } catch {
-      return dateString;
     }
   };
 

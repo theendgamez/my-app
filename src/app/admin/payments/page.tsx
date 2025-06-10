@@ -5,7 +5,8 @@ import AdminPage from '@/components/admin/AdminPage';
 import { adminFetch } from '@/utils/adminApi';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatDate as formatDateUtil } from '@/utils/formatters'; // Import new formatters
+import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 interface Payment {
   paymentId: string;
@@ -67,6 +68,7 @@ export default function AdminPaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const { t, locale } = useTranslations(); // Initialize useTranslations
   const [stats, setStats] = useState<PaymentStats>({
     total: 0,
     completed: 0,
@@ -101,7 +103,7 @@ export default function AdminPaymentsPage() {
           // Old format fallback
           paymentsData = response.payments;
         } else {
-          throw new Error('獲取到的付款數據格式不正確');
+          throw new Error(t('errorFetchingData')); // Use translated error
         }
         
         setPayments(paymentsData);
@@ -119,21 +121,21 @@ export default function AdminPaymentsPage() {
         setStats(statsData);
       } catch (err) {
         console.error('Error fetching payments:', err);
-        setError(err instanceof Error ? err.message : '獲取付款記錄時發生錯誤');
+        setError(err instanceof Error ? err.message : t('errorFetchingData')); // Use translated error
       } finally {
         setLoading(false);
       }
     };
 
     fetchPayments();
-  }, []);
+  }, [t]); // Added t to dependency array
 
   // Group payments by event
   useEffect(() => {
     if (payments.length > 0) {
       const grouped = payments.reduce((acc, payment) => {
         const eventId = payment.eventId || 'unknown';
-        const eventName = payment.eventName || '未知活動';
+        const eventName = payment.eventName || t('unknownEvent');
         
         if (!acc[eventId]) {
           acc[eventId] = {
@@ -173,7 +175,7 @@ export default function AdminPaymentsPage() {
       
       setGroupedPayments(Object.values(grouped));
     }
-  }, [payments]);
+  }, [payments , t]);
 
   // Filter and sort payments
   useEffect(() => {
@@ -272,7 +274,8 @@ export default function AdminPaymentsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-HK', {
+    return formatDateUtil(dateString, undefined, { // Pass undefined to use default locale from formatter
+      locale, // Pass current locale
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -281,29 +284,33 @@ export default function AdminPaymentsPage() {
     });
   };
 
+  const localizedFormatCurrency = (amount: number) => {
+    return formatCurrency(amount, 'HKD', locale); // Pass current locale
+  }
+
   return (
     <AdminPage 
-      title="支付記錄" 
+      title={t('paymentRecords')}
       isLoading={loading}
       error={error}
     >
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">總交易數</div>
+          <div className="text-sm font-medium text-gray-500">{t('totalTransactions')}</div>
           <div className="text-2xl font-semibold">{stats.total}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">已完成交易</div>
+          <div className="text-sm font-medium text-gray-500">{t('completedTransactions')}</div>
           <div className="text-2xl font-semibold text-green-600">{stats.completed}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">待處理交易</div>
+          <div className="text-sm font-medium text-gray-500">{t('pendingTransactions')}</div>
           <div className="text-2xl font-semibold text-yellow-600">{stats.pending}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">總收入</div>
-          <div className="text-2xl font-semibold text-blue-600">{formatCurrency(stats.totalAmount)}</div>
+          <div className="text-sm font-medium text-gray-500">{t('totalRevenue')}</div>
+          <div className="text-2xl font-semibold text-blue-600">{localizedFormatCurrency(stats.totalAmount)}</div>
         </div>
       </div>
 
@@ -313,7 +320,7 @@ export default function AdminPaymentsPage() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="搜索支付ID、訂單ID、用戶或活動..."
+              placeholder={t('searchPlaceholder')}
               className="w-full p-2 border rounded-md"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -330,7 +337,7 @@ export default function AdminPaymentsPage() {
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
-                按活動分組
+                {t('groupByEvent')}
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -340,7 +347,7 @@ export default function AdminPaymentsPage() {
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
-                列表檢視
+                {t('listView')}
               </button>
             </div>
             <select
@@ -348,21 +355,21 @@ export default function AdminPaymentsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="p-2 border rounded-md"
             >
-              <option value="all">所有狀態</option>
-              <option value="completed">已完成</option>
-              <option value="pending">處理中</option>
-              <option value="failed">失敗</option>
-              <option value="refunded">已退款</option>
+              <option value="all">{t('allStatuses')}</option>
+              <option value="completed">{t('completed')}</option>
+              <option value="pending">{t('pending')}</option>
+              <option value="failed">{t('failed')}</option>
+              <option value="refunded">{t('refunded')}</option>
             </select>
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
               className="p-2 border rounded-md"
             >
-              <option value="all">所有時間</option>
-              <option value="today">今天</option>
-              <option value="week">本週</option>
-              <option value="month">本月</option>
+              <option value="all">{t('allTimes')}</option>
+              <option value="today">{t('today')}</option>
+              <option value="week">{t('thisWeek')}</option>
+              <option value="month">{t('thisMonth')}</option>
             </select>
           </div>
         </div>
@@ -383,14 +390,14 @@ export default function AdminPaymentsPage() {
                         {eventGroup.eventName}
                       </h3>
                       <p className="text-sm text-gray-500">
-                        活動ID: {eventGroup.eventId.substring(0, 8)}...
+                        {t('eventIdShort', { id: eventGroup.eventId.substring(0, 8) })}...
                       </p>
                     </div>
                     <button
                       onClick={() => toggleEventExpansion(eventGroup.eventId)}
                       className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
-                      <span>查看詳情</span>
+                      <span>{t('viewEventDetails')}</span>
                       <svg 
                         className={`w-4 h-4 transition-transform ${
                           expandedEvents.has(eventGroup.eventId) ? 'rotate-180' : ''
@@ -410,23 +417,23 @@ export default function AdminPaymentsPage() {
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                     <div>
                       <div className="text-2xl font-bold text-blue-600">{eventGroup.totalPayments}</div>
-                      <div className="text-sm text-gray-600">總交易數</div>
+                      <div className="text-sm text-gray-600">{t('totalEventTransactions')}</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-green-600">{eventGroup.completedPayments}</div>
-                      <div className="text-sm text-gray-600">已完成</div>
+                      <div className="text-sm text-gray-600">{t('eventCompleted')}</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-yellow-600">{eventGroup.pendingPayments}</div>
-                      <div className="text-sm text-gray-600">處理中</div>
+                      <div className="text-sm text-gray-600">{t('eventPending')}</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-red-600">{eventGroup.failedPayments}</div>
-                      <div className="text-sm text-gray-600">失敗</div>
+                      <div className="text-sm text-gray-600">{t('eventFailed')}</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-purple-600">{formatCurrency(eventGroup.totalAmount)}</div>
-                      <div className="text-sm text-gray-600">總收入</div>
+                      <div className="text-2xl font-bold text-purple-600">{localizedFormatCurrency(eventGroup.totalAmount)}</div>
+                      <div className="text-sm text-gray-600">{t('eventTotalRevenue')}</div>
                     </div>
                   </div>
                 </div>
@@ -438,22 +445,22 @@ export default function AdminPaymentsPage() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            支付ID
+                            {t('paymentIdShort')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            用戶
+                            {t('user')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            金額
+                            {t('amount')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            狀態
+                            {t('status')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            創建時間
+                            {t('createdTime')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            操作
+                            {t('actions')}
                           </th>
                         </tr>
                       </thead>
@@ -462,27 +469,27 @@ export default function AdminPaymentsPage() {
                           <tr key={payment.paymentId} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">
-                                {payment.paymentId?.substring(0, 8) || 'N/A'}...
+                                {payment.paymentId?.substring(0, 8) || t('notApplicable')}...
                               </div>
                               <div className="text-xs text-gray-500">
-                                訂單: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : 'N/A'}
+                                {t('orderIdShort')}: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : t('notApplicable')}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{payment.userName || '未知用戶'}</div>
+                              <div className="text-sm text-gray-900">{payment.userName || t('unknownUser')}</div>
                               <div className="text-xs text-gray-500">
-                                {payment.userId ? payment.userId.substring(0, 8) + '...' : 'N/A'}
+                                {payment.userId ? payment.userId.substring(0, 8) + '...' : t('notApplicable')}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
+                              <div className="text-sm font-medium text-gray-900">{localizedFormatCurrency(payment.amount)}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(payment.status)}`}>
-                                {payment.status === 'completed' && '已完成'}
-                                {payment.status === 'pending' && '處理中'}
-                                {payment.status === 'failed' && '失敗'}
-                                {payment.status === 'refunded' && '已退款'}
+                                {payment.status === 'completed' && t('completed')}
+                                {payment.status === 'pending' && t('pending')}
+                                {payment.status === 'failed' && t('failed')}
+                                {payment.status === 'refunded' && t('refunded')}
                                 {!['completed', 'pending', 'failed', 'refunded'].includes(payment.status) && payment.status}
                               </span>
                             </td>
@@ -494,7 +501,7 @@ export default function AdminPaymentsPage() {
                                 href={`/admin/payments/${payment.paymentId}`}
                                 className="text-indigo-600 hover:text-indigo-900"
                               >
-                                詳情
+                                {t('viewDetails')}
                               </Link>
                             </td>
                           </tr>
@@ -507,7 +514,7 @@ export default function AdminPaymentsPage() {
             ))
           ) : (
             <div className="bg-white p-6 rounded-lg shadow text-center">
-              <p className="text-gray-500">沒有找到支付記錄</p>
+              <p className="text-gray-500">{t('noPaymentRecordsFound')}</p>
             </div>
           )}
         </div>
@@ -523,7 +530,7 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('paymentId')}
                   >
-                    支付ID
+                    {t('paymentIdShort')}
                     {sortField === 'paymentId' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -533,7 +540,7 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('userName')}
                   >
-                    用戶
+                    {t('user')}
                     {sortField === 'userName' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -543,7 +550,7 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('eventName')}
                   >
-                    活動
+                    {t('eventName')}
                     {sortField === 'eventName' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -553,7 +560,7 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('amount')}
                   >
-                    金額
+                    {t('amount')}
                     {sortField === 'amount' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -563,7 +570,7 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('status')}
                   >
-                    狀態
+                    {t('status')}
                     {sortField === 'status' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -573,13 +580,13 @@ export default function AdminPaymentsPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort('createdAt')}
                   >
-                    建立時間
+                    {t('createdTime')}
                     {sortField === 'createdAt' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
+                    {t('actions')}
                   </th>
                 </tr>
               </thead>
@@ -588,26 +595,26 @@ export default function AdminPaymentsPage() {
                   filteredPayments.map((payment) => (
                     <tr key={payment.paymentId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{payment.paymentId?.substring(0, 8) || 'N/A'}...</div>
-                        <div className="text-xs text-gray-500">訂單: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : 'N/A'}</div>
+                        <div className="text-sm font-medium text-gray-900">{payment.paymentId?.substring(0, 8) || t('notApplicable')}...</div>
+                        <div className="text-xs text-gray-500">{t('orderIdShort')}: {payment.bookingToken ? payment.bookingToken.substring(0, 8) + '...' : t('notApplicable')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{payment.userName || '未知用戶'}</div>
-                        <div className="text-xs text-gray-500">{payment.userId ? payment.userId.substring(0, 8) + '...' : 'N/A'}</div>
+                        <div className="text-sm text-gray-900">{payment.userName || t('unknownUser')}</div>
+                        <div className="text-xs text-gray-500">{payment.userId ? payment.userId.substring(0, 8) + '...' : t('notApplicable')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{payment.eventName || '未知活動'}</div>
-                        <div className="text-xs text-gray-500">{payment.eventId ? payment.eventId.substring(0, 8) + '...' : 'N/A'}</div>
+                        <div className="text-sm text-gray-900">{payment.eventName || t('unknownEvent')}</div>
+                        <div className="text-xs text-gray-500">{payment.eventId ? payment.eventId.substring(0, 8) + '...' : t('notApplicable')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
+                        <div className="text-sm font-medium text-gray-900">{localizedFormatCurrency(payment.amount)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(payment.status)}`}>
-                          {payment.status === 'completed' && '已完成'}
-                          {payment.status === 'pending' && '處理中'}
-                          {payment.status === 'failed' && '失敗'}
-                          {payment.status === 'refunded' && '已退款'}
+                          {payment.status === 'completed' && t('completed')}
+                          {payment.status === 'pending' && t('pending')}
+                          {payment.status === 'failed' && t('failed')}
+                          {payment.status === 'refunded' && t('refunded')}
                           {!['completed', 'pending', 'failed', 'refunded'].includes(payment.status) && payment.status}
                         </span>
                       </td>
@@ -619,7 +626,7 @@ export default function AdminPaymentsPage() {
                           href={`/admin/payments/${payment.paymentId}`}
                           className="text-indigo-600 hover:text-indigo-900 mr-2"
                         >
-                          查看詳情
+                          {t('viewDetails')}
                         </Link>
                       </td>
                     </tr>
@@ -632,7 +639,7 @@ export default function AdminPaymentsPage() {
                           <LoadingSpinner size="medium" />
                         </div>
                       ) : (
-                        '沒有找到支付記錄'
+                        t('noPaymentRecordsFound')
                       )}
                     </td>
                   </tr>

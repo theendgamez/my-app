@@ -1,5 +1,6 @@
 import { FiSearch } from 'react-icons/fi';
 import React from 'react';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface SearchBarProps {
   searchQuery: string;
@@ -8,13 +9,15 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, setSearchQuery, onSubmit }) => {
+  const { t } = useTranslations();
+  
   return (
     <form onSubmit={onSubmit} className="flex items-center gap-2 w-full max-w-[600px]">
       <div className="relative flex-1 min-w-0">
         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="搜尋演唱會"
+          placeholder={t('searchConcerts')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 p-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 
@@ -27,7 +30,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, setSearchQuery, onSu
           transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 
           whitespace-nowrap flex-shrink-0"
       >
-        搜尋
+        {t('search')}
       </button>
     </form>
   );

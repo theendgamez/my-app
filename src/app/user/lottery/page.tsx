@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import Link from 'next/link';
 import { Registration } from '@/types';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 export default function UserLotteryPage() {
   const router = useRouter();
@@ -145,7 +146,7 @@ export default function UserLotteryPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {reg.drawDate ? new Date(reg.drawDate).toLocaleDateString() : '—'}
+                            {reg.drawDate ? formatDate(reg.drawDate, undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'} {/* Use new formatter */}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

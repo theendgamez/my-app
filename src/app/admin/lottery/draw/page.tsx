@@ -45,32 +45,10 @@ function LotteryDrawContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [drawResult, setDrawResult] = useState<DrawResult | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [, setIsMobile] = useState(false);
 
   // Use the imported hook directly
   const searchParams = useSearchParams();
   const eventIdFromQuery = searchParams?.get('eventId');
-
-  // Check if screen is mobile
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false); // Close sidebar on mobile by default
-      }
-    };
-    
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkIsMobile);
-    };
-  }, []);
-
-  // Function to toggle sidebar
-  // (removed unused toggleSidebar)
 
   // Check if user is admin, redirect if not
   useEffect(() => {
@@ -181,7 +159,7 @@ function LotteryDrawContent() {
   }
 
   return (
-    <div className={`container mx-auto p-4 md:p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-0 md:ml-64' : 'ml-0'} pt-20`}>
+    <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-0">執行抽籤</h1>
         <Link
@@ -381,7 +359,9 @@ export default function AdminLotteryDrawPage() {
           toggleSidebar={toggleSidebar}
           isMobile={isMobile}
         />
-        <div className="flex-1">
+        <div 
+          className={`flex-1 container mx-auto p-4 md:p-8 transition-all duration-300 ${isSidebarOpen ? 'ml-0 md:ml-64' : 'ml-0'}`}
+        >
           {/* Wrap the component using useSearchParams with Suspense */}
           <Suspense
             fallback={

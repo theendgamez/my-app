@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import React from 'react';
+import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface Transaction {
   ticketId: string;
@@ -126,11 +127,6 @@ export default function BlockchainExplorer() {
     setFilteredBlocks(filtered);
   }, [searchQuery, blockchain]);
 
-  // Format timestamp
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('zh-HK');
-  };
-
   // Get transaction action translation
   const getActionText = (action: string) => {
     switch (action) {
@@ -242,7 +238,7 @@ export default function BlockchainExplorer() {
                         <div className="text-sm font-medium text-gray-900">{block.index}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{formatDate(block.timestamp)}</div>
+                        <div className="text-sm text-gray-500">{formatDate(new Date(block.timestamp))}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-mono text-gray-900">
@@ -315,7 +311,7 @@ export default function BlockchainExplorer() {
                                           <td className="px-4 py-2 text-xs text-gray-500">
                                             {typeof tx.timestamp === 'string' 
                                               ? new Date(tx.timestamp).toLocaleString('zh-HK')
-                                              : formatDate(tx.timestamp as number)
+                                              : formatDate(new Date(tx.timestamp as number))
                                             }
                                           </td>
                                           <td className="px-4 py-2 text-xs">

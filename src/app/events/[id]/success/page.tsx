@@ -7,6 +7,7 @@ import { Payment, Ticket } from '@/types';
 import Navbar from '@/components/navbar/Navbar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
+import { formatCurrency } from '@/utils/formatters'; // Import the new formatter
 
 // Helper function to sanitize redirect URLs to prevent loops
 const sanitizeRedirectUrl = (url: string): string => {
@@ -240,7 +241,7 @@ export default function SuccessPage() {
                     {isFreePayment ? (
                       <span className="text-green-600">免費票券</span>
                     ) : (
-                      <span>HKD {payment.totalAmount.toLocaleString('zh-HK')}</span>
+                      <span>{formatCurrency(payment.totalAmount)}</span>
                     )}
                   </div>
                 </div>
