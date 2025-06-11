@@ -35,11 +35,11 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="antialiased flex flex-col min-h-screen"> {/* Ensure body can flex */}
+      <body className="antialiased">
         <AuthProvider>
           <NotificationProvider>
             <ClientLayout>
-              <div className="main-content flex-grow"> {/* Add flex-grow here */}
+              <div className="main-content">
                 {children}
               </div>
             </ClientLayout>

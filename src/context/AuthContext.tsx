@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import authEvents from '@/utils/authEvents';
 import { REDIRECT_COOLDOWN} from '@/utils/authRedirect';
@@ -358,7 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initialize();
   }, [fetchUserData, fetchPermissions, isAuthenticated, permissionsLoaded]);
 
-  const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResult> => {
+  const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
     if (typeof window === 'undefined') return { success: false, error: 'Cannot run on server' };
 
     try {
@@ -387,9 +387,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       localStorage.setItem('accessToken', token);
       localStorage.setItem('userId', userData.userId);
-      if (userData.role) { // Ensure userRole is stored on login
-        localStorage.setItem('userRole', userData.role);
-      }
 
       localStorage.removeItem(REDIRECT_COOLDOWN);
       localStorage.removeItem(AUTH_CHECK_FLAG);
@@ -416,43 +413,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error: error instanceof Error ? error.message : 'An unknown error occurred',
       };
     }
-  }, [refreshAuthState, setUser, setIsAuthenticated, setIsAdmin]);
+  };
 
-  const redirectToLogin = useCallback((returnPath?: string) => {
+  const redirectToLogin = (returnPath?: string) => {
     if (typeof window === 'undefined') return;
     if (returnPath) {
       localStorage.setItem('postLoginRedirect', returnPath);
     }
     localStorage.setItem(REDIRECT_COOLDOWN, Date.now().toString());
     router.push('/login');
-  }, [router]);
-
-  const contextValue = useMemo(() => ({
-    isAuthenticated,
-    isAdmin,
-    user,
-    loading,
-    permissions: userPermissions,
-    permissionsLoaded,
-    login,
-    logout,
-    redirectToLogin,
-    refreshAuthState,
-  }), [
-    isAuthenticated,
-    isAdmin,
-    user,
-    loading,
-    userPermissions,
-    permissionsLoaded,
-    login,
-    logout,
-    redirectToLogin,
-    refreshAuthState,
-  ]);
+  };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        isAdmin,
+        user,
+        loading,
+        permissions: userPermissions,
+        permissionsLoaded,
+        login,
+        logout,
+        redirectToLogin,
+        refreshAuthState,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

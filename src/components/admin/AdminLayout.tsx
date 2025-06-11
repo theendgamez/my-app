@@ -8,7 +8,6 @@ import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/admin/Sidebar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { FiMenu } from 'react-icons/fi';
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -24,7 +23,6 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAdmin, isAuthenticated, loading, refreshAuthState } = useAuth();
-  const { t } = useTranslations(); // Initialize useTranslations
   const [isMounted, setIsMounted] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
@@ -122,12 +120,12 @@ export default function AdminLayout({
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-500 mb-4">{t('adminNoAccess')}</p>
+          <p className="text-red-500 mb-4">您沒有訪問此頁面的權限</p>
           <button 
             onClick={() => router.push('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded"
           >
-            {t('adminBackToHome')}
+            返回主頁
           </button>
         </div>
       </div>
@@ -143,7 +141,7 @@ export default function AdminLayout({
         <Sidebar 
           isOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar} 
-          isMobile={typeof window !== 'undefined' && window.innerWidth < 768} // More robust mobile check      
+          isMobile={false}        
         />
         
         {/* Main content area */}
@@ -154,12 +152,12 @@ export default function AdminLayout({
             <button
               onClick={toggleSidebar}
               className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none"
-              aria-label={isSidebarOpen ? t('adminCollapseSidebar') : t('adminExpandSidebar')}
+              aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               <FiMenu size={24} />
             </button>
             <h1 className="ml-4 text-lg font-medium text-gray-800">
-              {title || t('adminDefaultTitle')}
+              {title || '票務系統管理'}
             </h1>
           </header>
           

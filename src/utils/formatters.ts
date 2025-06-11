@@ -1,54 +1,54 @@
-import { Locale } from 'date-fns'; // Import Locale type
-import { format as formatDateFns } from 'date-fns';
-import { enUS, zhHK } from 'date-fns/locale'; // Import specific locales
-
-const locales: Record<string, Locale> = {
-  en: enUS,
-  zh: zhHK,
-};
-
 /**
- * Formats a date string or timestamp into a localized string.
- * @param dateInput The date string, timestamp number, or Date object.
- * @param locale The locale string (e.g., 'en-US', 'zh-HK'). Defaults to 'en-US'.
- * @param options Intl.DateTimeFormatOptions to customize the output.
- * @returns A localized date string, or the original input if formatting fails.
+ * Format a currency value to HKD format
+ * @param amount Amount to format
+ * @param zeroValueText Optional text to show when amount is zero
+ * @returns Formatted currency string
  */
-export function formatDate(
-  dateString: string | Date,
-  formatStr: string = 'Pp', // Default format: 'Sep 18, 2023, 11:05 AM'
-  options?: { locale?: string } & Intl.DateTimeFormatOptions // Allow passing Intl.DateTimeFormatOptions
-): string {
-  try {
-    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    const localeKey = options?.locale || 'en'; // Default to English if no specific locale is passed
-    const dateFnsLocale = locales[localeKey] || enUS; // Fallback to enUS for date-fns
-
-    if (options && Object.keys(options).length > 1 && !(Object.keys(options).length === 1 && options.hasOwnProperty('locale'))) { // If more than just locale is passed
-        // Use Intl.DateTimeFormat for more complex options
-        return new Intl.DateTimeFormat(localeKey, options).format(date);
-    }
-    
-    // Use date-fns for simpler formatting or default
-    return formatDateFns(date, formatStr, { locale: dateFnsLocale });
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return String(dateString); // Fallback to original string
+export function formatCurrency(amount: number | string | undefined, zeroValueText = 'HKD 0'): string {
+  // Handle empty values
+  if (amount === undefined || amount === null || amount === '') {
+    return zeroValueText;
   }
+  
+  // Convert to number if it's a string
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Handle zero value
+  if (numAmount === 0) {
+    return zeroValueText;
+  }
+  
+  // Format with HKD and thousands separators
+  return `HKD ${numAmount.toLocaleString('en-HK')}`;
 }
 
-export function formatCurrency(
-  amount: number,
-  currency: string = 'HKD',
-  locale: string = 'zh-HK' // Default to Hong Kong Chinese for currency
-): string {
+/**
+ * Format a date string for consistent display
+ * @param dateString The date to format
+ * @param fallbackText Text to show when date is invalid or missing
+ * @returns Formatted date string
+ */
+export function formatDate(dateString?: string | null, fallbackText = '未知日期'): string {
+  if (!dateString) return fallbackText;
+  
   try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date:', dateString);
+      return fallbackText;
+    }
+    
+    return date.toLocaleString('zh-HK', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   } catch (error) {
-    console.error("Error formatting currency:", error);
-    return `${currency} ${amount.toFixed(2)}`; // Fallback
+    console.error('Error formatting date:', error);
+    return fallbackText;
   }
 }

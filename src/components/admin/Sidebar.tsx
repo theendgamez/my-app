@@ -20,7 +20,6 @@ import {
   FiLink
 } from 'react-icons/fi';
 import { RiBattery2Line } from 'react-icons/ri';
-import { useTranslations } from '@/hooks/useTranslations';
 
 interface MenuSection {
   title: string;
@@ -38,89 +37,82 @@ interface SidebarProps {
   isMobile: boolean;
 }
 
-
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) => {
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [localAdmin, setLocalAdmin] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
-  const { t } = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   
   // Calculate effectiveIsAdmin with useMemo so it can be safely used in dependencies
   const effectiveIsAdmin = useMemo(() => isAdmin || localAdmin, [isAdmin, localAdmin]);
   
-  const [sections, setSections] = useState<MenuSection[]>([]);
-
-  useEffect(() => {
-    setSections([
-      {
-        title: t('sidebarDashboard'),
-        isOpen: true,
-        items: [
-          { name: t('sidebarOverview'), icon: <FiHome size={18} />, href: '/admin/dashboard' },
-        ]
-      },
-      {
-        title: t('sidebarEventManagement'),
-        isOpen: false,
-        items: [
-          { name: t('sidebarCreateEvent'), icon: <FiPlus size={18} />, href: '/admin/create-event' },
-          { name: t('sidebarEventList'), icon: <FiList size={18} />, href: '/admin/events' },
-        ]
-      },
-      {
-        title: t('sidebarLotterySystem'),
-        isOpen: false,
-        items: [
-          { name: t('lotteryManagement'), icon: <RiBattery2Line size={18} />, href: '/admin/lottery' },
-          { name: t('performDraw'), icon: <RiBattery2Line size={18} />, href: '/admin/lottery/draw' },
-        ]
-      },
-      {
-        title: t('sidebarUsersAndTickets'),
-        isOpen: false,
-        items: [
-          { name: t('sidebarUserManagement'), icon: <FiUsers size={18} />, href: '/admin/users' },
-          { name: t('sidebarTicketManagement'), icon: <FiTag size={18} />, href: '/admin/tickets' },
-          { name: t('sidebarOrderManagement'), icon: <FiShoppingBag size={18} />, href: '/admin/orders' },
-          {
-            name: t('sidebarScanTickets'),
-            href: '/admin/tickets/scan',
-            icon: <FiCamera size={18} />,
-          },
-        ]
-      },
-      {
-        title: t('sidebarFinance'),
-        isOpen: false,
-        items: [
-          { name: t('paymentRecords'), icon: <FiDollarSign size={18} />, href: '/admin/payments' },
-          { name: t('sidebarFinancialReports'), icon: <FiBarChart2 size={18} />, href: '/admin/reports' },
-        ]
-      },
-      {
-        title: t('sidebarSystemSettingsSection'),
-        isOpen: false,
-        items: [
-          { name: t('systemSettings'), icon: <FiSettings size={18} />, href: '/admin/settings' },
-        ]
-      },
-      {
-        title: t('sidebarBlockchainManagement'),
-        isOpen: false,
-        items: [
-          {
-            name: t('sidebarBlockchain'),
-            href: '/admin/blockchain',
-            icon: <FiLink size={18} />,
-          },
-        ]
-      },
-    ]);
-  }, [t]);
-
+  const [sections, setSections] = useState<MenuSection[]>([
+    {
+      title: '儀表板',
+      isOpen: true,
+      items: [
+        { name: '總覽', icon: <FiHome size={18} />, href: '/admin/dashboard' },
+      ]
+    },
+    {
+      title: '活動管理',
+      isOpen: false,
+      items: [
+        { name: '建立活動', icon: <FiPlus size={18} />, href: '/admin/create-event' },
+        { name: '活動列表', icon: <FiList size={18} />, href: '/admin/events' },
+      ]
+    },
+    {
+      title: '抽籤系統',
+      isOpen: false,
+      items: [
+        { name: '抽籤管理', icon: <RiBattery2Line size={18} />, href: '/admin/lottery' },
+        { name: '執行抽籤', icon: <RiBattery2Line size={18} />, href: '/admin/lottery/draw' },
+      ]
+    },
+    {
+      title: '用戶與票券',
+      isOpen: false,
+      items: [
+        { name: '用戶管理', icon: <FiUsers size={18} />, href: '/admin/users' },
+        { name: '票券管理', icon: <FiTag size={18} />, href: '/admin/tickets' },
+        { name: '訂單管理', icon: <FiShoppingBag size={18} />, href: '/admin/orders' },
+        {
+          name: '掃描票券',
+          href: '/admin/tickets/scan',
+          icon: <FiCamera size={18} />,
+        },
+      ]
+    },
+    {
+      title: '財務',
+      isOpen: false,
+      items: [
+        { name: '支付記錄', icon: <FiDollarSign size={18} />, href: '/admin/payments' },
+        { name: '財務報告', icon: <FiBarChart2 size={18} />, href: '/admin/reports' },
+      ]
+    },
+    {
+      title: '系統設定',
+      isOpen: false,
+      items: [
+        { name: '系統設定', icon: <FiSettings size={18} />, href: '/admin/settings' },
+      ]
+    },
+    {
+      title: '區塊鏈管理',
+      isOpen: false,
+      items: [
+        {
+          name: '區塊鏈',
+          href: '/admin/blockchain',
+          icon: <FiLink size={18} />,
+        },
+      ]
+    },
+  ]);
 
   // Use localStorage to check if admin on client-side
   useEffect(() => {
@@ -151,39 +143,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
   if (authLoading || !isAuthenticated) {
     return null;
   }
-
-  // Base classes for the sidebar container
-  const sidebarContainerBaseClasses = `fixed z-30 w-64 bg-white dark:bg-neutral-800 shadow-md transition-transform duration-300 overflow-y-auto`;
   
-  // Desktop specific classes
-  // Use 'top-navbar' which corresponds to '4rem' defined in tailwind.config.ts
-  // Use direct values in calc() for Tailwind JIT to parse correctly
-  const desktopTopClass = "top-navbar"; // Uses theme.spacing.navbar (4rem)
-  const desktopHeightClass = "h-[calc(100vh-4rem-6rem)]"; // 4rem navbar + 6rem footer estimate
-  const desktopTransformOpen = "transform translate-x-0";
-  const desktopTransformClosed = "transform -translate-x-full";
-
-  const desktopOpenClasses = `${sidebarContainerBaseClasses} ${desktopTopClass} ${desktopHeightClass} ${desktopTransformOpen} left-0`;
-  const desktopClosedClasses = `${sidebarContainerBaseClasses} ${desktopTopClass} ${desktopHeightClass} ${desktopTransformClosed} left-0`;
-
-  // Mobile specific classes (overlay style)
-  const mobileContainerBaseClasses = `fixed z-40 w-64 bg-white dark:bg-neutral-800 shadow-lg transition-transform duration-300 overflow-y-auto`;
-  const mobileTopClass = "top-navbar"; // Starts below main navbar (4rem)
-  const mobileHeightClass = "h-[calc(100vh-4rem)]"; // Extends to viewport bottom, accounting for 4rem navbar
-  const mobileTransformOpen = "transform translate-x-0";
-  const mobileTransformClosed = "transform -translate-x-full";
-  
-  const mobileOpenClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformOpen} inset-x-0`;
-  const mobileClosedClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformClosed} inset-x-0`;
-
-
-  const generatedSidebarClasses = isMobile
-    ? isOpen
-      ? mobileOpenClasses
-      : mobileClosedClasses
+  // Mobile sidebar should be a overlay when open
+  const mobileStyles = isMobile 
+    ? isOpen 
+      ? 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform translate-x-0' 
+      : 'fixed inset-0 z-40 bg-white w-64 shadow-lg transition-transform duration-300 transform -translate-x-full'
     : isOpen
-      ? desktopOpenClasses
-      : desktopClosedClasses;
+      ? 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform translate-x-0'
+      : 'fixed top-0 left-0 z-30 w-64 h-screen pt-16 bg-white shadow-md transition-transform duration-300 transform -translate-x-full md:translate-x-0';
 
   return (
     <>
@@ -196,12 +164,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
       )}
       
       {/* Sidebar */}
-      <aside className={generatedSidebarClasses}> {/* Use generated classes */}
+      <aside className={mobileStyles}>
         {isMobile && (
-          <div className="p-4 border-b dark:border-neutral-700">
-            <button
+          <div className="p-4 border-b">
+            <button 
               onClick={toggleSidebar}
-              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              className="text-gray-700 hover:text-gray-900"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -216,14 +184,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
               <li key={section.title}>
                 {isOpen ? (
                   <button
-                    className="flex items-center justify-between w-full px-2 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-none"
+                    className="flex items-center justify-between w-full px-2 py-2 text-gray-700 hover:text-gray-900 focus:outline-none"
                     onClick={() => toggleSection(index)}
                   >
                     <span className="text-sm font-medium">{section.title}</span>
                     {section.isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
                   </button>
                 ) : (
-                  <div className="px-2 py-2 text-gray-600 dark:text-gray-400 text-center text-xs">
+                  <div className="px-2 py-2 text-gray-600 text-center text-xs">
                     {section.title.charAt(0)}
                   </div>
                 )}
@@ -239,13 +207,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
                           href={item.href}
                           className={`flex items-center ${isOpen ? 'px-4 py-2 text-sm' : 'px-2 py-3 justify-center'} rounded-md transition-colors ${
                             isActive 
-                              ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium' 
-                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
+                              ? 'bg-blue-50 text-blue-700 font-medium' 
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                           }`}
                           title={!isOpen ? item.name : undefined}
                           onClick={() => isMobile && toggleSidebar()}
                         >
-                          <span className={`${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'} ${isOpen ? 'mr-3' : ''}`}>
+                          <span className={`${isActive ? 'text-blue-600' : 'text-gray-500'} ${isOpen ? 'mr-3' : ''}`}>
                             {item.icon}
                           </span>
                           {isOpen && <span>{item.name}</span>}

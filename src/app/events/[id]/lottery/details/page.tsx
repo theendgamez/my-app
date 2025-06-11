@@ -8,7 +8,6 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import Link from 'next/link';
 import { Registration } from '@/types';
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import and alias if local name conflicts
 
 export default function LotteryDetailsPage() {
   const router = useRouter();
@@ -68,7 +67,7 @@ export default function LotteryDetailsPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '未指定';
     try {
-      return formatDateUtil(dateString); // Use imported formatter
+      return new Date(dateString).toLocaleString();
     } catch {
       return '日期格式有誤';
     }

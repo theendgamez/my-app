@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
     // Calculate payment
     const paymentId = uuidv4();
     const ticketPrice = zone.price;
-    const platformFeePerTicket = 18;
+    const platformFee = 18;
     const subtotal = ticketPrice * booking.quantity;
-    const platformFeeTotal = platformFeePerTicket * booking.quantity;
+    const platformFeeTotal = platformFee * booking.quantity;
     const totalAmount = subtotal + platformFeeTotal;
 
     const payment = {
@@ -86,8 +86,7 @@ export async function POST(request: NextRequest) {
       zone: booking.zone,
       payQuantity: booking.quantity,
       totalAmount,
-      amount: subtotal, // Store subtotal (ticket price sum)
-      platformFee: platformFeeTotal, // Explicitly store the platform fee component
+      amount: totalAmount,
       paymentMethod: cardDetails?.method || 'card',
       relatedTo: "ticket_purchase" as const,
       createdAt: new Date().toISOString(),

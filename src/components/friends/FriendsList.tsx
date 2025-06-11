@@ -1,6 +1,5 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface Friend {
   friendshipId: string;
@@ -22,6 +21,20 @@ interface Props {
 
 export default function FriendsList({ friends, onRemoveFriend }: Props) {
   const router = useRouter();
+
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('zh-HK', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch  {
+      return dateString;
+    }
+  };
 
   if (friends.length === 0) {
     return (

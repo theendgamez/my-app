@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import Events from '@/components/eventCompo/EventComponents';
 import { Events as EventType } from '@/types';
-import { useTranslations } from '@/hooks/useTranslations';
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventType[]>([]);
@@ -12,7 +11,6 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { t } = useTranslations();
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -61,13 +59,13 @@ export default function EventsPage() {
       <Navbar />
       <main className="flex-1 pt-20">
         <div className="container mx-auto px-6 lg:px-8">
-          <h1 className="text-3xl text font-boldmb-12">{t('events')}</h1>
+          <h1 className="text-3xl text font-boldmb-12">活動</h1>
           <div className="max-w-xl mx-auto mb-12">
             <input
               type="text"
               name="search"
               id="search"
-              placeholder={t('searchEvents')}
+              placeholder="搜尋活動"
               className="w-full p-4 border rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

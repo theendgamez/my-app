@@ -71,12 +71,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Invalid JSON', 
         details: 'The request body is not valid JSON',
-        rawBody: rawBody
+        rawBody: rawBody // Include rawBody for debugging client-side issues
       }, { status: 400 });
     }
     
     // Extract the auth token if present
-    let userId: string | undefined;
+    let userIdFromToken: string | undefined;
     const authHeader = request.headers.get('Authorization');
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -85,31 +85,30 @@ export async function POST(request: NextRequest) {
         const decoded = await verifyToken(token);
         if (decoded && decoded.userId) {
           console.log('Extracted userId from token:', decoded.userId);
-          userId = decoded.userId;
+          userIdFromToken = decoded.userId;
         }
       } catch (err) {
-        console.error('Error decoding token:', err);
+        console.warn('Error decoding token or token invalid:', err);
+        // Potentially return 401 if token is present but invalid
+        // return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
       }
     }
     
-    // Use userId from token if not provided in request body
-    if (!data.userId && userId) {
-      console.log('Using userId from token instead of request body');
-      data.userId = userId;
-    }
+    // Use userId from token if available, otherwise from request body
+    const resolvedUserId = userIdFromToken || data.userId;
     
-    const { userId: requestUserId, eventId, zone, quantity, sessionId } = data;
+    const { eventId, zone, quantity, sessionId } = data;
     
     // Validate all fields and log the values
     console.log('Field validation:');
-    console.log('- userId:', requestUserId);
+    console.log('- resolvedUserId:', resolvedUserId);
     console.log('- eventId:', eventId);
     console.log('- zone:', zone);
     console.log('- quantity:', quantity);
     console.log('- sessionId:', sessionId);
     
     // Type check each field
-    if (requestUserId && typeof requestUserId !== 'string') {
+    if (resolvedUserId && typeof resolvedUserId !== 'string') {
       return NextResponse.json({
         error: 'Invalid data type',
         details: 'userId must be a string'
@@ -145,11 +144,11 @@ export async function POST(request: NextRequest) {
     }
     
     // Ensure userId is set from either request body or token
-    if (!requestUserId) {
-      console.error('No userId provided in request body or token');
+    if (!resolvedUserId) {
+      console.error('No userId provided in request body or derivable from token');
       return NextResponse.json({ 
         error: 'Missing userId', 
-        details: 'User ID must be provided either in the request body or via Authorization token'
+        details: 'User ID must be provided either in the request body or via a valid Authorization token'
       }, { status: 400 });
     }
     
@@ -166,18 +165,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Missing required fields', 
         details: errorMessage,
-        receivedData: data
+        receivedData: data // Send back what was received for easier debugging
       }, { status: 400 });
     }
     
     // Verify the user exists
-    const user = await db.users.findById(requestUserId);
+    const user = await db.users.findById(resolvedUserId);
     if (!user) {
-      console.error('Invalid userId provided:', requestUserId);
+      console.error('Invalid userId provided:', resolvedUserId);
       return NextResponse.json({ 
         error: 'Invalid user ID',
         details: 'The provided userId does not exist in our records' 
-      }, { status: 401 });
+      }, { status: 401 }); // 401 or 400 depending on if it's auth or bad data
     }
     
     // Check if event exists
@@ -211,15 +210,22 @@ export async function POST(request: NextRequest) {
       eventId,
       zone,
       quantity,
-      userId: user.userId,
+      userId: user.userId, // Use the validated user.userId
       eventName: event.eventName,
       price: Number(zoneDetails.price),
       timestamp: Date.now()
     };
 
+    const secret = process.env.BOOKING_SECRET;
+    if (!secret) {
+      console.error('CRITICAL: BOOKING_SECRET environment variable is not set. Using insecure fallback.');
+      // Depending on policy, you might want to throw an error here in production
+      // throw new Error('BOOKING_SECRET is not configured.'); 
+    }
+
     // Create a signed token to prevent tampering
     const bookingToken = crypto
-      .createHmac('sha256', process.env.BOOKING_SECRET || 'booking-secret')
+      .createHmac('sha256', secret || 'booking-secret-fallback') // Use fallback only if secret is truly undefined
       .update(JSON.stringify(bookingData))
       .digest('hex');
 
@@ -230,7 +236,7 @@ export async function POST(request: NextRequest) {
       eventId,
       zone,
       quantity,
-      userId: user.userId,
+      userId: user.userId, // Use the validated user.userId
       expiresAt: new Date(Date.now() + BOOKING_EXPIRY_MS).toISOString(),
       status: 'pending'
     });

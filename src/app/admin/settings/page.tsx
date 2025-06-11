@@ -1,16 +1,13 @@
 "use client";
 
 import AdminPage from '@/components/admin/AdminPage';
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 export default function AdminSettingsPage() {
-  const { t } = useTranslations(); // Initialize useTranslations
-
   return (
-    <AdminPage title={t('systemSettings')} isLoading={false}>
+    <AdminPage title="系統設定" isLoading={false}>
       <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">{t('featureInProgress')}</h2>
-        <p className="text-gray-600">{t('comingSoon')}</p>
+        <h2 className="text-xl font-semibold mb-4">系統設定功能開發中</h2>
+        <p className="text-gray-600">此功能即將推出，敬請期待！</p>
       </div>
     </AdminPage>
   );

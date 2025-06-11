@@ -7,8 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Events } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Corrected import path
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 const PLATFORM_FEE = 18; // Platform fee per ticket in HKD
 
@@ -69,7 +68,6 @@ const BookingPage = () => {
   const router = useRouter();
   const { id } = useParams();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const { t, locale } = useTranslations(); // Initialize useTranslations
   const [event, setEvent] = useState<Events | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +105,7 @@ const BookingPage = () => {
         
         // Check if id is valid
         if (!id) {
-          setError(t('errorFetchingData')); // Use translated error
+          setError('無效的活動編號');
           setLoading(false);
           return;
         }
@@ -117,14 +115,14 @@ const BookingPage = () => {
 
         // Prevent booking if event is in draw mode or has ended
         if (data.isDrawMode === true) {
-          setError(t('errorFetchingData')); // Use translated error, or a more specific one like 'eventInDrawModeNotBookable'
+          setError('此活動為抽籤制，請前往抽籤登記頁面');
           router.push(`/events/${id}/lottery`);
           return;
         }
 
         // Check if event date has passed
         if (data.eventDate && new Date(data.eventDate) < new Date()) {
-          setError(t('errorFetchingData')); // Use translated error, or 'eventHasEnded'
+          setError('此活動已結束，無法進行訂票');
           return;
         }
 
@@ -134,7 +132,7 @@ const BookingPage = () => {
         }
       } catch (err) {
         console.error('Error fetching event details:', err);
-        setError(err instanceof Error ? err.message : t('errorFetchingData')); // Use translated error
+        setError(err instanceof Error ? err.message : '無法獲取活動詳情');
       } finally {
         setLoading(false);
       }
@@ -143,12 +141,16 @@ const BookingPage = () => {
     if (isAuthenticated) {
       fetchEventDetails();
     }
-  }, [id, router, isAuthenticated, authLoading, t]); // Added t to dependency array
+  }, [id, router, isAuthenticated, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isProcessing || !selectedZone) return;
+    if (isProcessing || !selectedZone || !user || !user.userId) {
+      setError('請選擇區域或用戶信息不完整。');
+      console.error('Booking submission prevented:', { isProcessing, selectedZone, user });
+      return;
+    }
     
     try {
       setIsProcessing(true);
@@ -163,10 +165,10 @@ const BookingPage = () => {
       }));
       
       // Create booking
-      const sessionId = crypto.randomUUID();
+      const sessionId = uuidv4(); // Use uuidv4() instead of crypto.randomUUID()
       const payload = {
         eventId: id,
-        userId: user?.userId,
+        userId: user.userId, // Ensure user.userId is used
         zone: selectedZone,
         quantity,
         sessionId
@@ -177,20 +179,37 @@ const BookingPage = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'x-user-id': user?.userId || ''
+          'x-user-id': user.userId // Ensure user.userId is used
         },
         credentials: 'omit',
         body: JSON.stringify(payload)
       });
       
       if (!res.ok) {
-        throw new Error('Booking creation failed');
+        const errorText = await res.text(); // Get text first, might not be JSON
+        console.error('Booking creation API error:', res.status, res.statusText, errorText);
+        let errorMessage = `預訂創建失敗，狀態碼: ${res.status}.`;
+        try {
+          const jsonData = JSON.parse(errorText);
+          errorMessage = jsonData.error || jsonData.details || errorMessage;
+        } catch {
+          // If parsing fails, use the raw text if available and informative
+          if (errorText.length < 200) { // Avoid logging huge HTML error pages
+             errorMessage += ` 回應: ${errorText}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
       
       const data = await res.json();
+      if (!data.bookingToken) {
+        console.error('Booking token missing in API response:', data);
+        throw new Error('預訂成功，但未收到預訂令牌。');
+      }
       router.push(`/events/${id}/payment?bookingToken=${data.bookingToken}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('errorProcessingPayment')); // Use translated error
+      console.error('handleSubmit_FullError:', err); // Log the full error object
+      setError(err instanceof Error ? err.message : '創建預訂時發生未知錯誤。');
     } finally {
       setIsProcessing(false);
     }
@@ -209,10 +228,6 @@ const BookingPage = () => {
   const subtotal = ticketPrice * quantity;
   const totalPrice = subtotal + platformFeeTotal;
 
-  const formatDate = (dateString: string) => {
-    return formatDateUtil(dateString, 'Pp', { locale });
-  };
-
   if (loading || authLoading) {
     return (
       <>
@@ -229,13 +244,13 @@ const BookingPage = () => {
       <>
         <Navbar />
         <div className="container mx-auto p-4 pt-20">
-          <Alert type="error" title={t('error')} message={error} /> {/* Ensure 'error' key exists */}
+          <Alert type="error" title="Error" message={error} />
           <div className="mt-4 flex justify-center">
             <button
               onClick={() => router.push('/events')}
               className="px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
             >
-              {t('backToList')}
+              返回活動列表
             </button>
           </div>
         </div>
@@ -249,12 +264,12 @@ const BookingPage = () => {
         <Navbar />
         <div className="container mx-auto p-4 pt-20">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6">{t('pageNotFound')}</h1>
+            <h1 className="text-2xl font-bold mb-6">找不到活動</h1>
             <button
               onClick={() => router.push('/events')}
               className="px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600"
             >
-              {t('browseOtherEvents')}
+              瀏覽其他活動
             </button>
           </div>
         </div>
@@ -267,27 +282,27 @@ const BookingPage = () => {
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">{t('selectTicketsFor', { eventName: event.eventName })}</h1>
+          <h1 className="text-2xl font-bold mb-6">{event.eventName} - 選擇門票</h1>
           
           {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
           
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-yellow-800 mb-2">{t('seatAllocationTip')}</h3>
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">座位分配提示</h3>
               <p className="text-yellow-700">
-                {t('seatAllocationMessage')}
+                為確保訂票過程公平，所選區域內的座位將會由系統隨機分配。座位號碼將在付款完成後即時顯示。
               </p>
             </div>
             <table className="w-full mb-6">
               <tbody className="divide-y">
                 <tr className="py-2">
-                  <td className="py-3 font-semibold">{t('performanceTime')}</td>
+                  <td className="py-3 font-semibold">演出時間</td>
                   <td className="py-3">
-                    {event.eventDate ? formatDate(event.eventDate) : 'N/A'}
+                    {event.eventDate ? new Date(event.eventDate).toLocaleString() : 'N/A'}
                   </td>
                 </tr>
                 <tr className="py-2">
-                  <td className="py-3 font-semibold">{t('performanceLocation')}</td>
+                  <td className="py-3 font-semibold">演出地點</td>
                   <td className="py-3">{event.location}</td>
                 </tr>
               </tbody>
@@ -296,9 +311,9 @@ const BookingPage = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block mb-2 font-semibold">
-                  {t('selectZone')}
+                  選擇區域: 
                   <span className="text-sm font-normal text-gray-600 ml-2">
-                    {t('seatsRandomlyAssigned')}
+                    (座位將隨機分配)
                   </span>
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
@@ -317,14 +332,14 @@ const BookingPage = () => {
                             : 'border-gray-200 hover:border-blue-200'}
                       `}
                     >
-                      <div className="font-semibold mb-1">{t('zoneNameWithSuffix', { zoneName: zone.name })}</div>
+                      <div className="font-semibold mb-1">{zone.name}區</div>
                       <div className="text-sm text-gray-600">
                         HKD {Number(zone.price).toLocaleString('en-HK')}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {zone.zoneQuantity === 0 
-                          ? t('soldOut')
-                          : t('ticketsRemaining', { count: zone.zoneQuantity })}
+                          ? '已售罄' 
+                          : `尚餘 ${zone.zoneQuantity} 張`}
                       </div>
                     </button>
                   ))}
@@ -332,7 +347,7 @@ const BookingPage = () => {
               </div>
 
               <div className="max-w-xs">
-                <label className="block mb-2 font-semibold">{t('quantity')}:</label>
+                <label className="block mb-2 font-semibold">數量:</label>
                 <select
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
@@ -343,7 +358,7 @@ const BookingPage = () => {
                     const isDisabled = selectedZoneDetails ? selectedZoneDetails.zoneQuantity < num : false;
                     return (
                       <option key={num} value={num} disabled={isDisabled}>
-                        {num} {t('ticketsUnit')} {isDisabled ? t('ticketInsufficient') : ''}
+                        {num} 張 {isDisabled ? '(票券不足)' : ''}
                       </option>
                     );
                   })}
@@ -352,11 +367,11 @@ const BookingPage = () => {
 
               {selectedZone && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-semibold mb-3">{t('orderSummary')}</h3>
+                  <h3 className="font-semibold mb-3">訂單摘要</h3>
                   <table className="w-full">
                     <tbody className="divide-y">
                       <tr>
-                        <td className="py-2">{t('ticketPrice')}</td>
+                        <td className="py-2">門票價格</td>
                         <td className="py-2 text-right">
                           HKD {ticketPrice.toLocaleString('en-HK')} × {quantity}
                         </td>
@@ -365,7 +380,7 @@ const BookingPage = () => {
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-2">{t('platformFeeLabel')}</td>
+                        <td className="py-2">平台手續費</td>
                         <td className="py-2 text-right">
                           HKD {PLATFORM_FEE} × {quantity}
                         </td>
@@ -374,7 +389,7 @@ const BookingPage = () => {
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-2 font-bold">{t('total')}</td>
+                        <td className="py-2 font-bold">總計</td>
                         <td></td>
                         <td className="py-2 text-right font-bold">
                           HKD {totalPrice.toLocaleString('en-HK')}
@@ -391,14 +406,14 @@ const BookingPage = () => {
                   onClick={handleBackNavigation}
                   className="flex-1 px-6 py-2 rounded bg-gray-200 hover:bg-gray-300"
                 >
-                  {t('back')}
+                  返回
                 </button>
                 <button
                   type="submit"
                   disabled={!selectedZone || loading || isProcessing}
                   className="flex-1 px-6 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? t('processing') : t('proceedToPayment')}
+                  {isProcessing ? '處理中...' : '前往付款'}
                 </button>
               </div>
             </form>

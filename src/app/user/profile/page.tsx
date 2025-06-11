@@ -5,12 +5,12 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import Navbar from '@/components/navbar/Navbar';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useTranslations } from '@/hooks/useTranslations';
 
 interface FormData {
   userName: string;
   email: string;
   phoneNumber: string;
+  // Add other necessary fields
 }
 
 export default function ProfilePage() {
@@ -20,7 +20,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
   const params = useParams();
-  const { t } = useTranslations();
   
   // Use Auth Context
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -92,7 +91,7 @@ export default function ProfilePage() {
     setSuccess('');
 
     if (!user) {
-      setError(t('profileErrorUserNotFound'));
+      setError('用戶資料不存在');
       return;
     }
 
@@ -122,13 +121,13 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess(t('profileUpdateSuccess'));
+        setSuccess('個人資料更新成功');
       } else {
-        setError(result.error || t('profileUpdateFailed'));
+        setError(result.error || '更新失敗，請重試');
       }
     } catch (err) {
-      console.error('更新個人資料時出錯:', err); // This console log should also be translated or made generic if user-facing
-      setError(t('profileUpdateErrorGeneric'));
+      console.error('更新個人資料時出錯:', err);
+      setError('發生錯誤，請稍後再試');
     } finally {
       setLoading(false);
     }
@@ -138,7 +137,7 @@ export default function ProfilePage() {
     <div>
       <Navbar />
       <main className="p-8 pt-20 flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">{t('profilePageTitle')}</h1>
+        <h1 className="text-2xl font-bold mb-4">個人資料</h1>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         {success && <p className="text-green-500 text-sm mb-4">{success}</p>}
         
@@ -157,47 +156,57 @@ export default function ProfilePage() {
         ) : isAuthenticated && user ? ( 
           <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-md">
             <div className="mb-4">
-              <label htmlFor="userName" className="block text-sm font-medium text-gray-700">{t('userName')}</label>
+              <label htmlFor="userName" className="block text-gray-700 mb-2">
+                用戶名
+              </label>
               <input
                 type="text"
                 id="userName"
                 {...register('userName', { required: true })}
                 className="w-full p-2 border rounded"
               />
-              {errors.userName && <span className="text-red-500 text-sm">{t('formErrorRequired')}</span>}
+              {errors.userName && <span className="text-red-500 text-sm">此欄位為必填</span>}
             </div>
             <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('email')}</label>
+              <label htmlFor="email" className="block text-gray-700 mb-2">
+                電子郵件
+              </label>
               <input
                 type="email"
                 id="email"
                 {...register('email', { required: true })}
                 className="w-full p-2 border rounded"
               />
-              {errors.email && <span className="text-red-500 text-sm">{t('formErrorRequired')}</span>}
+              {errors.email && <span className="text-red-500 text-sm">此欄位為必填</span>}
             </div>
             <div className="mb-4">
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">{t('phoneNumber')}</label>
+              <label htmlFor="phoneNumber" className="block text-gray-700 mb-2">
+                電話號碼
+              </label>
               <input
                 type="tel"
                 id="phoneNumber"
                 {...register('phoneNumber', { required: true })}
                 className="w-full p-2 border rounded"
               />
-              {errors.phoneNumber && <span className="text-red-500 text-sm">{t('formErrorRequired')}</span>}
+              {errors.phoneNumber && <span className="text-red-500 text-sm">此欄位為必填</span>}
             </div>
-            <button type="submit" disabled={loading}   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-              {loading ? t('processing') : t('profileUpdateSuccess')} {/* Assuming 'profileUpdateSuccess' can be reused for button or add 'updateProfileButton' */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ${loading ? 'opacity-50' : ''}`}
+            >
+              {loading ? '更新中...' : '更新個人資料'}
             </button>
           </form>
         ) : (
           <div className="text-center">
-            <p className="text-red-500">{t('profileErrorLoadUser')}</p>
+            <p className="text-red-500">無法載入用戶資料，請重新登入</p>
             <button
               onClick={() => router.push('/login')}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
-              {t('profileButtonBackToLogin')}
+              返回登入頁面
             </button>
           </div>
         )}

@@ -4,7 +4,6 @@ import QRScanner from './QRScanner';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import { adminFetch, updateTicketStatus, handleAdminError } from '@/utils/adminApi';
 import { Ticket } from '@/types/index';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
 // This component allows admins to scan and verify tickets, with options for auto-verification and custom success/error handling.
 
 interface TicketCheckerProps {
@@ -54,7 +53,7 @@ export default function TicketChecker({
             userName: ticket.userRealName || '未提供姓名',
             zone: ticket.zone ?? '未知區域',
             usedAt: ticket.verificationInfo?.lastVerified 
-              ? formatDate(ticket.verificationInfo.lastVerified) // Use new formatter
+              ? new Date(ticket.verificationInfo.lastVerified).toLocaleString('zh-TW') 
               : '未知時間',
             verifiedBy: ticket.verificationInfo?.verifierName || '未知人員',
             verificationCount: ticket.verificationInfo?.verificationCount || 1,

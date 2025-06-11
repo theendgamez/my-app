@@ -8,7 +8,6 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
 import { Ticket } from '@/types';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 export default function LotteryResultPage() {
   const router = useRouter();
@@ -152,7 +151,7 @@ export default function LotteryResultPage() {
                       <div className="flex-1 space-y-2">
                         <h3 className="font-semibold text-lg">{ticket.eventName}</h3>
                         <p className="text-gray-600">
-                          {ticket.eventDate ? formatDate(ticket.eventDate) : 'Date unavailable'} {/* Use new formatter */}
+                          {ticket.eventDate ? new Date(ticket.eventDate).toLocaleString() : 'Date unavailable'}
                         </p>
                         <p className="text-gray-600">
                           {ticket.eventLocation}

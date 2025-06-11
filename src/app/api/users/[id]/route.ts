@@ -15,13 +15,11 @@ export async function GET(
     // Get current user from token
     const currentUser = await getCurrentUser(request);
     const requestedId = (await params).id;
-    const headerUserId = request.headers.get('x-user-id');
 
-    // Check if user is requesting their own data, is admin, or x-user-id matches requestedId (with a valid token)
+    // Check if user is requesting their own data or is admin
     const hasAccess = currentUser && (
       currentUser.userId === requestedId || 
-      currentUser.role === 'admin' ||
-      (headerUserId && headerUserId === requestedId)
+      currentUser.role === 'admin'
     );
 
     if (!hasAccess) {

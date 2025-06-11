@@ -7,7 +7,6 @@ import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import {batchAnalyzeUsers } from '@/utils/mlService';
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import and alias
 
 interface User {
   userId: string;
@@ -152,33 +151,32 @@ export default function AdminUsersPage() {
   });
 
   // Get role badge class
-  const roleBadgeClasses: Record<string, string> = {
-    admin: 'bg-red-100 text-red-800',
-    staff: 'bg-blue-100 text-blue-800',
-    default: 'bg-gray-100 text-gray-800',
-  };
-  
   const getRoleBadgeClass = (role: string) => {
-    return roleBadgeClasses[role] || roleBadgeClasses.default;
+    switch (role) {
+      case 'admin':
+        return 'bg-red-100 text-red-800';
+      case 'staff':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Function to get risk badge color
-  const riskBadgeClasses: Record<string, string> = {
-    'very-high': 'bg-red-100 text-red-800',
-    'high': 'bg-orange-100 text-orange-800', // Assuming orange for high
-    'medium': 'bg-yellow-100 text-yellow-800', // Assuming yellow for medium
-    'low': 'bg-green-100 text-green-800',   // Assuming green for low
-    'default': 'bg-gray-100 text-gray-800',
-  };
-
   const getRiskBadgeColor = (level?: string) => {
-    return (level && riskBadgeClasses[level]) || riskBadgeClasses.default;
+    switch (level) {
+      case 'very-high': return 'bg-red-100 text-red-800';
+      case 'high': return 'bg-orange-100 text-orange-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Format date for display
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return formatDateUtil(dateString); // Use imported formatter
+    return new Date(dateString).toLocaleString('zh-HK');
   };
 
   // Enhanced function to analyze user risk

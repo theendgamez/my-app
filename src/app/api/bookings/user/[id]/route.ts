@@ -3,10 +3,14 @@ import db from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise <{id: string }> } // Correct type signature
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = (await params).id; // Access id directly
+    const userId = (await params).id; 
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required in the path.' }, { status: 400 });
+    }
     
     // Get status query parameter
     const { searchParams } = new URL(request.url);

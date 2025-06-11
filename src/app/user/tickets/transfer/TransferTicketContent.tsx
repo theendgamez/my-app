@@ -6,7 +6,6 @@ import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Alert } from '@/components/ui/Alert';
 import { Ticket } from '@/types';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 // Update the Friend interface to match the actual API response structure
 interface Friend {
@@ -97,7 +96,7 @@ export default function TransferTicketContent() {
   const getNextTransferTime = (transferredAt: string) => {
     const lastTransferDate = new Date(transferredAt);
     const nextAvailableDate = new Date(lastTransferDate.getTime() + (7 * 24 * 60 * 60 * 1000)); // Add 7 days
-    return formatDate(nextAvailableDate, undefined, { // Pass undefined to use default locale from formatter
+    return nextAvailableDate.toLocaleString('zh-TW', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

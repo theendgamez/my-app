@@ -7,9 +7,6 @@ import { useState, useEffect, Suspense } from 'react';
 import Navbar from '@/components/navbar/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import authEvents from '@/utils/authEvents';
-import { useTranslations } from '@/hooks/useTranslations';
-
-
 
 // Loading fallback component
 const LoginFormSkeleton = () => (
@@ -41,7 +38,7 @@ const LoginForm = () => {
 
   // Move useAuth to component level
   const { login, refreshAuthState } = useAuth();
-    const { t } = useTranslations();
+
   useEffect(() => {
     // Show message if redirected due to auth error
     if (authError) {
@@ -149,7 +146,7 @@ const LoginForm = () => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
-        <label htmlFor="email" className="block text-sm/6 font-medium text-gray-900">{t('email')}</label>
+        <label htmlFor="email" className="block text-sm/6 font-medium text-gray-900">Email</label>
         <div className="mt-2">
           <input
             id="email"
@@ -163,7 +160,7 @@ const LoginForm = () => {
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm/6 font-medium text-gray-900">{t('password')}</label>
+        <label htmlFor="password" className="block text-sm/6 font-medium text-gray-900">Password</label>
         <div className="mt-2">
           <input
             id="password"
@@ -205,14 +202,12 @@ interface FormData {
 // Main login page component using minimalistic localStorage approach
 // Only stores the user ID in localStorage for improved security
 export default function LoginPage() {
-  const { t } = useTranslations();
-
   return (
     <>
       <Navbar />
       <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-          <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900">{t('login')}</h2>
+          <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900">Login</h2>
         </div>
 
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">

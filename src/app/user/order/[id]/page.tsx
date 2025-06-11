@@ -341,7 +341,7 @@ export default function OrderDetailPage() {
                         {/* Only show "免費票券" when we're absolutely sure this is a free ticket */}
                         {orderDetails.totalAmount > 0 
                           ? formatCurrency(orderDetails.totalAmount) 
-                          : '免費票券'}
+                          : formatCurrency(0, '免費票券')}
                       </p>
                     </div>
                   </div>

@@ -1,5 +1,4 @@
 import React from 'react';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
 
 interface PendingRequest {
   friendshipId: string;
@@ -18,6 +17,20 @@ interface Props {
 }
 
 export default function PendingRequestsList({ pendingRequests, onAcceptRequest, onRejectRequest }: Props) {
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('zh-HK', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
   if (pendingRequests.length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md text-center">

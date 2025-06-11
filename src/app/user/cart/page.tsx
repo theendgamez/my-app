@@ -7,8 +7,6 @@ import { Alert } from '@/components/ui/Alert';
 import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Booking, Events } from '@/types';
-import { formatDate } from '@/utils/formatters'; // Import the new formatter
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 // Define user interface to match the localStorage structure
 interface BookingWithEvent extends Booking {
@@ -25,7 +23,6 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
-  const { t } = useTranslations(); // Initialize useTranslations
 
   // Memoize fetchBookings with useCallback
   const fetchBookings = useCallback(async () => {
@@ -51,7 +48,7 @@ export default function CartPage() {
           router.push(`/login?redirect=${encodeURIComponent('/user/cart')}`);
           return;
         }
-        throw new Error(t('cartErrorFetchBookings'));
+        throw new Error('Failed to fetch bookings');
       }
 
       const data = await response.json();
@@ -90,11 +87,11 @@ export default function CartPage() {
       setBookings(pendingBookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
-      setError(error instanceof Error ? error.message : t('cartErrorLoadingOrders'));
+      setError(error instanceof Error ? error.message : '載入訂單時發生錯誤');
     } finally {
       setLoading(false);
     }
-  }, [user, router, t]);
+  }, [user, router]);
 
   useEffect(() => {
     // Check authentication first
@@ -134,14 +131,14 @@ export default function CartPage() {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || t('cartErrorCancelOrderFailed'));
+        throw new Error(errorData.error || '取消訂單失敗');
       }
 
       // Remove cancelled booking from the list
       setBookings(bookings.filter(b => b.bookingToken !== bookingToken));
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      setError(error instanceof Error ? error.message : t('cartErrorCancellingOrderGeneral'));
+      setError(error instanceof Error ? error.message : '取消訂單時發生錯誤');
     } finally {
       setActionInProgress(null);
     }
@@ -174,18 +171,18 @@ export default function CartPage() {
       <Navbar />
       <div className="container mx-auto p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">{t('cartPageTitle')}</h1>
+          <h1 className="text-2xl font-bold mb-6">待付款訂單</h1>
 
           {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
 
           {bookings.length === 0 ? (
             <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <p className="text-gray-600 mb-4">{t('cartNoPendingOrders')}</p>
+              <p className="text-gray-600 mb-4">您沒有待付款的訂單</p>
               <button
                 onClick={(e) => handleNavigate(e, '/events')}
                 className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
-                {t('browseEvents')}
+                瀏覽活動
               </button>
             </div>
           ) : (
@@ -198,45 +195,45 @@ export default function CartPage() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h2 className="text-xl font-semibold">
-                        {booking.event?.eventName || t('unknownEvent')}
+                        {booking.event?.eventName || '未知活動'}
                       </h2>
                       <p className="text-gray-600">
                         {booking.event?.eventDate
-                          ? formatDate(booking.event.eventDate) // Use new formatter
-                          : t('cartUnknownDate')}
+                          ? new Date(booking.event.eventDate).toLocaleString()
+                          : '日期未知'}
                       </p>
                     </div>
                     <div className="text-right">
                       <span className="inline-block px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
-                        {t('needPayment')}
+                        待付款
                       </span>
                     </div>
                   </div>
 
                   <div className="border-t border-b py-3 mb-4">
                     <div className="grid grid-cols-2 gap-2 mb-2">
-                      <span className="text-gray-600">{t('cartZoneLabel')}</span>
+                      <span className="text-gray-600">區域:</span>
                       <span className="text-right">{booking.zone}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-2">
-                      <span className="text-gray-600">{t('cartQuantityLabel')}</span>
-                      <span className="text-right">{booking.quantity} {t('ticketsUnit')}</span>
+                      <span className="text-gray-600">數量:</span>
+                      <span className="text-right">{booking.quantity} 張</span>
                     </div>
                     {booking.price && (
                       <>
                         <div className="grid grid-cols-2 gap-2 mb-2">
-                          <span className="text-gray-600">{t('ticketPrice')}</span>
+                          <span className="text-gray-600">票價:</span>
                           <span className="text-right">HKD {booking.price.toLocaleString('en-HK')} × {booking.quantity}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mb-2">
-                          <span className="text-gray-600">{t('platformFeeLabel')}</span>
+                          <span className="text-gray-600">平台服務費:</span>
                           <span className="text-right">HKD 18 × {booking.quantity}</span>
                         </div>
                       </>
                     )}
                     {booking.totalAmount && (
                       <div className="grid grid-cols-2 gap-2 font-bold pt-2 border-t">
-                        <span>{t('total')}</span>
+                        <span>總金額:</span>
                         <span className="text-right">HKD {booking.totalAmount.toLocaleString('en-HK')}</span>
                       </div>
                     )}
@@ -251,7 +248,7 @@ export default function CartPage() {
                       disabled={actionInProgress === booking.bookingToken}
                       className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-50 disabled:opacity-50"
                     >
-                      {actionInProgress === booking.bookingToken ? t('processing') : t('cartCancelOrder')}
+                      {actionInProgress === booking.bookingToken ? '處理中...' : '取消訂單'}
                     </button>
                     <button
                       onClick={(e) => {
@@ -260,7 +257,7 @@ export default function CartPage() {
                       }}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
-                      {t('proceedToPayment')}
+                      前往付款
                     </button>
                   </div>
                 </div>

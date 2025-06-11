@@ -89,7 +89,7 @@
 
 /* Base Styles */
 html {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', 'Microsoft YaHei', sans-serif; /* Added Noto Sans SC and Microsoft YaHei for Chinese */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
@@ -153,12 +153,6 @@ body {
   .btn-success {
     @apply btn bg-green-600 text-white;
     @apply hover:bg-green-700 focus:ring-green-500;
-    @apply shadow-md hover:shadow-lg;
-  }
-
-  .btn-info {
-    @apply btn bg-blue-600 text-white;
-    @apply hover:bg-blue-700 focus:ring-blue-500;
     @apply shadow-md hover:shadow-lg;
   }
 

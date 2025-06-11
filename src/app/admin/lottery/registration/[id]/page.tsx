@@ -6,8 +6,6 @@ import AdminPage from '@/components/admin/AdminPage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import and alias
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 interface RegistrationData {
   registrationId?: string;
@@ -49,7 +47,6 @@ export default function LotteryRegistrationDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { user, isAdmin, loading: authLoading } = useAuth();
-  const { t, locale } = useTranslations(); // Initialize useTranslations
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
@@ -82,7 +79,7 @@ export default function LotteryRegistrationDetailPage() {
       }
 
       if (!response.ok) {
-        throw new Error('Failed to fetch registration data'); // This could be t('errorFetchingRegistration')
+        throw new Error('Failed to fetch registration data');
       }
 
       const data = await response.json();
@@ -136,11 +133,11 @@ export default function LotteryRegistrationDetailPage() {
       }
     } catch (error) {
       console.error('Error fetching registration data:', error);
-      setError(t('errorFetchingRegistration'));
+      setError('無法獲取抽籤記錄資料');
     } finally {
       setLoading(false);
     }
-  }, [id, user?.userId, t]); // Added t to dependencies
+  }, [id, user?.userId]);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -155,18 +152,18 @@ export default function LotteryRegistrationDetailPage() {
 
   const getStatusBadge = (status: string, paymentStatus?: string) => {
     if (paymentStatus === 'pending') {
-      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">{t('unpaid')}</span>;
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">未付款</span>;
     }
     
     switch (status) {
       case 'registered':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{t('statusWaitingDraw')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">等待抽籤</span>;
       case 'drawn':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">{t('statusDrawn')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">已抽籤</span>;
       case 'won':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{t('statusWon')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">已中籤</span>;
       case 'lost':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{t('statusLost')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">未中籤</span>;
       default:
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{status}</span>;
     }
@@ -175,7 +172,7 @@ export default function LotteryRegistrationDetailPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     try {
-      return formatDateUtil(dateString, 'Pp', { locale }); // Use imported formatter with locale
+      return new Date(dateString).toLocaleString('zh-TW');
     } catch {
       return dateString;
     }
@@ -194,12 +191,12 @@ export default function LotteryRegistrationDetailPage() {
   }
 
   return (
-    <AdminPage title={t('lotteryRegistrationDetails')}>
+    <AdminPage title="抽籤記錄詳情">
       <div className="container-responsive">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
-              {t('lotteryRegistrationDetails')}
+              抽籤記錄詳情
               {registrationData && (
                 <span className="text-sm text-gray-500 ml-2 font-normal">
                   (#{(registrationData.registrationId || registrationData.registrationToken || id)?.toString().substring(0, 8) ?? ''}...)
@@ -208,9 +205,9 @@ export default function LotteryRegistrationDetailPage() {
             </h1>
             <button
               onClick={() => router.back()}
-              className="btn-secondary" // Assuming btn-secondary is styled
+              className="btn-secondary"
             >
-              {t('backToList')}
+              返回列表
             </button>
           </div>
 
@@ -221,31 +218,31 @@ export default function LotteryRegistrationDetailPage() {
           )}
 
           {/* Registration Information */}
-          <div className="card p-6 mb-6"> {/* Assuming card is styled */}
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('registrationInfo')}</h2>
+          <div className="card p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">抽籤資訊</h2>
             {registrationData ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('registrationId')}</label>
+                  <label className="block text-sm font-medium text-gray-700">記錄ID</label>
                   <p className="mt-1 text-sm text-gray-900">
                     {registrationData.registrationId || registrationData.registrationToken || id}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('registrationDate')}</label>
+                  <label className="block text-sm font-medium text-gray-700">報名日期</label>
                   <p className="mt-1 text-sm text-gray-900">
                     {formatDate(registrationData.registrationDate || registrationData.createdAt)}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('status')}</label>
+                  <label className="block text-sm font-medium text-gray-700">狀態</label>
                   <div className="mt-1 flex items-center gap-2">
                     {getStatusBadge(registrationData.status, registrationData.paymentStatus)}
                   </div>
                 </div>
                 {(registrationData.selectedZones || registrationData.zoneName) && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('selectedZone')}</label>
+                    <label className="block text-sm font-medium text-gray-700">選擇區域</label>
                     <p className="mt-1 text-sm text-gray-900">
                       {registrationData.selectedZones?.join(', ') || registrationData.zoneName}
                     </p>
@@ -253,13 +250,13 @@ export default function LotteryRegistrationDetailPage() {
                 )}
                 {registrationData.quantity && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('quantity')}</label>
-                    <p className="mt-1 text-sm text-gray-900">{registrationData.quantity} {t('ticketsUnit')}</p>
+                    <label className="block text-sm font-medium text-gray-700">數量</label>
+                    <p className="mt-1 text-sm text-gray-900">{registrationData.quantity} 張</p>
                   </div>
                 )}
                 {registrationData.platformFee && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('platformFeeLabel')}</label> {/* Changed from platformFee to platformFeeLabel */}
+                    <label className="block text-sm font-medium text-gray-700">平台費</label>
                     <p className="mt-1 text-sm text-gray-900">
                       HK$ {registrationData.platformFee * (registrationData.quantity || 1)}
                     </p>
@@ -267,111 +264,111 @@ export default function LotteryRegistrationDetailPage() {
                 )}
               </div>
             ) : (
-              <p className="text-gray-500">{t('loadingRegistrationInfo')}</p>
+              <p className="text-gray-500">無法載入抽籤資訊</p>
             )}
           </div>
 
           {/* User Information */}
           <div className="card p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('userInfo')}</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">用戶資訊</h2>
             {userData ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('userName')}</label>
+                  <label className="block text-sm font-medium text-gray-700">用戶名稱</label>
                   <p className="mt-1 text-sm text-gray-900">{userData.userName}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('email')}</label>
+                  <label className="block text-sm font-medium text-gray-700">電子郵件</label>
                   <p className="mt-1 text-sm text-gray-900">{userData.email}</p>
                 </div>
                 {(userData.phone || userData.phoneNumber || registrationData?.phoneNumber) && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('phoneNumber')}</label>
+                    <label className="block text-sm font-medium text-gray-700">電話號碼</label>
                     <p className="mt-1 text-sm text-gray-900">
                       {userData.phone || userData.phoneNumber || registrationData?.phoneNumber}
                     </p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('userId')}</label>
+                  <label className="block text-sm font-medium text-gray-700">用戶ID</label>
                   <p className="mt-1 text-sm text-gray-500">{userData.userId}</p>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">{t('loadingUserInfo')}</p>
+              <p className="text-gray-500">無法載入用戶資訊</p>
             )}
           </div>
 
           {/* Event Information */}
           <div className="card p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('eventInfo')}</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">活動資訊</h2>
             {eventData ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventName')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動名稱</label>
                   <p className="mt-1 text-sm text-gray-900">{eventData.eventName}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventDate')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動日期</label>
                   <p className="mt-1 text-sm text-gray-900">{formatDate(eventData.eventDate)}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventLocation')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動地點</label>
                   <p className="mt-1 text-sm text-gray-900">{eventData.location}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventId')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動ID</label>
                   <p className="mt-1 text-sm text-gray-500">{eventData.eventId}</p>
                 </div>
               </div>
             ) : registrationData?.eventName ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventName')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動名稱</label>
                   <p className="mt-1 text-sm text-gray-900">{registrationData.eventName}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('eventId')}</label>
+                  <label className="block text-sm font-medium text-gray-700">活動ID</label>
                   <p className="mt-1 text-sm text-gray-500">{registrationData.eventId}</p>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">{t('loadingEventInfo')}</p>
+              <p className="text-gray-500">無法載入活動資訊</p>
             )}
           </div>
 
           {/* Payment Information */}
           {registrationData?.paymentStatus && (
             <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('paymentInfo')}</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">付款資訊</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('paymentStatus')}</label>
+                  <label className="block text-sm font-medium text-gray-700">付款狀態</label>
                   <div className="mt-1">
                     {registrationData.paymentStatus === 'paid' ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">{t('paid')}</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">已支付</span>
                     ) : (
-                      <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">{t('unpaid')}</span>
+                      <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">未支付</span>
                     )}
                   </div>
                 </div>
                 {registrationData.paymentId && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('paymentId')}</label>
+                    <label className="block text-sm font-medium text-gray-700">支付ID</label>
                     <div className="mt-1 flex items-center gap-2">
                       <p className="text-sm text-gray-900">{registrationData.paymentId}</p>
                       <Link 
                         href={`/admin/payments/${registrationData.paymentId}`}
                         className="text-blue-600 hover:text-blue-800 text-sm"
                       >
-                        {t('viewDetails')}
+                        查看詳情
                       </Link>
                     </div>
                   </div>
                 )}
                 {registrationData.paidAt && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('paymentTime')}</label>
+                    <label className="block text-sm font-medium text-gray-700">付款時間</label>
                     <p className="mt-1 text-sm text-gray-900">{formatDate(registrationData.paidAt)}</p>
                   </div>
                 )}

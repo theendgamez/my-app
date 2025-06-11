@@ -7,8 +7,6 @@ import Navbar from '@/components/navbar/Navbar';
 import Sidebar from '@/components/admin/Sidebar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import the new formatter
-import { useTranslations } from '@/hooks/useTranslations'; // Import useTranslations
 
 interface EventDetails {
   eventId: string;
@@ -34,7 +32,6 @@ export default function AdminLotteryRegistrationsPage() {
   const router = useRouter();
   const { eventId } = useParams();
   const { isAdmin, isAuthenticated, loading: authLoading } = useAuth();
-  const { t, locale } = useTranslations(); // Initialize useTranslations
   
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -76,7 +73,7 @@ export default function AdminLotteryRegistrationsPage() {
         });
         
         if (!eventResponse.ok) {
-          throw new Error(t('errorFetchingData')); // Use translated error
+          throw new Error(`無法獲取活動資料: ${eventResponse.status}`);
         }
         
         const eventData = await eventResponse.json();
@@ -92,7 +89,7 @@ export default function AdminLotteryRegistrationsPage() {
         });
         
         if (!registrationsResponse.ok) {
-          throw new Error(t('errorFetchingData')); // Use translated error
+          throw new Error(`無法獲取抽籤登記: ${registrationsResponse.status}`);
         }
         
         const registrationsData = await registrationsResponse.json();
@@ -100,7 +97,7 @@ export default function AdminLotteryRegistrationsPage() {
         
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : t('errorFetchingData')); // Use translated error
+        setError(err instanceof Error ? err.message : '獲取數據時發生錯誤');
       } finally {
         setLoading(false);
       }
@@ -109,7 +106,7 @@ export default function AdminLotteryRegistrationsPage() {
     if (!authLoading && isAdmin && eventId) {
       fetchEventAndRegistrations();
     }
-  }, [authLoading, isAdmin, eventId, t]); // Added t to dependency array
+  }, [authLoading, isAdmin, eventId]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -152,18 +149,18 @@ export default function AdminLotteryRegistrationsPage() {
 
   const getStatusBadge = (status: string, paymentStatus: string) => {
     if (paymentStatus === 'pending') {
-      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">{t('unpaid')}</span>;
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">未付款</span>;
     }
     
     switch (status) {
       case 'registered':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{t('statusWaitingDraw')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">等待抽籤</span>;
       case 'drawn':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">{t('statusDrawn')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">已抽籤</span>;
       case 'won':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{t('statusWon')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">已中籤</span>;
       case 'lost':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{t('statusLost')}</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">未中籤</span>;
       default:
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{status}</span>;
     }
@@ -189,10 +186,6 @@ export default function AdminLotteryRegistrationsPage() {
   // Function to toggle sidebar
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const formatDate = (dateString: string, formatOptions?: Intl.DateTimeFormatOptions) => {
-    return formatDateUtil(dateString, undefined, { locale, ...formatOptions });
   };
 
   if (authLoading) {
@@ -221,20 +214,20 @@ export default function AdminLotteryRegistrationsPage() {
             <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-0">
               {event ? (
                 <>
-                  {t('lotteryRegistrationsFor', { eventName: event.eventName })}
+                  抽籤登記 - {event.eventName}
                   <span className="text-sm text-gray-500 ml-2 font-normal">
-                    {t('totalRegistrants', { count: registrations.length })}
+                    ({registrations.length} 人)
                   </span>
                 </>
               ) : (
-                t('lotteryRegistrationsFor', { eventName: '...' })
+                '抽籤登記'
               )}
             </h1>
             <Link
               href="/admin/lottery"
               className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
             >
-              {t('backToLotteryManagement')}
+              返回抽籤管理
             </Link>
           </div>
 
@@ -256,7 +249,7 @@ export default function AdminLotteryRegistrationsPage() {
             </div>
           ) : registrations.length === 0 ? (
             <div className="bg-white p-6 rounded-lg shadow text-center">
-              <p className="text-gray-600 mb-4">{t('noRegistrationsForEvent')}</p>
+              <p className="text-gray-600 mb-4">此活動沒有抽籤登記</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -269,7 +262,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('registrationToken')}
                       >
-                        {t('registrationNumber')}
+                        抽籤編號
                         {sortField === 'registrationToken' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -279,7 +272,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('userName')}
                       >
-                        {t('user')}
+                        用戶
                         {sortField === 'userName' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -289,7 +282,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('phoneNumber')}
                       >
-                        {t('phone')}
+                        電話
                         {sortField === 'phoneNumber' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -299,7 +292,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('zoneName')}
                       >
-                        {t('zone')}
+                        區域
                         {sortField === 'zoneName' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -309,7 +302,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('quantity')}
                       >
-                        {t('quantity')}
+                        數量
                         {sortField === 'quantity' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -319,7 +312,7 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('status')}
                       >
-                        {t('status')}
+                        狀態
                         {sortField === 'status' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -329,13 +322,13 @@ export default function AdminLotteryRegistrationsPage() {
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('createdAt')}
                       >
-                        {t('registrationTime')}
+                        登記時間
                         {sortField === 'createdAt' && (
                           <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('actions')}
+                        操作
                       </th>
                     </tr>
                   </thead>
@@ -346,27 +339,27 @@ export default function AdminLotteryRegistrationsPage() {
                           <div className="text-sm text-gray-900">{registration.registrationToken.substring(0, 8)}...</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{registration.userName || t('userNotProvided')}</div>
+                          <div className="text-sm text-gray-900">{registration.userName || '未知用戶'}</div>
                           <div className="text-xs text-gray-500">{registration.userId.substring(0, 8)}...</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{registration.phoneNumber || t('phoneNotProvided')}</div>
+                          <div className="text-sm text-gray-900">{registration.phoneNumber || '無'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{registration.zoneName}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {registration.quantity} {t('ticketsUnit')}
+                          {registration.quantity} 張
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(registration.status, registration.paymentStatus)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {formatDate(registration.createdAt, { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                            {new Date(registration.createdAt).toLocaleDateString()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {formatDate(registration.createdAt, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                            {new Date(registration.createdAt).toLocaleTimeString()}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -374,7 +367,7 @@ export default function AdminLotteryRegistrationsPage() {
                             href={`/admin/lottery/registration/${registration.registrationToken}`}
                             className="text-indigo-600 hover:text-indigo-900"
                           >
-                            {t('viewDetails')}
+                            查看詳情
                           </Link>
                         </td>
                       </tr>
