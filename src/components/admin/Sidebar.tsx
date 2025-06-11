@@ -152,15 +152,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
     return null;
   }
 
-  const NAVBAR_HEIGHT = "4rem"; // Height of the main Navbar from ClientLayout
-  const FOOTER_HEIGHT_ESTIMATE = "6rem"; // Estimated height of the Footer
-
   // Base classes for the sidebar container
-  const sidebarContainerBaseClasses = `fixed z-30 w-64 bg-white shadow-md transition-transform duration-300 overflow-y-auto`;
+  const sidebarContainerBaseClasses = `fixed z-30 w-64 bg-white dark:bg-neutral-800 shadow-md transition-transform duration-300 overflow-y-auto`;
   
   // Desktop specific classes
-  const desktopTopClass = `top-[${NAVBAR_HEIGHT}]`;
-  const desktopHeightClass = `h-[calc(100vh-${NAVBAR_HEIGHT}-${FOOTER_HEIGHT_ESTIMATE})]`;
+  // Use 'top-navbar' which corresponds to '4rem' defined in tailwind.config.ts
+  // Use direct values in calc() for Tailwind JIT to parse correctly
+  const desktopTopClass = "top-navbar"; // Uses theme.spacing.navbar (4rem)
+  const desktopHeightClass = "h-[calc(100vh-4rem-6rem)]"; // 4rem navbar + 6rem footer estimate
   const desktopTransformOpen = "transform translate-x-0";
   const desktopTransformClosed = "transform -translate-x-full";
 
@@ -168,13 +167,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
   const desktopClosedClasses = `${sidebarContainerBaseClasses} ${desktopTopClass} ${desktopHeightClass} ${desktopTransformClosed} left-0`;
 
   // Mobile specific classes (overlay style)
-  const mobileContainerBaseClasses = `fixed z-40 w-64 bg-white shadow-lg transition-transform duration-300 overflow-y-auto`;
-  const mobileTopClass = `top-[${NAVBAR_HEIGHT}]`; // Starts below main navbar
-  const mobileHeightClass = `h-[calc(100vh-${NAVBAR_HEIGHT})]`; // Extends to viewport bottom
+  const mobileContainerBaseClasses = `fixed z-40 w-64 bg-white dark:bg-neutral-800 shadow-lg transition-transform duration-300 overflow-y-auto`;
+  const mobileTopClass = "top-navbar"; // Starts below main navbar (4rem)
+  const mobileHeightClass = "h-[calc(100vh-4rem)]"; // Extends to viewport bottom, accounting for 4rem navbar
   const mobileTransformOpen = "transform translate-x-0";
   const mobileTransformClosed = "transform -translate-x-full";
   
-  const mobileOpenClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformOpen} inset-x-0`; // inset-x-0 for full width behavior if needed, or left-0
+  const mobileOpenClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformOpen} inset-x-0`;
   const mobileClosedClasses = `${mobileContainerBaseClasses} ${mobileTopClass} ${mobileHeightClass} ${mobileTransformClosed} inset-x-0`;
 
 
@@ -199,10 +198,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
       {/* Sidebar */}
       <aside className={generatedSidebarClasses}> {/* Use generated classes */}
         {isMobile && (
-          <div className="p-4 border-b">
+          <div className="p-4 border-b dark:border-neutral-700">
             <button
               onClick={toggleSidebar}
-              className="text-gray-700 hover:text-gray-900"
+              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -217,14 +216,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
               <li key={section.title}>
                 {isOpen ? (
                   <button
-                    className="flex items-center justify-between w-full px-2 py-2 text-gray-700 hover:text-gray-900 focus:outline-none"
+                    className="flex items-center justify-between w-full px-2 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-none"
                     onClick={() => toggleSection(index)}
                   >
                     <span className="text-sm font-medium">{section.title}</span>
                     {section.isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
                   </button>
                 ) : (
-                  <div className="px-2 py-2 text-gray-600 text-center text-xs">
+                  <div className="px-2 py-2 text-gray-600 dark:text-gray-400 text-center text-xs">
                     {section.title.charAt(0)}
                   </div>
                 )}
@@ -240,13 +239,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, isMobile }) =>
                           href={item.href}
                           className={`flex items-center ${isOpen ? 'px-4 py-2 text-sm' : 'px-2 py-3 justify-center'} rounded-md transition-colors ${
                             isActive 
-                              ? 'bg-blue-50 text-blue-700 font-medium' 
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium' 
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
                           }`}
                           title={!isOpen ? item.name : undefined}
                           onClick={() => isMobile && toggleSidebar()}
                         >
-                          <span className={`${isActive ? 'text-blue-600' : 'text-gray-500'} ${isOpen ? 'mr-3' : ''}`}>
+                          <span className={`${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'} ${isOpen ? 'mr-3' : ''}`}>
                             {item.icon}
                           </span>
                           {isOpen && <span>{item.name}</span>}

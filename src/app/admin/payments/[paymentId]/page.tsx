@@ -190,7 +190,9 @@ export default function PaymentDetailPage() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">金額</dt>
                   <dd className="mt-1 text-sm text-gray-900 font-semibold">
-                    {formatCurrency(payment.totalAmount || payment.amount, '免費票券')}
+                    {(payment.totalAmount || payment.amount || 0) > 0
+                      ? formatCurrency(payment.totalAmount || payment.amount || 0)
+                      : '免費票券'}
                   </dd>
                 </div>
                 <div>
@@ -214,9 +216,9 @@ export default function PaymentDetailPage() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">票價</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {payment.payQuantity && payment.amount ? 
+                    {payment.payQuantity && payment.amount && (payment.amount / payment.payQuantity) > 0 ? 
                       `${formatCurrency(payment.amount/payment.payQuantity)} × ${payment.payQuantity}` : 
-                      formatCurrency(payment.amount, '免費票券')}
+                      ((payment.amount || 0) > 0 ? formatCurrency(payment.amount || 0) : '免費票券')}
                   </dd>
                 </div>
               </dl>

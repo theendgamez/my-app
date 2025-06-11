@@ -178,11 +178,23 @@ export async function POST(request: NextRequest) {
     const bookingToken = uuidv4();
     const now = new Date().toISOString();
 
+    let paymentAmount = 0;
+    let paymentPlatformFee = 0;
+
+    if (paymentType === 'platform_fee') {
+      paymentPlatformFee = totalAmount; // totalAmount from request is purely platform fee
+      paymentAmount = 0;
+    } else { // 'ticket_price'
+      paymentPlatformFee = 0; // This transaction is only for tickets, platform fee paid separately
+      paymentAmount = totalAmount; // totalAmount from request is purely ticket price
+    }
+
     await db.payments.create({
       paymentId,
       userId: user.userId,
-      amount: totalAmount,
-      totalAmount: totalAmount,
+      amount: paymentAmount,
+      platformFee: paymentPlatformFee,
+      totalAmount: totalAmount, // totalAmount from request body
       paymentMethod,
       status: 'completed',
       createdAt: now,

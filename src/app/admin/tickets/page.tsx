@@ -8,7 +8,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/context/AuthContext';
 import { Ticket} from '@/types';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
-import { formatDate as formatDateUtil } from '@/utils/formatters'; // Import and alias
+import { formatDate as formatDateUtil } from '@/utils/formatters';
+import { useTranslations } from '@/hooks/useTranslations';
 
 
 export default function AdminTicketsPage() {
@@ -23,6 +24,7 @@ export default function AdminTicketsPage() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [uniqueEvents, setUniqueEvents] = useState<{id: string, name: string}[]>([]);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
+  const { t, locale } = useTranslations(); // Correctly destructure t and locale
   
   const router = useRouter();
   const { isAuthenticated, isAdmin } = useAuth();
@@ -74,7 +76,7 @@ export default function AdminTicketsPage() {
         setUniqueEvents(events);
       } catch (error) {
         console.error('Error fetching tickets:', error);
-        setError('獲取票券數據失敗');
+        setError(t('adminErrorFetchingTickets'));
       } finally {
         setLoading(false);
       }
@@ -83,7 +85,7 @@ export default function AdminTicketsPage() {
     if (isAuthenticated && isAdmin) {
       fetchTickets();
     }
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated, isAdmin, t, setLoading, setError, setTickets, setUniqueEvents]);
   
   // Redirect if not admin
   useEffect(() => {
@@ -115,7 +117,8 @@ export default function AdminTicketsPage() {
 
   // Handle ticket status change
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
-    if (!confirm(`確定要將此票券狀態更改為 ${newStatus}？`)) {
+    const statusKey = `status${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`;
+    if (!confirm(t('adminConfirmTicketStatusChange', { status: t(statusKey) }))) {
       return;
     }
     
@@ -141,7 +144,7 @@ export default function AdminTicketsPage() {
       ));
     } catch (error) {
       console.error('Error updating ticket status:', error);
-      setError('更新票券狀態失敗');
+      setError(t('adminErrorUpdatingTicketStatus'));
     } finally {
       setActionInProgress(null);
     }
@@ -226,25 +229,18 @@ export default function AdminTicketsPage() {
 
   // Format date for display
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    return formatDateUtil(dateString); // Use imported formatter
+    if (!dateString) return t('notApplicable');
+    return formatDateUtil(dateString, undefined, { locale }); // Pass locale to formatter
   };
 
-  // Translate status to Chinese
-  const translateStatus = (status: string) => {
-    switch (status) {
-      case 'available': return '可用';
-      case 'reserved': return '預留中';
-      case 'sold': return '已售出';
-      case 'used': return '已使用';
-      case 'cancelled': return '已取消';
-      default: return status;
-    }
-  };
+  // Get status translation key
+  const getStatusTranslationKey = (status: string): string => {
+    return `status${status.charAt(0).toUpperCase() + status.slice(1)}`;
+  }
 
   return (
     <AdminPage 
-      title="票券管理" 
+      title={t('adminTicketManagement')}
       isLoading={loading}
       error={error}
     >
@@ -254,7 +250,7 @@ export default function AdminTicketsPage() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="搜索票券ID、活動名稱、用戶名稱..."
+              placeholder={t('adminSearchTicketsPlaceholder')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -266,19 +262,19 @@ export default function AdminTicketsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px]"
             >
-              <option value="all">所有狀態</option>
-              <option value="available">可用</option>
-              <option value="reserved">預留中</option>
-              <option value="sold">已售出</option>
-              <option value="used">已使用</option>
-              <option value="cancelled">已取消</option>
+              <option value="all">{t('allStatuses')}</option>
+              <option value="available">{t('statusAvailable')}</option>
+              <option value="reserved">{t('statusReserved')}</option>
+              <option value="sold">{t('statusSold')}</option>
+              <option value="used">{t('statusUsed')}</option>
+              <option value="cancelled">{t('statusCancelled')}</option>
             </select>
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px]"
             >
-              <option value="all">所有活動</option>
+              <option value="all">{t('allEvents')}</option>
               {uniqueEvents.map(event => (
                 <option key={event.id} value={event.id}>{event.name}</option>
               ))}
@@ -301,7 +297,7 @@ export default function AdminTicketsPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{eventInfo.name}</h3>
                     <p className="text-sm text-gray-600">
-                      {formatDate(eventInfo.date)} • {tickets.length} 張票券
+                      {formatDate(eventInfo.date)} • {t('ticketCount', { count: tickets.length })}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -314,7 +310,7 @@ export default function AdminTicketsPage() {
                               key={status}
                               className={`px-2 py-1 text-xs rounded-full ${getStatusBadgeClass(status)}`}
                             >
-                              {translateStatus(status)}: {count}
+                              {t(getStatusTranslationKey(status))}: {count}
                             </span>
                           );
                         }
@@ -338,7 +334,7 @@ export default function AdminTicketsPage() {
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort('ticketId')}
                           >
-                            票券ID
+                            {t('ticketIdLabel')}
                             {sortField === 'ticketId' && (
                               <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                             )}
@@ -347,7 +343,7 @@ export default function AdminTicketsPage() {
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort('userRealName')}
                           >
-                            用戶
+                            {t('user')}
                             {sortField === 'userRealName' && (
                               <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                             )}
@@ -356,7 +352,7 @@ export default function AdminTicketsPage() {
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort('zone')}
                           >
-                            區域/座位
+                            {t('zoneSeatLabel')}
                             {sortField === 'zone' && (
                               <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                             )}
@@ -365,7 +361,7 @@ export default function AdminTicketsPage() {
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort('status')}
                           >
-                            狀態
+                            {t('status')}
                             {sortField === 'status' && (
                               <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                             )}
@@ -374,13 +370,13 @@ export default function AdminTicketsPage() {
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort('purchaseDate')}
                           >
-                            購買日期
+                            {t('purchaseDateLabel')}
                             {sortField === 'purchaseDate' && (
                               <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                             )}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            操作
+                            {t('actions')}
                           </th>
                         </tr>
                       </thead>
@@ -393,20 +389,20 @@ export default function AdminTicketsPage() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{ticket.userRealName || '未提供姓名'}</div>
+                              <div className="text-sm font-medium text-gray-900">{ticket.userRealName || t('nameNotProvided')}</div>
                               <div className="text-xs text-gray-500 font-mono">{ticket.userId.substring(0, 8)}...</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{ticket.zone}</div>
-                              <div className="text-xs text-gray-500">座位: {ticket.seatNumber || 'N/A'}</div>
+                              <div className="text-xs text-gray-500">{t('seatLabel')}: {ticket.seatNumber || t('notApplicable')}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-3 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getStatusBadgeClass(ticket.status)}`}>
-                                {translateStatus(ticket.status)}
+                                {t(getStatusTranslationKey(ticket.status))}
                               </span>
                               {ticket.transferredAt && (
                                 <div className="text-xs text-gray-500 mt-1">
-                                  已轉贈 ({formatDate(ticket.transferredAt)})
+                                  {t('transferred')} ({formatDate(ticket.transferredAt)})
                                 </div>
                               )}
                             </td>
@@ -419,7 +415,7 @@ export default function AdminTicketsPage() {
                                   href={`/admin/tickets/${ticket.ticketId}`}
                                   className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
                                 >
-                                  查看
+                                  {t('view')}
                                 </Link>
                                 {ticket.status !== 'used' && (
                                   <button
@@ -427,7 +423,7 @@ export default function AdminTicketsPage() {
                                     disabled={actionInProgress === ticket.ticketId}
                                     className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
-                                    驗證
+                                    {t('validate')}
                                   </button>
                                 )}
                                 {ticket.status !== 'cancelled' && (
@@ -436,7 +432,7 @@ export default function AdminTicketsPage() {
                                     disabled={actionInProgress === ticket.ticketId}
                                     className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
-                                    作廢
+                                    {t('void')}
                                   </button>
                                 )}
                               </div>
@@ -453,25 +449,25 @@ export default function AdminTicketsPage() {
                       <div key={ticket.ticketId} className="p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{ticket.userRealName || '未提供姓名'}</h4>
+                            <h4 className="font-medium text-gray-900">{ticket.userRealName || t('nameNotProvided')}</h4>
                             <p className="text-xs text-gray-500 font-mono mt-1">
                               {ticket.ticketId.substring(0, 8)}...
                             </p>
                           </div>
                           <span className={`px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getStatusBadgeClass(ticket.status)}`}>
-                            {translateStatus(ticket.status)}
+                            {t(getStatusTranslationKey(ticket.status))}
                           </span>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                           <div>
-                            <span className="text-gray-500">區域:</span> {ticket.zone}
+                            <span className="text-gray-500">{t('zone')}:</span> {ticket.zone}
                           </div>
                           <div>
-                            <span className="text-gray-500">座位:</span> {ticket.seatNumber || 'N/A'}
+                            <span className="text-gray-500">{t('seatLabel')}:</span> {ticket.seatNumber || t('notApplicable')}
                           </div>
                           <div className="col-span-2">
-                            <span className="text-gray-500">購買:</span> {formatDate(ticket.purchaseDate)}
+                            <span className="text-gray-500">{t('purchaseDateLabel')}:</span> {formatDate(ticket.purchaseDate)}
                           </div>
                         </div>
                         
@@ -480,7 +476,7 @@ export default function AdminTicketsPage() {
                             href={`/admin/tickets/${ticket.ticketId}`}
                             className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-md text-sm font-medium text-center hover:bg-blue-200 transition-colors"
                           >
-                            查看
+                            {t('view')}
                           </Link>
                           
                           {ticket.status !== 'used' && (
@@ -489,7 +485,7 @@ export default function AdminTicketsPage() {
                               disabled={actionInProgress === ticket.ticketId}
                               className={`flex-1 px-3 py-2 bg-green-100 text-green-700 rounded-md text-sm font-medium hover:bg-green-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
                             >
-                              驗證
+                              {t('validate')}
                             </button>
                           )}
                           
@@ -499,7 +495,7 @@ export default function AdminTicketsPage() {
                               disabled={actionInProgress === ticket.ticketId}
                               className={`flex-1 px-3 py-2 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors ${actionInProgress === ticket.ticketId ? 'opacity-50' : ''}`}
                             >
-                              作廢
+                              {t('void')}
                             </button>
                           )}
                         </div>
@@ -518,8 +514,8 @@ export default function AdminTicketsPage() {
               </div>
             ) : (
               <div className="text-gray-500">
-                <p className="text-lg mb-2">沒有找到匹配的票券</p>
-                <p className="text-sm">請嘗試調整搜索條件或篩選器</p>
+                <p className="text-lg mb-2">{t('adminNoMatchingTickets')}</p>
+                <p className="text-sm">{t('adminAdjustSearchFilters')}</p>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 
 export interface Notification {
@@ -36,17 +36,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const fetchNotifications = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user?.userId) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch lottery notifications
       const response = await fetch('/api/notifications/lottery', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'x-user-id': user?.userId || ''
+          'x-user-id': user.userId 
         }
       });
       
@@ -62,10 +61,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.userId]);
 
   const markAsRead = useCallback(async (id: string) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user?.userId) return;
     
     try {
       const response = await fetch('/api/notifications/lottery/read', {
@@ -73,7 +72,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'x-user-id': user?.userId || ''
+          'x-user-id': user.userId
         },
         body: JSON.stringify({ notificationId: id })
       });
@@ -91,10 +90,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       console.error('Error marking notification as read:', err);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.userId]);
 
   const markAllAsRead = useCallback(async () => {
-    if (!isAuthenticated || notifications.length === 0) return;
+    if (!isAuthenticated || !user?.userId || notifications.length === 0) return;
     
     try {
       const response = await fetch('/api/notifications/lottery/read-all', {
@@ -102,7 +101,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'x-user-id': user?.userId || ''
+          'x-user-id': user.userId
         }
       });
       
@@ -117,7 +116,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
     }
-  }, [isAuthenticated, user, notifications.length]);
+  }, [isAuthenticated, user?.userId, notifications]);
 
   // Fetch notifications when auth state changes
   useEffect(() => {
@@ -137,7 +136,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => clearInterval(intervalId);
   }, [isAuthenticated, fetchNotifications]);
 
-  const value = {
+  const value = useMemo(() => ({
     notifications,
     unreadCount,
     loading,
@@ -145,7 +144,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     fetchNotifications,
     markAsRead,
     markAllAsRead
-  };
+  }), [notifications, unreadCount, loading, error, fetchNotifications, markAsRead, markAllAsRead]);
 
   return (
     <NotificationContext.Provider value={value}>

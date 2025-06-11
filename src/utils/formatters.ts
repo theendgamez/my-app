@@ -21,10 +21,10 @@ export function formatDate(
 ): string {
   try {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    const localeKey = options?.locale || 'zh'; // Default to Chinese
-    const dateFnsLocale = locales[localeKey] || zhHK;
+    const localeKey = options?.locale || 'en'; // Default to English if no specific locale is passed
+    const dateFnsLocale = locales[localeKey] || enUS; // Fallback to enUS for date-fns
 
-    if (options && Object.keys(options).length > 1) { // If more than just locale is passed
+    if (options && Object.keys(options).length > 1 && !(Object.keys(options).length === 1 && options.hasOwnProperty('locale'))) { // If more than just locale is passed
         // Use Intl.DateTimeFormat for more complex options
         return new Intl.DateTimeFormat(localeKey, options).format(date);
     }

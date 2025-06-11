@@ -50,14 +50,15 @@ export async function POST(request: NextRequest) {
     // Create payment record
     const paymentId = uuidv4();
     const now = new Date().toISOString();
-    const platformFee = registration.platformFee || 18;
-    const totalAmount = platformFee * (registration.quantity || 1);
+    const platformFeePerTicket = registration.platformFee || 18;
+    const calculatedPlatformFeeTotal = platformFeePerTicket * (registration.quantity || 1);
 
     await db.payments.create({
       paymentId,
       userId: user.userId,
-      amount: totalAmount,
-      totalAmount: totalAmount,
+      amount: 0, // Base amount is 0 as this payment is only for platform fee
+      platformFee: calculatedPlatformFeeTotal, // Platform fee component
+      totalAmount: calculatedPlatformFeeTotal, // Total amount is the platform fee itself
       paymentMethod: 'credit_card',
       status: 'completed',
       createdAt: now,

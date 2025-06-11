@@ -89,9 +89,9 @@ export async function POST(request: NextRequest) {
 
     // Calculate payment
     const ticketPrice = Number(zoneDetails.price);
-    const platformFee = 18; // Platform fee per ticket
+    const platformFeePerTicket = 18; // Platform fee per ticket
     const subtotal = ticketPrice * booking.quantity;
-    const platformFeeTotal = platformFee * booking.quantity;
+    const platformFeeTotal = platformFeePerTicket * booking.quantity;
     const totalAmount = subtotal + platformFeeTotal;
 
     // Generate payment ID
@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       payQuantity: booking.quantity,
       totalAmount,
       amount: subtotal, // Store the subtotal without platform fee in amount
+      platformFee: platformFeeTotal, // Explicitly store the platform fee component
       paymentMethod: 'credit_card',
       relatedTo: "ticket_purchase" as const,
       createdAt: now,

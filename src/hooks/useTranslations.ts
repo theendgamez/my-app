@@ -15,12 +15,15 @@ export const useTranslations = () => {
         setTranslations(langModule.default || langModule);
       } catch (error) {
         console.error(`Could not load translations for locale: ${locale}`, error);
-        // Fallback to Chinese if current locale fails
+        // Fallback to the other primary language if current locale fails
+        const fallbackLocale = locale === 'en' ? 'zh' : 'en';
         try {
-          const fallbackModule = await import('@/locales/zh.json');
+          console.warn(`Attempting to load fallback translations for locale: ${fallbackLocale}`);
+          const fallbackModule = await import(`@/locales/${fallbackLocale}.json`);
           setTranslations(fallbackModule.default || fallbackModule);
         } catch (fallbackError) {
-          console.error('Could not load fallback translations', fallbackError);
+          console.error(`Could not load fallback translations for ${fallbackLocale}`, fallbackError);
+          // Final fallback to an empty object if both primary and secondary fallbacks fail
           setTranslations({});
         }
       }

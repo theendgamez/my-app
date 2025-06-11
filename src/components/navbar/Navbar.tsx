@@ -55,6 +55,10 @@ const Navbar = () => {
   const handleLanguageChange = (newLocale: 'en' | 'zh') => {
     setLocale(newLocale);
     setShowLanguageMenu(false);
+    // Also close mobile menu if open
+    if (isMobileMenuOpen) {
+      closeMobileMenu();
+    }
   };
 
   return (
@@ -63,7 +67,7 @@ const Navbar = () => {
         <div className="navbar-content">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-white">SL TIX</span>
+            <span className="text-lg font-bold text-white">{t('ticketingSystem')}</span>
           </Link>
 
           {/* Desktop Search Bar */}
@@ -134,7 +138,7 @@ const Navbar = () => {
                       locale === 'en' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
                     }`}
                   >
-                    {t('english')}
+                    {t('navbarEnglish')}
                   </button>
                   <button
                     onClick={() => handleLanguageChange('zh')}
@@ -142,7 +146,7 @@ const Navbar = () => {
                       locale === 'zh' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
                     }`}
                   >
-                    {t('chinese')}
+                    {t('navbarChinese')}
                   </button>
                 </div>
               )}
@@ -239,29 +243,27 @@ const Navbar = () => {
 
               {/* Mobile Language Switcher */}
               <div className="pt-2 border-t border-blue-500">
-                <div className="py-2 text-white text-xs font-medium">{t('chinese')}/{t('english')}</div>
+                <div className="py-2 text-white text-xs font-medium">{t('navbarLanguage')}</div>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => {
                       handleLanguageChange('zh');
-                      closeMobileMenu();
                     }}
                     className={`px-3 py-1 rounded text-xs ${
                       locale === 'zh' ? 'bg-white text-blue-600' : 'bg-blue-500 text-white hover:bg-blue-400'
                     }`}
                   >
-                    {t('chinese')}
+                    {t('navbarChinese')}
                   </button>
                   <button
                     onClick={() => {
                       handleLanguageChange('en');
-                      closeMobileMenu();
                     }}
                     className={`px-3 py-1 rounded text-xs ${
                       locale === 'en' ? 'bg-white text-blue-600' : 'bg-blue-500 text-white hover:bg-blue-400'
                     }`}
                   >
-                    {t('english')}
+                    {t('navbarEnglish')}
                   </button>
                 </div>
               </div>

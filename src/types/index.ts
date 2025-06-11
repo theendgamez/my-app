@@ -74,12 +74,13 @@ export interface Events {
 
 // Payment and ticket related types
 export interface Payment {
-  totalAmount: number;
+  totalAmount: number; // Final amount paid by the user
   paymentId?: string;
   userId?: string;
   eventId?: string;
   eventName?: string;
-  amount?: number;
+  amount?: number; // Sub-total or base amount before fees
+  platformFee?: number; // Optional: platform fee charged
   paymentMethod?: string;
   status?: string;
   createdAt?: string;
