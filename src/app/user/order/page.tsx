@@ -48,7 +48,7 @@ export default function UserOrderPage() {
       setLoading(true);
       setError(null);
 
-      const accessToken = localStorage.getItem('accessToken');
+      const accessToken = localStorage.getItem('accessToken'); // Fix: Use localStorage instead of getCurrentUser()
       const userId = user.userId;
 
       console.log(`Fetching tickets for user: ${userId}`);

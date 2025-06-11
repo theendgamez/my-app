@@ -72,11 +72,35 @@ interface TicketUpdate {
     // Update the ticket
     await db.tickets.update(ticketId, updateData);
     
-    return NextResponse.json({
+    // Log status change for real-time tracking
+    console.log(`Ticket ${ticketId} status updated to ${status} by admin ${currentUser.userId} at ${new Date().toISOString()}`);
+    
+    // If marking as used, also log to audit trail
+    if (status === 'used') {
+      await db.ticketAudit.log({
+        ticketId,
+        userId: currentUser.userId,
+        action: 'admin_verify',
+        timestamp: new Date().toISOString(),
+        details: `Admin ${currentUser.userName || currentUser.userId} marked ticket as used`,
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        userRole: 'Admin'
+      });
+    }
+    
+    const response = NextResponse.json({
       success: true,
       message: `票券狀態已更新為 ${status}`,
-      usageTimestamp: updateData.verificationInfo?.usageTimestamp || null
+      usageTimestamp: updateData.verificationInfo?.usageTimestamp || null,
+      timestamp: Date.now() // Add server timestamp for client sync
     });
+    
+    // Add headers to bust any cached data
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('X-Status-Updated', 'true');
+    response.headers.set('X-Update-Timestamp', Date.now().toString());
+    
+    return response;
   } catch (error) {
     console.error('Error updating ticket status:', error);
     return NextResponse.json(
